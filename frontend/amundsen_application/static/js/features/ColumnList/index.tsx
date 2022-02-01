@@ -43,6 +43,8 @@ import { logAction } from 'utils/analytics';
 import { buildTableKey, TablePageParams } from 'utils/navigationUtils';
 import { getUniqueValues, filterOutUniqueValues } from 'utils/stats';
 
+import { GraphIcon } from 'components/SVGIcons/GraphIcon';
+
 import ColumnType from './ColumnType';
 import ColumnDescEditableText from './ColumnDescEditableText';
 import ColumnStats from './ColumnStats';
@@ -55,7 +57,6 @@ import {
 } from './constants';
 
 import './styles.scss';
-import { GraphIcon } from 'components/SVGIcons/GraphIcon';
 
 export interface ComponentProps {
   columns: TableColumn[];
