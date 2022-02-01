@@ -55,6 +55,7 @@ import {
 } from './constants';
 
 import './styles.scss';
+import { GraphIcon } from 'components/SVGIcons/GraphIcon';
 
 export interface ComponentProps {
   columns: TableColumn[];
@@ -259,13 +260,13 @@ const ColumnList: React.FC<ColumnListProps> = ({
       children: item.children,
       sort_order: item.sort_order,
       usage: getUsageStat(item),
-      stats: hasItemStats ? item.stats : null,
       badges: hasColumnBadges ? item.badges : [],
       action: {
         name: item.name,
         isActionEnabled: !item.nested_level,
       },
       name: item.name,
+      stats: hasItemStats ? item.stats : null,
       isEditable: item.is_editable,
       isExpandable: !item.nested_level,
       editText: editText || null,
@@ -418,6 +419,21 @@ const ColumnList: React.FC<ColumnListProps> = ({
       },
     ];
   }
+
+  formattedColumns = [
+    ...formattedColumns,
+    {
+      title: '',
+      field: 'stats',
+      horAlign: TextAlignmentValues.right,
+      component: (stats) => {
+        if (stats != null && stats.length > 0) {
+          return <GraphIcon />;
+        }
+        return null;
+      },
+    },
+  ];
 
   const openedColumnsMap = {};
   const handleRowExpand = (rowValues) => {
