@@ -7,7 +7,7 @@ from amundsen_application.models.announcements import Announcements, Post
 from amundsen_application.base.base_announcement_client import BaseAnnouncementClient
 
 # 1.) Add contentful and rich_text_renderer to requirements.txt file
-# 2.) Configure contentful space with matching annoucement content model
+# 2.) Configure contentful space with matching announcement content model
 # 3.) Set the three application configuration variables
 class ContentfulAnnouncementClient(BaseAnnouncementClient):
     def __init__(self) -> None:
