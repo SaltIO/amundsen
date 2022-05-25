@@ -342,17 +342,33 @@ class DbtExtractor(Extractor):
                                         table_name=tbl_metadata.name,
                                         source=os.path.join(self._source_url, manifest_content.get('original_file_path')))
 
-        LOGGER.info(f'Extracting lineage? [{self._extract_lineage}]')
+        LOGGER.info(f'dbt_id_to_table_key = {dbt_id_to_table_key}')
         if self._extract_lineage:
             LOGGER.info('Extracting lineage...')
+            LOGGER.info(f'self._extract_sources = {self._extract_sources}')
+            LOGGER.info(f"self._dbt_manifest['child_map'].items() = {self._dbt_manifest['child_map'].items()}")
             for upstream, downstreams in self._dbt_manifest['child_map'].items():
+                LOGGER.info(f'upstream={upstream}')
+                LOGGER.info(f'downstreams={downstreams}')
                 if upstream not in dbt_id_to_table_key:
+                    LOGGER.info(f'upstream not in dbt_id_to_table_key')
                     continue
-                valid_downstreams = [
-                    dbt_id_to_table_key[k] for k in downstreams
-                    # Adding lineage for models and sources (if _extract_sources == True)
-                    if ((self._extract_sources and k.startswith(DBT_SOURCE_PREFIX)) or k.startswith(DBT_MODEL_PREFIX)) and dbt_id_to_table_key.get(k)
-                ]
+                # valid_downstreams = [
+                #     dbt_id_to_table_key[k] for k in downstreams
+                #     # Adding lineage for models and sources (if _extract_sources == True)
+                #     if ((self._extract_sources and k.startswith(DBT_SOURCE_PREFIX)) or k.startswith(DBT_MODEL_PREFIX)) and dbt_id_to_table_key.get(k)
+                # ]
+
+                valid_downstreams = []
+                for k in downstreams:
+                    LOGGER.info(f'downstream={k}')
+                    if (self._extract_sources and k.startswith(DBT_SOURCE_PREFIX)) and dbt_id_to_table_key.get(k):
+                        LOGGER.info(f'downstream is a source and was found in dbt_id_to_table_key')
+                        valid_downstreams.append(dbt_id_to_table_key[k])
+                    elif k.startswith(DBT_MODEL_PREFIX) and dbt_id_to_table_key.get(k):
+                        LOGGER.info(f'downstream is a model and was found in dbt_id_to_table_key')
+                        valid_downstreams.append(dbt_id_to_table_key[k])
+
                 if valid_downstreams:
                     LOGGER.info(f'Valid downstreams: {valid_downstreams}')
                     yield TableLineage(
