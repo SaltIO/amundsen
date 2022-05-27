@@ -35,8 +35,8 @@ import {
 } from 'config/config-utils';
 
 import BadgeList from 'features/BadgeList';
-import ColumnList, { FormattedDataType } from 'features/ColumnList';
-import ColumnDetailsView from 'features/ColumnList/ColumnDetailsPanel';
+import ColumnList from 'features/ColumnList';
+import ColumnDetailsPanel from 'features/ColumnList/ColumnDetailsPanel';
 
 import Alert from 'components/Alert';
 import BookmarkIcon from 'components/Bookmark/BookmarkIcon';
@@ -67,6 +67,7 @@ import {
   Lineage,
   TableApp,
 } from 'interfaces';
+import { FormattedDataType } from 'interfaces/ColumnList';
 
 import DataPreviewButton from './DataPreviewButton';
 import ExploreButton from './ExploreButton';
@@ -239,7 +240,12 @@ export class TableDetail extends React.Component<
 
     return descriptions.map((d) => (
       <EditableSection key={`prog_desc:${d.source}`} title={d.source} readOnly>
-        <EditableText maxLength={999999} value={d.text} editable={false} />
+        <EditableText
+          maxLength={999999}
+          value={d.text}
+          editable={false}
+          allowDangerousHtml
+        />
       </EditableSection>
     ));
   };
@@ -262,11 +268,17 @@ export class TableDetail extends React.Component<
     const { isRightPanelPreExpanded } = this.state;
     const { getColumnLineageDispatch } = this.props;
 
-    let colIndex = -1;
+    if (isRightPanelPreExpanded) {
+      return;
+    }
+
+    let key = '';
     if (columnDetails) {
-      const { name, tableParams } = columnDetails;
-      ({ col_index: colIndex } = columnDetails);
-      getColumnLineageDispatch(buildTableKey(tableParams), name);
+      ({ key } = columnDetails);
+      if (!columnDetails.isNestedColumn) {
+        const { name, tableParams } = columnDetails;
+        getColumnLineageDispatch(buildTableKey(tableParams), name);
+      }
     }
 
     if (!isRightPanelPreExpanded && colIndex >= 0) {
@@ -279,26 +291,36 @@ export class TableDetail extends React.Component<
     }
   };
 
-  toggleRightPanel = (
-    newColumnDetails: FormattedDataType | undefined,
-    event
-  ) => {
-    const { isRightPanelOpen, selectedColumnIndex } = this.state;
+  toggleRightPanel = (newColumnDetails: FormattedDataType | undefined) => {
+    const { isRightPanelOpen, selectedColumnKey } = this.state;
     const { getColumnLineageDispatch } = this.props;
 
-    if (event) {
-      logClick(event);
-    }
-
-    let colIndex = -1;
+    let key = '';
     if (newColumnDetails) {
-      const { name, tableParams } = newColumnDetails;
-      ({ col_index: colIndex } = newColumnDetails);
-      getColumnLineageDispatch(buildTableKey(tableParams), name);
+      ({ key } = newColumnDetails);
     }
 
     const shouldPanelOpen =
-      (colIndex >= 0 && colIndex !== selectedColumnIndex) || !isRightPanelOpen;
+      (key && key !== selectedColumnKey) || !isRightPanelOpen;
+
+    if (
+      shouldPanelOpen &&
+      newColumnDetails &&
+      !newColumnDetails.isNestedColumn
+    ) {
+      const { name, tableParams } = newColumnDetails;
+      getColumnLineageDispatch(buildTableKey(tableParams), name);
+    }
+
+    if (newColumnDetails && shouldPanelOpen) {
+      logAction({
+        command: 'click',
+        label: `${newColumnDetails.key} ${newColumnDetails.type.type}`,
+        target_id: `column::${newColumnDetails.key}`,
+        target_type: 'column stats',
+      });
+    }
+
     this.setState({
       isRightPanelOpen: shouldPanelOpen,
       selectedColumnIndex: shouldPanelOpen ? colIndex : -1,
@@ -340,7 +362,9 @@ export class TableDetail extends React.Component<
           editText={editText}
           editUrl={editUrl}
           sortBy={sortedBy}
-          columnToPreExpand={selectedColumn}
+          preExpandPanelKey={
+            selectedColumn ? tableData.key + '/' + selectedColumn : undefined
+          }
           preExpandRightPanel={this.preExpandRightPanel}
           hideSomeColumnMetadata={isRightPanelOpen}
           toggleRightPanel={this.toggleRightPanel}
