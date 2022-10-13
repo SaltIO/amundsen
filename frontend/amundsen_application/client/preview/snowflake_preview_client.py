@@ -34,12 +34,24 @@ class SnowflakePreviewClient(FactoryBasePreviewClient):
         logging.info(f"role={self.role}")
         logging.info(f"username={self.username}")
 
+    def _is_preview_client_configured(self) -> bool:
+        return (self.account_identifier is not None and \
+                self.warehouse is not None and \
+                self.role is not None and \
+                self.username is not None and \
+                self.password is not None)
+
     def is_supported_preview_source(self, params: Dict, optionalHeaders: Dict = None) -> bool:
         warehouse_type = params.get('database')
         if warehouse_type is not None and \
            warehouse_type.lower() == 'snowflake':
-            return True
+            if self._is_preview_client_configured():
+                return True
+            else:
+                logging.warn('Table preview supported for source Snowflake, but the SnowflakePreviewClient was not setup correctly')
+                return False
         else:
+            logging.info('Skipping Snowflake table preview for non-Dremio table')
             return False
 
     def get_feature_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:

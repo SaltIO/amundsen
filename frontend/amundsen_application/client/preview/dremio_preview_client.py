@@ -1,6 +1,7 @@
 
 from http import HTTPStatus
 import logging
+import os
 from typing import Dict  # noqa: F401
 
 from flask import Response, jsonify, make_response, current_app as app
@@ -37,12 +38,12 @@ class DremioPreviewClient(FactoryBasePreviewClient):
     SQL_STATEMENT = 'SELECT * FROM {schema}."{table}" LIMIT 50'
 
     def __init__(self,) -> None:
-        self.url = app.config['PREVIEW_CLIENT_URL']
-        self.username = app.config['PREVIEW_CLIENT_DREMIO_USERNAME']
-        self.password = app.config['PREVIEW_CLIENT_DREMIO_PASSWORD']
+        self.url = os.getenv('PREVIEW_CLIENT_URL')
+        self.username = os.getenv('PREVIEW_CLIENT_DREMIO_USERNAME')
+        self.password = os.getenv('PREVIEW_CLIENT_DREMIO_PASSWORD')
 
         self.connection_args: Dict[str, bytes] = {}
-        tls_root_certs_path = app.config['PREVIEW_CLIENT_DREMIO_CERTIFICATE']
+        tls_root_certs_path = os.getenv('PREVIEW_CLIENT_DREMIO_CERTIFICATE')
         if tls_root_certs_path is not None:
             with open(tls_root_certs_path, "rb") as f:
                 self.connection_args["tls_root_certs"] = f.read()
@@ -53,12 +54,16 @@ class DremioPreviewClient(FactoryBasePreviewClient):
                 self.password is not None)
 
     def is_supported_preview_source(self, params: Dict, optionalHeaders: Dict = None) -> bool:
-        
         warehouse_type = params.get('database')
         if warehouse_type is not None and \
            warehouse_type.lower() == 'dremio':
-            return True
+            if self._is_preview_client_configured():
+                return True
+            else:
+                logging.warn('Table preview supported for source Dremio, but the DremioPreviewClient was not setup correctly')
+                return False
         else:
+            logging.info('Skipping Dremio table preview for non-Dremio table')
             return False
 
     def get_feature_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:
@@ -71,8 +76,7 @@ class DremioPreviewClient(FactoryBasePreviewClient):
     def get_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:
         """Preview data from Dremio source
         """
-        if not self.is_supported_preview_source(params, optionalHeaders):
-            logging.info('Skipping table preview for non-Dremio table')
+        if not self.is_supported_preview_source(params, optionalHeaders):            
             return make_response(jsonify({'preview_data': {}}), HTTPStatus.OK)
 
         try:
