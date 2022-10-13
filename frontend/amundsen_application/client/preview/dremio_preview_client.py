@@ -38,7 +38,7 @@ class DremioPreviewClient(FactoryBasePreviewClient):
     SQL_STATEMENT = 'SELECT * FROM {schema}."{table}" LIMIT 50'
 
     def __init__(self,) -> None:
-        self.url = os.getenv('PREVIEW_CLIENT_URL')
+        self.url = os.getenv('PREVIEW_CLIENT_DREMIO_URL')
         self.username = os.getenv('PREVIEW_CLIENT_DREMIO_USERNAME')
         self.password = os.getenv('PREVIEW_CLIENT_DREMIO_PASSWORD')
 
