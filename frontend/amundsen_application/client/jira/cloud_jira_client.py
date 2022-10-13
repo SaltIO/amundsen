@@ -120,6 +120,7 @@ class CloudJiraClient(BaseIssueTrackerClient):
         try:
             if app.config['AUTH_USER_METHOD']:
                 user_email = app.config['AUTH_USER_METHOD'](app).email
+                # The reporter is hardcoded due to not wanting all users to have JIRA accounts
                 reporter = {'name': 'zac'}
                 # We currently cannot use the email directly because of the following issue:
                 # https://community.atlassian.com/t5/Answers-Developer-Questions/JIRA-Rest-API-find-JIRA-user-based-on-user-s-email-address/qaq-p/532715
