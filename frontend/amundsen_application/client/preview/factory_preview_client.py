@@ -6,13 +6,13 @@ from typing import Dict  # noqa: F401
 
 from flask import Response, jsonify, make_response
 
-from amundsen_application.client.preview.source_selector_base_preview_client import FactoryBasePreviewClient
+from amundsen_application.client.preview.factory_base_preview_client import FactoryBasePreviewClient
 from amundsen_application.client.preview.dremio_preview_client import DremioPreviewClient
 from amundsen_application.client.preview.snowflake_preview_client import SnowflakePreviewClient  # noqa: F401
 from amundsen_application.base.base_superset_preview_client import BasePreviewClient
 
 
-class SourceSelectorPreviewClient(BasePreviewClient):
+class FactoryPreviewClient(BasePreviewClient):
 
     def __init__(self,) -> None:
         self.dremio_preview_client: FactoryBasePreviewClient = DremioPreviewClient()
