@@ -11,10 +11,10 @@ from marshmallow import ValidationError
 
 # from amundsen_application.base.base_superset_preview_client import BasePreviewClient
 from amundsen_application.models.preview_data import PreviewData, PreviewDataSchema, ColumnItem
-from amundsen_application.client.preview.source_selector_base_preview_client import SourceSelectorBasePreviewClient
+from amundsen_application.client.preview.factory_base_preview_client import FactoryBasePreviewClient
 
 # Consider a multi-database preview client
-class SnowflakePreviewClient(SourceSelectorBasePreviewClient):
+class SnowflakePreviewClient(FactoryBasePreviewClient):
 
     SQL_STATEMENT = 'SELECT * FROM {database}.{schema}.{table} LIMIT 50'
     SNOWFLAKE_CONN_STR = 'snowflake://{user}:{password}@{account_identifier}/{database}/{schema}>?warehouse={warehouse}&role={role}'

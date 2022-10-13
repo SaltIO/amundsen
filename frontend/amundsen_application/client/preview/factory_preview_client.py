@@ -6,7 +6,7 @@ from typing import Dict  # noqa: F401
 
 from flask import Response, jsonify, make_response
 
-from amundsen_application.client.preview.source_selector_base_preview_client import SourceSelectorBasePreviewClient
+from amundsen_application.client.preview.source_selector_base_preview_client import FactoryBasePreviewClient
 from amundsen_application.client.preview.dremio_preview_client import DremioPreviewClient
 from amundsen_application.client.preview.snowflake_preview_client import SnowflakePreviewClient  # noqa: F401
 from amundsen_application.base.base_superset_preview_client import BasePreviewClient
@@ -15,8 +15,8 @@ from amundsen_application.base.base_superset_preview_client import BasePreviewCl
 class SourceSelectorPreviewClient(BasePreviewClient):
 
     def __init__(self,) -> None:
-        self.dremio_preview_client: SourceSelectorBasePreviewClient = DremioPreviewClient()
-        self.snowflake_preview_client: SourceSelectorBasePreviewClient = SnowflakePreviewClient()
+        self.dremio_preview_client: FactoryBasePreviewClient = DremioPreviewClient()
+        self.snowflake_preview_client: FactoryBasePreviewClient = SnowflakePreviewClient()
 
 
     def get_feature_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:

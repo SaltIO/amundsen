@@ -8,7 +8,7 @@ from marshmallow import ValidationError
 from pyarrow import flight
 
 from amundsen_application.models.preview_data import PreviewData, PreviewDataSchema, ColumnItem
-from amundsen_application.client.preview.source_selector_base_preview_client import SourceSelectorBasePreviewClient
+from amundsen_application.client.preview.factory_base_preview_client import FactoryBasePreviewClient
 
 
 class _DremioAuthHandler(flight.ClientAuthHandler):
@@ -32,7 +32,7 @@ class _DremioAuthHandler(flight.ClientAuthHandler):
         return self.token
 
 
-class DremioPreviewClient(SourceSelectorBasePreviewClient):
+class DremioPreviewClient(FactoryBasePreviewClient):
 
     SQL_STATEMENT = 'SELECT * FROM {schema}."{table}" LIMIT 50'
 
@@ -47,7 +47,13 @@ class DremioPreviewClient(SourceSelectorBasePreviewClient):
             with open(tls_root_certs_path, "rb") as f:
                 self.connection_args["tls_root_certs"] = f.read()
 
+    def _is_preview_client_configured(self) -> bool:
+        return (self.url is not None and \
+                self.username is not None and \
+                self.password is not None)
+
     def is_supported_preview_source(self, params: Dict, optionalHeaders: Dict = None) -> bool:
+        
         warehouse_type = params.get('database')
         if warehouse_type is not None and \
            warehouse_type.lower() == 'dremio':
