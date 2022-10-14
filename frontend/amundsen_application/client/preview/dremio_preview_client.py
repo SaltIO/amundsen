@@ -48,6 +48,10 @@ class DremioPreviewClient(FactoryBasePreviewClient):
             with open(tls_root_certs_path, "rb") as f:
                 self.connection_args["tls_root_certs"] = f.read()
 
+        logging.info(f"url={self.url}")
+        logging.info(f"connection_args={self.connection_args}")
+        logging.info(f"username={self.username}")
+
     def _is_preview_client_configured(self) -> bool:
         return (self.url is not None and \
                 self.username is not None and \
@@ -63,7 +67,7 @@ class DremioPreviewClient(FactoryBasePreviewClient):
                 logging.warn('Table preview supported for source Dremio, but the DremioPreviewClient was not setup correctly')
                 return False
         else:
-            logging.info('Skipping Dremio table preview for non-Dremio table')
+            logging.info(f'Skipping Dremio table preview for non-Dremio ({warehouse_type}) table')
             return False
 
     def get_feature_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:

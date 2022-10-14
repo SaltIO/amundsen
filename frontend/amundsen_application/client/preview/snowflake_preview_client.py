@@ -51,7 +51,7 @@ class SnowflakePreviewClient(FactoryBasePreviewClient):
                 logging.warn('Table preview supported for source Snowflake, but the SnowflakePreviewClient was not setup correctly')
                 return False
         else:
-            logging.info('Skipping Snowflake table preview for non-Dremio table')
+            logging.info(f'Skipping Snowflake table preview for non-Snowflake ({warehouse_type}) table')
             return False
 
     def get_feature_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:
@@ -66,7 +66,6 @@ class SnowflakePreviewClient(FactoryBasePreviewClient):
         """
         
         if not self.is_supported_preview_source(params, optionalHeaders):
-            logging.info('Skipping table preview for non-Snowflake table')
             return make_response(jsonify({'preview_data': {}}), HTTPStatus.OK)
 
         try:
