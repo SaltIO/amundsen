@@ -111,11 +111,11 @@ class DremioPreviewClient(FactoryBasePreviewClient):
                 payload = jsonify({'preview_data': data})
                 return make_response(payload, HTTPStatus.OK)
             except ValidationError as err:
-                logging.error(f'Error(s) occurred while building preview data: {err.messages}')
+                logging.exception(f'ValidationError occurred while building preview data: {err.messages}')
                 payload = jsonify({'preview_data': {}})
                 return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         except Exception as e:
-            logging.error(f'Encountered exception: {e}')
+            logging.exception(f'DremioPreviewClient exception: ')
             payload = jsonify({'preview_data': {}})
             return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
