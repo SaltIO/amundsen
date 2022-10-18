@@ -43,6 +43,7 @@ class SqlAlchemyBasePreviewClient(FactoryBasePreviewClient):
         if not self.is_supported_preview_source(params, optionalHeaders):
             return make_response(jsonify({'preview_data': {}}), HTTPStatus.OK)
 
+        engine = None
         try:
             conn_str = self.get_conn_str(params=params, optionalHeaders=optionalHeaders)
             logging.info(f"conn_str={conn_str}")

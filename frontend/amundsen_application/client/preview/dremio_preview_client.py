@@ -17,7 +17,7 @@ from amundsen_application.client.preview.sqlalchemy_base_preview_client import S
 class DremioPreviewClient(SqlAlchemyBasePreviewClient):
 
     SQL_STATEMENT = 'SELECT * FROM {schema}."{table}" LIMIT 50'
-    CONN_STR = 'dremio://{username}:{password}@{host}}:{port}}/dremio;SSL=0'
+    CONN_STR = 'dremio://{username}:{password}@{host}:{port}/dremio;SSL=0'
 
 
     def __init__(self,) -> None:
