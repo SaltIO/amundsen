@@ -10,12 +10,11 @@ from pyarrow import flight
 
 from sqlalchemy import create_engine
 
-from amundsen_application.models.preview_data import PreviewData, PreviewDataSchema, ColumnItem
-from amundsen_application.client.preview.factory_base_preview_client import FactoryBasePreviewClient
+from amundsen_application.client.preview.sqlalchemy_base_preview_client import SqlAlchemyBasePreviewClient
 
 
 
-class DremioPreviewClient(FactoryBasePreviewClient):
+class DremioPreviewClient(SqlAlchemyBasePreviewClient):
 
     SQL_STATEMENT = 'SELECT * FROM {schema}."{table}" LIMIT 50'
     CONN_STR = 'dremio://{username}:{password}@{host}}:{port}}/dremio;SSL=0'

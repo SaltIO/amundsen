@@ -14,13 +14,10 @@ from amundsen_application.models.preview_data import PreviewData, PreviewDataSch
 from amundsen_application.client.preview.factory_base_preview_client import FactoryBasePreviewClient
 
 # Consider a multi-database preview client
-class SQLAlchemyBasePreviewClient(FactoryBasePreviewClient):
+class SqlAlchemyBasePreviewClient(FactoryBasePreviewClient):
 
     
     def __init__(self,) -> None:
-        pass
-
-    def _is_preview_client_configured(self) -> bool:
         pass
 
     def is_supported_preview_source(self, params: Dict, optionalHeaders: Dict = None) -> bool:
