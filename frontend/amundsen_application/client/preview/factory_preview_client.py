@@ -33,7 +33,7 @@ class FactoryPreviewClient(BasePreviewClient):
                 break
     
         if response == None:
-            logging.warn(f'Unsupported dataset source for preview client: {params}')
+            logging.warning(f'Unsupported dataset source for preview client: {params}')
             response = make_response(jsonify({'preview_data': {}}), HTTPStatus.OK)
         
         return response

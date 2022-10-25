@@ -12,10 +12,12 @@ class MsSqlPreviewClient(SqlAlchemyBasePreviewClient):
     
 
     def __init__(self,) -> None:
+        self.host = os.getenv("PREVIEW_CLIENT_MSSQL_HOST")
         self.driver = os.getenv("PREVIEW_CLIENT_MSSQL_DRIVER")
         self.username = os.getenv("PREVIEW_CLIENT_MSSQL_USERNAME")
         self.password = os.getenv("PREVIEW_CLIENT_MSSQL_PASSWORD")
 
+        logging.info(f"host={self.host}")
         logging.info(f"driver={self.driver}")
         logging.info(f"username={self.username}")
 
@@ -52,7 +54,8 @@ class MsSqlPreviewClient(SqlAlchemyBasePreviewClient):
             user=self.username,
             password=self.password,
             driver=self.driver,
-            database=database
+            database=database,
+            host=self.host
         )
 
         return conn_str
