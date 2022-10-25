@@ -8,7 +8,7 @@ from amundsen_application.client.preview.sqlalchemy_base_preview_client import S
 class MsSqlPreviewClient(SqlAlchemyBasePreviewClient):
 
     SQL_STATEMENT = 'SELECT * FROM {schema}.{table} LIMIT 50'
-    CONN_STR = 'mssql+pyodbc://{user}:{password}@{host}/{database}?driver={driver}}'
+    CONN_STR = 'mssql+pyodbc://{user}:{password}@{host}/{database}?driver={driver}'
     
 
     def __init__(self,) -> None:
