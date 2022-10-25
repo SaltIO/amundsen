@@ -7,7 +7,7 @@ from amundsen_application.client.preview.sqlalchemy_base_preview_client import S
 
 class SnowflakePreviewClient(SqlAlchemyBasePreviewClient):
 
-    SQL_STATEMENT = 'SELECT * FROM {database}.{schema}.{table} LIMIT 50;'
+    SQL_STATEMENT = 'SELECT * FROM {database}.{schema}.{table} LIMIT 50'
     CONN_STR = 'snowflake://{user}:{password}@{account_identifier}/{database}/{schema}>?warehouse={warehouse}&role={role}'
     
 
