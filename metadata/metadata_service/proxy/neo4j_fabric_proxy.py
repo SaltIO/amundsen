@@ -60,6 +60,8 @@ class Neo4jFabricProxy(Neo4jProxy):
             if len(as_split) == 1:
                 if RETURN_SPECIAL_CHAR_RE.search(as_split[0]) == None:
                     cleaned_return_statement += as_split[0]
+                else:
+                    continue
             else:
                 cleaned_return_statement += as_split[1]
             cleaned_return_statement += ','
