@@ -24,6 +24,7 @@ PROXY_CLIENT_KWARGS = 'PROXY_CLIENT_KWARGS'
 
 PROXY_CLIENTS = {
     'NEO4J': 'metadata_service.proxy.neo4j_proxy.Neo4jProxy',
+    'NEO4J_FABRIC': 'metadata_service.proxy.neo4j_fabric_proxy.Neo4jFabricProxy',
     'ATLAS': 'metadata_service.proxy.atlas_proxy.AtlasProxy',
     'NEPTUNE': 'metadata_service.proxy.neptune_proxy.NeptuneGremlinProxy',
     'MYSQL': 'metadata_service.proxy.mysql_proxy.MySQLProxy'
