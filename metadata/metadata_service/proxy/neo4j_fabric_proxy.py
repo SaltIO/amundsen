@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import re
+import logging
 import textwrap
 from typing import (Tuple)  # noqa: F401
 
@@ -13,6 +14,7 @@ from metadata_service.proxy.neo4j_proxy import Neo4jProxy
 from metadata_service.proxy.statsd_utilities import timer_with_counter
 from metadata_service.util import UserResourceRel
 
+LOGGER = logging.getLogger(__name__)
 
 class Neo4jFabricProxy(Neo4jProxy):
     """
@@ -53,7 +55,7 @@ class Neo4jFabricProxy(Neo4jProxy):
             }}
             {return_statement}
         """)
-        Neo4jProxy.LOGGER.info(f"_fabric_query_statement={fabric_statement}")
+        Neo4jFabricProxy.LOGGER.info(f"_fabric_query_statement={fabric_statement}")
         return fabric_statement
 
     def _get_col_query_statement(self) -> str:
