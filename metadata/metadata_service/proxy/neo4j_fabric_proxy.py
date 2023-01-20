@@ -54,8 +54,9 @@ class Neo4jFabricProxy(Neo4jProxy):
                 cleaned_return_statement += as_split[0]
             else:
                 cleaned_return_statement += as_split[1]
+            cleaned_return_statement += ','
 
-        return cleaned_return_statement
+        return cleaned_return_statement[0: -1]
 
     def _fabric_query_statement(self, fabric_db_name: str, statement: str) -> str:
         fabric_statement = textwrap.dedent(f"""
