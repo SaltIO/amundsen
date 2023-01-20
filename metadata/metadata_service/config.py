@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Set  # noqa: F401
 
 import boto3
 from flask import Flask  # noqa: F401
+import neo4j
 
 from metadata_service.entity.badge import Badge
 
@@ -118,6 +119,8 @@ class LocalConfig(Config):
 
     SWAGGER_ENABLED = True
 
+class LocalFederatedConfig(LocalConfig):
+    PROXY_DATABASE_NAME = os.environ.get('PROXY_DATABASE_NAME', neo4j.DEFAULT_DATABASE)
 
 class AtlasConfig(LocalConfig):
     PROXY_HOST = os.environ.get('PROXY_HOST', 'localhost')
