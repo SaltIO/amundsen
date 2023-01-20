@@ -16,6 +16,8 @@ from metadata_service.util import UserResourceRel
 
 LOGGER = logging.getLogger(__name__)
 
+RETURN_SPECIAL_CHAR_RE = re.compile('()}{')
+
 class Neo4jFabricProxy(Neo4jProxy):
     """
     A proxy to Neo4j (Gateway to Neo4j)
@@ -52,9 +54,11 @@ class Neo4jFabricProxy(Neo4jProxy):
         return_statement = re.split('order by ', return_statement, flags=re.IGNORECASE)[0]
         LOGGER.info(f"orig return statement={return_statement}")
         for column in return_statement.split(','):
+            LOGGER.info(f"column={column}")
             as_split = re.split(' as ', column, flags=re.IGNORECASE)
             if len(as_split) == 1:
-                cleaned_return_statement += as_split[0]
+                if RETURN_SPECIAL_CHAR_RE.search(as_split[0]) == None:
+                    cleaned_return_statement += as_split[0]
             else:
                 cleaned_return_statement += as_split[1]
             cleaned_return_statement += ','
