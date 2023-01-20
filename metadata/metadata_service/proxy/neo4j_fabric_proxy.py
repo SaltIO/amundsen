@@ -31,16 +31,16 @@ class Neo4jFabricProxy(Neo4jProxy):
                  database_name: str = neo4j.DEFAULT_DATABASE,
                  **kwargs: dict) -> None:
         super().__init__(
-            host,
-            port,
-            user,
-            password,
-            num_conns,
-            max_connection_lifetime_sec,
-            encrypted,
-            validate_ssl,
-            database_name,
-            **kwargs
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            num_conns=num_conns,
+            max_connection_lifetime_sec=max_connection_lifetime_sec,
+            encrypted=encrypted,
+            validate_ssl=validate_ssl,
+            database_name=database_name,
+            kwargs=kwargs
         )
     
     def _fabric_query_statement(self, fabric_db_name: str, statement: str) -> str:
