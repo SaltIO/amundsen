@@ -55,7 +55,7 @@ class Neo4jFabricProxy(Neo4jProxy):
             }}
             {return_statement}
         """)
-        Neo4jFabricProxy.LOGGER.info(f"_fabric_query_statement={fabric_statement}")
+        LOGGER.info(f"_fabric_query_statement={fabric_statement}")
         return fabric_statement
 
     def _get_col_query_statement(self) -> str:
