@@ -47,14 +47,17 @@ class Neo4jFabricProxy(Neo4jProxy):
     
     def _prepare_return_statement(self, statement: str) -> str:
         cleaned_return_statement = "RETURN "
+        LOGGER.info(f"orig statement={statement}")
         return_statement = re.split('return ', statement, flags=re.IGNORECASE)[1]
+        LOGGER.info(f"orig return statement={return_statement}")
         for column in return_statement.split(','):
-            as_split = re.split(' as ', statement, flags=re.IGNORECASE)
+            as_split = re.split(' as ', column, flags=re.IGNORECASE)
             if len(as_split) == 1:
                 cleaned_return_statement += as_split[0]
             else:
                 cleaned_return_statement += as_split[1]
             cleaned_return_statement += ','
+        LOGGER.info(f"cleaned return statement={cleaned_return_statement}")
 
         return cleaned_return_statement[0: -1]
 
