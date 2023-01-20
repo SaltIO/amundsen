@@ -1275,7 +1275,7 @@ class Neo4jProxy(BaseProxy):
         # query = textwrap.dedent("""
         # MATCH (n:Updatedtimestamp{key: 'amundsen_updated_timestamp'}) RETURN n as ts
         # """)
-        quert = self._get_latest_updated_ts_query_statement()
+        query = self._get_latest_updated_ts_query_statement()
         record = self._execute_cypher_query(statement=query,
                                             param_dict={})
         # None means we don't have record for neo4j, es last updated / index ts

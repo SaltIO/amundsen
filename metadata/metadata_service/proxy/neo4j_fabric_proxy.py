@@ -45,15 +45,26 @@ class Neo4jFabricProxy(Neo4jProxy):
             kwargs=kwargs
         )
     
+    def _prepare_return_statement(statement: str) -> str:
+        cleaned_return_statement = "RETURN "
+        return_statement = re.split('return ', statement, flags=re.IGNORECASE)[1]
+        for column in return_statement.split(','):
+            as_split = re.split(' as ', statement, flags=re.IGNORECASE)
+            if len(as_split) == 1:
+                cleaned_return_statement += as_split[0]
+            else:
+                cleaned_return_statement += as_split[1]
+
+        return cleaned_return_statement
+
     def _fabric_query_statement(self, fabric_db_name: str, statement: str) -> str:
-        return_statement = f"RETURN {re.split('return ', statement, flags=re.IGNORECASE)[1]}"
         fabric_statement = textwrap.dedent(f"""
             UNWIND {fabric_db_name}.graphIds() AS graphId
             CALL {{
                 USE {fabric_db_name}.graph(graphId)
                 {statement.replace(';','')}
             }}
-            {return_statement}
+            {self._prepare_return_statement(statement)}
         """)
         LOGGER.info(f"_fabric_query_statement={fabric_statement}")
         return fabric_statement
