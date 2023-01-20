@@ -45,7 +45,7 @@ class Neo4jFabricProxy(Neo4jProxy):
             kwargs=kwargs
         )
     
-    def _prepare_return_statement(statement: str) -> str:
+    def _prepare_return_statement(self, statement: str) -> str:
         cleaned_return_statement = "RETURN "
         return_statement = re.split('return ', statement, flags=re.IGNORECASE)[1]
         for column in return_statement.split(','):
