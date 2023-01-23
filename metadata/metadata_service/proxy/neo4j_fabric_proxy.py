@@ -81,7 +81,7 @@ class Neo4jFabricProxy(Neo4jProxy):
         # Skip the last char, which should be the trailing comma
         return cleaned_return_statement[0: -1]
 
-    def _prepare_federated_query_statement(self, statement: str, federated_resource_type: ResourceType) -> str:   
+    def _prepare_federated_query_statement(self, statement: str, federated_resource_type: ResourceType = None) -> str:   
         
         resource_type = ("federated_resource:" + federated_resource_type.name if federated_resource_type is None else '')
         federated_statement = textwrap.dedent(f"""
@@ -91,7 +91,7 @@ class Neo4jFabricProxy(Neo4jProxy):
 
         return federated_statement
 
-    def _get_fabric_query_statement(self, fabric_db_name: str, statement: str, federated_resource_type: ResourceType) -> str:
+    def _get_fabric_query_statement(self, fabric_db_name: str, statement: str, federated_resource_type: ResourceType = None) -> str:
         fabric_statement = textwrap.dedent(f"""
             UNWIND {fabric_db_name}.graphIds() AS graphId
             CALL {{
