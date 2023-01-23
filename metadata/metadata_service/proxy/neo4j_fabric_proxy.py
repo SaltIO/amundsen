@@ -66,8 +66,8 @@ class Neo4jFabricProxy(Neo4jProxy):
         """
         LOGGER.info(f"orig statement={statement}")
         cleaned_return_statement = "RETURN "
-        return_statement = re.split(r'(^|\s)return($|\s)', statement, flags=re.IGNORECASE)[1]
-        return_statement = re.split(r'(^|\s)order by($|\s)', return_statement, flags=re.IGNORECASE)[0]
+        return_statement = re.split('return', statement, flags=re.IGNORECASE)[1]
+        return_statement = re.split('order by', return_statement, flags=re.IGNORECASE)[0]
         LOGGER.info(f"return_statement={return_statement}")
         for column in return_statement.split(','):
             as_split = re.split(' as ', column, flags=re.IGNORECASE)
