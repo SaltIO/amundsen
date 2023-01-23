@@ -65,8 +65,8 @@ class Neo4jFabricProxy(Neo4jProxy):
         column name.
         """
         cleaned_return_statement = "RETURN "
-        return_statement = re.split('/^return$/', statement, flags=re.IGNORECASE)[1]
-        return_statement = re.split('/^order by$/', return_statement, flags=re.IGNORECASE)[0]
+        return_statement = re.split(r'^return$', statement, flags=re.IGNORECASE)[1]
+        return_statement = re.split(r'^order by$', return_statement, flags=re.IGNORECASE)[0]
         for column in return_statement.split(','):
             as_split = re.split(' as ', column, flags=re.IGNORECASE)
             if len(as_split) == 1:
