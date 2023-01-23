@@ -68,6 +68,7 @@ class Neo4jFabricProxy(Neo4jProxy):
         cleaned_return_statement = "RETURN "
         return_statement = re.split(r'(^|\s)return($|\s)', statement, flags=re.IGNORECASE)[1]
         return_statement = re.split(r'(^|\s)order by($|\s)', return_statement, flags=re.IGNORECASE)[0]
+        LOGGER.info(f"return_statement={return_statement}")
         for column in return_statement.split(','):
             as_split = re.split(' as ', column, flags=re.IGNORECASE)
             if len(as_split) == 1:
@@ -79,6 +80,7 @@ class Neo4jFabricProxy(Neo4jProxy):
                 cleaned_return_statement += as_split[1]
             cleaned_return_statement += ','
         
+        LOGGER.info(f"cleaned_return_statement={cleaned_return_statement}")
         # Skip the last char, which should be the trailing comma
         return cleaned_return_statement[0: -1]
 
