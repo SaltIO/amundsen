@@ -83,7 +83,7 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _prepare_federated_query_statement(self, statement: str, federated_resource_type: ResourceType = None) -> str:   
         
-        resource_type = ("federated_resource:" + federated_resource_type.name if federated_resource_type is None else '')
+        resource_type = ("federated_resource:" + federated_resource_type.name if federated_resource_type is not None else '')
         federated_statement = textwrap.dedent(f"""
             MATCH ({resource_type})<-[:TAG]-(shared_tag:Tag {{key: "{self.federated_tag}"}})
             {statement.replace(';','')}
