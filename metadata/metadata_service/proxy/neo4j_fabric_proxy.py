@@ -4,16 +4,18 @@
 import re
 import logging
 import textwrap
-from typing import (Tuple)  # noqa: F401
+from typing import (Tuple, List)  # noqa: F401
 import os
 
 import neo4j
 from amundsen_common.entity.resource_type import ResourceType
-from amundsen_common.models.table import (User)
+from amundsen_common.models.table import (User, Reader)
+
 
 from metadata_service.proxy.neo4j_proxy import Neo4jProxy
 from metadata_service.proxy.statsd_utilities import timer_with_counter
 from metadata_service.util import UserResourceRel
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,8 +65,8 @@ class Neo4jFabricProxy(Neo4jProxy):
         column name.
         """
         cleaned_return_statement = "RETURN "
-        return_statement = re.split('return ', statement, flags=re.IGNORECASE)[1]
-        return_statement = re.split('order by ', return_statement, flags=re.IGNORECASE)[0]
+        return_statement = re.split('/^return$/', statement, flags=re.IGNORECASE)[1]
+        return_statement = re.split('/^order by$/', return_statement, flags=re.IGNORECASE)[0]
         for column in return_statement.split(','):
             as_split = re.split(' as ', column, flags=re.IGNORECASE)
             if len(as_split) == 1:
@@ -79,20 +81,22 @@ class Neo4jFabricProxy(Neo4jProxy):
         # Skip the last char, which should be the trailing comma
         return cleaned_return_statement[0: -1]
 
-    def _prepare_federated_query_statement(self, statement: str) -> str:   
+    def _prepare_federated_query_statement(self, statement: str, federated_resource_type: ResourceType) -> str:   
+        
+        resource_type = ("federated_resource:" + federated_resource_type.name if federated_resource_type is None else '')
         federated_statement = textwrap.dedent(f"""
-            MATCH ()-[:TAG]-(shared_tag:Tag {{key: "{self.federated_tag}"}})
+            MATCH ({resource_type})<-[:TAG]-(shared_tag:Tag {{key: "{self.federated_tag}"}})
             {statement.replace(';','')}
         """)
 
         return federated_statement
 
-    def _get_fabric_query_statement(self, fabric_db_name: str, statement: str) -> str:
+    def _get_fabric_query_statement(self, fabric_db_name: str, statement: str, federated_resource_type: ResourceType) -> str:
         fabric_statement = textwrap.dedent(f"""
             UNWIND {fabric_db_name}.graphIds() AS graphId
             CALL {{
                 USE {fabric_db_name}.graph(graphId)
-                {self._prepare_federated_query_statement(statement=statement)}
+                {self._prepare_federated_query_statement(statement=statement, federated_resource_type=federated_resource_type)}
             }}
             {self._prepare_federated_return_statement(statement=statement)}
         """)
@@ -102,8 +106,8 @@ class Neo4jFabricProxy(Neo4jProxy):
     def _get_col_query_statement(self) -> str:
         return self._get_fabric_query_statement(self._database_name, super()._get_col_query_statement())
 
-    def _get_usage_query_statement(self) -> str:
-        return self._get_fabric_query_statement(self._database_name, super()._get_usage_query_statement())
+    # def _get_usage_query_statement(self) -> str:
+    #     return self._get_fabric_query_statement(self._database_name, super()._get_usage_query_statement())
 
     def _get_table_query_statement(self) -> str:
         return self._get_fabric_query_statement(self._database_name, super()._get_table_query_statement())
@@ -176,6 +180,11 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _get_resource_generation_code_query_statement(self, resource_type: ResourceType) -> str:
         return self._get_fabric_query_statement(self._database_name, super()._get_resource_generation_code_query_statement(resource_type))
+
+    @timer_with_counter
+    def _exec_usage_query(self, table_uri: str) -> List[Reader]:
+        LOGGER.info('_exec_usage_query: Neo4fFabricProxy is does not support pulling User info from source')
+        return []
     
     @timer_with_counter
     def put_resource_description(self, *,
