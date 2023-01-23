@@ -64,9 +64,10 @@ class Neo4jFabricProxy(Neo4jProxy):
         chars in the column name, we assume it is some aggregation so we ignore it.  Otherwise, we use the proper
         column name.
         """
+        LOGGER.info(f"orig statement={statement}")
         cleaned_return_statement = "RETURN "
-        return_statement = re.split(r'^return$', statement, flags=re.IGNORECASE)[1]
-        return_statement = re.split(r'^order by$', return_statement, flags=re.IGNORECASE)[0]
+        return_statement = re.split(r'(^|\s)return($|\s)', statement, flags=re.IGNORECASE)[1]
+        return_statement = re.split(r'(^|\s)order by($|\s)', return_statement, flags=re.IGNORECASE)[0]
         for column in return_statement.split(','):
             as_split = re.split(' as ', column, flags=re.IGNORECASE)
             if len(as_split) == 1:
