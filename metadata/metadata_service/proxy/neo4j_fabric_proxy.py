@@ -85,14 +85,14 @@ class Neo4jFabricProxy(Neo4jProxy):
         # Skip the last char, which should be the trailing comma
         return cleaned_return_statement[0: -1]
 
-    def _prepare_federated_resource_tag_match_statement(self, resource_type: ResourceType) -> str:   
+    def _prepare_federated_resource_tag_match_statement(self, resource_type: ResourceType = None) -> str:   
         node_label = (f"{resource_type.name.lower()}:{resource_type.name}" if resource_type is not None else 'resource')
         federated_statement = textwrap.dedent(f"""
             MATCH (shared_tag:Tag {{key: "{self.federated_tag}"}})-[:TAG]->({node_label})
         """)
         return federated_statement
 
-    def _prepare_federated_query_statement(self, statement: str, resource_type: ResourceType) -> str:   
+    def _prepare_federated_query_statement(self, statement: str, resource_type: ResourceType = None) -> str:   
         federated_statement = textwrap.dedent(f"""
             {self._prepare_federated_resource_tag_match_statement(resource_type=resource_type)}
             {statement}
