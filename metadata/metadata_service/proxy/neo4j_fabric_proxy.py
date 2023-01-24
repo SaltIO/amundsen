@@ -118,7 +118,7 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _get_col_query_statement(self) -> str:
         return self._get_fabric_query_statement(self._database_name, 
-            self._prepare_federated_query_statement(statement=super()._get_usage_query_statement(), 
+            self._prepare_federated_query_statement(statement=super()._get_col_query_statement(), 
                 resource_type=ResourceType.Table))
 
     def _get_table_query_statement(self) -> str:
