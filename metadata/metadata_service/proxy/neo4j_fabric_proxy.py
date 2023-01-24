@@ -210,8 +210,8 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _get_dashboard_query_statement(self) -> str:
         statement = textwrap.dedent(f"""
-            {self._prepare_federated_resource_tag_match_statement(self, ResourceType.Table)}
-            {self._prepare_federated_resource_tag_match_statement(self, ResourceType.Dashboard)}
+            {self._prepare_federated_resource_tag_match_statement(ResourceType.Table)}
+            {self._prepare_federated_resource_tag_match_statement(ResourceType.Dashboard)}
             {super()._get_dashboard_query_statement()}
         """)
 
@@ -219,8 +219,8 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _get_resources_using_table_query_statement(self) -> str:
         statement = textwrap.dedent(f"""
-            {self._prepare_federated_resource_tag_match_statement(self, ResourceType.Table)}
-            {self._prepare_federated_resource_tag_match_statement(self, ResourceType.Dashboard)}
+            {self._prepare_federated_resource_tag_match_statement(ResourceType.Table)}
+            {self._prepare_federated_resource_tag_match_statement(ResourceType.Dashboard)}
             {super()._get_resources_using_table_query_statement()}
         """)
 
