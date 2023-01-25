@@ -208,14 +208,13 @@ class Neo4jFabricProxy(Neo4jProxy):
     # def _get_frequently_used_tables_query_statement(self) -> str:
     #     return self._get_fabric_query_statement(self._database_name, super()._get_frequently_used_tables_query_statement())
 
-    def _get_dashboard_query_statement(self) -> str:
-        statement = textwrap.dedent(f"""
-            {self._prepare_federated_resource_tag_match_statement(ResourceType.Table)}
-            {self._prepare_federated_resource_tag_match_statement(ResourceType.Dashboard)}
-            {super()._get_dashboard_query_statement()}
+    def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
+        table_where_clause = textwrap.dedent(f"""
+            WHERE exists({self._prepare_federated_resource_tag_match_statement(ResourceType.Table)})
         """)
-
-        return self._get_fabric_query_statement(self._database_name, statement)
+        return self._get_fabric_query_statement(self._database_name, 
+            self._prepare_federated_query_statement(statement=super()._get_dashboard_query_statement(table_where_clause), 
+                resource_type=ResourceType.Dashboard))
 
     def _get_resources_using_table_query_statement(self) -> str:
         statement = textwrap.dedent(f"""

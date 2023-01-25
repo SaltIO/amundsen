@@ -2019,9 +2019,9 @@ class Neo4jProxy(BaseProxy):
                 tx.rollback()
             raise e
 
-    def _get_dashboard_query_statement(self) -> str:
-        get_dashboard_detail_query = textwrap.dedent(u"""
-            MATCH (dashboard:Dashboard {key: $query_key})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+    def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
+        get_dashboard_detail_query = textwrap.dedent(f"""
+            MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
             OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
             OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution) WHERE split(last_exec.key, '/')[5] = '_last_execution'
             OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
@@ -2029,7 +2029,7 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (dashboard)-[:LAST_UPDATED_AT]->(t:Timestamp)
             OPTIONAL MATCH (dashboard)-[:OWNER]->(owner:User)
             WITH c, dg, dashboard, description, last_exec, last_success_exec, t, collect(owner) as owners
-            OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
+            OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag{{tag_type: $tag_normal_type}})
             OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badge:Badge)
             WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, collect(tag) as tags,
             collect(badge) as badges
@@ -2038,17 +2038,17 @@ class Neo4jProxy(BaseProxy):
             sum(read.read_count) as recent_view_count
             OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)
             WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
-            recent_view_count, collect({name: query.name, url: query.url, query_text: query.query_text}) as queries
+            recent_view_count, collect({{name: query.name, url: query.url, query_text: query.query_text}}) as queries
             OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)-[:HAS_CHART]->(chart:Chart)
             WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
             recent_view_count, queries, collect(chart) as charts
             OPTIONAL MATCH (dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)
-            <-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database)
+            <-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database) {table_where_clause}
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
             WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
             recent_view_count, queries, charts,
-            collect({name: table.name, schema: schema.name, cluster: cluster.name, database: db.name,
-            description: table_description.description}) as tables
+            collect({{name: table.name, schema: schema.name, cluster: cluster.name, database: db.name,
+            description: table_description.description}}) as tables
             RETURN
             c.name as cluster_name,
             dashboard.key as uri,
