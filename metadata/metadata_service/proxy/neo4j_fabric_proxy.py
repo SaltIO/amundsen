@@ -216,7 +216,7 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
         table_where_clause = textwrap.dedent(f"""
-            WHERE exists({self._prepare_federated_resource_tag_rel_statement(reseource_type=ResourceType.Table, include_tag_name=False)})
+            WHERE exists({self._prepare_federated_resource_tag_rel_statement(resource_type=ResourceType.Table, include_tag_name=False)})
         """)
         return self._get_fabric_query_statement(self._database_name, 
             self._prepare_federated_query_statement(statement=super()._get_dashboard_query_statement(table_where_clause), 
