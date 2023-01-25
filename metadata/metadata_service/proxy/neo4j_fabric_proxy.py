@@ -85,10 +85,16 @@ class Neo4jFabricProxy(Neo4jProxy):
         # Skip the last char, which should be the trailing comma
         return cleaned_return_statement[0: -1]
 
-    def _prepare_federated_resource_tag_match_statement(self, resource_type: ResourceType = None) -> str:   
+    def _prepare_federated_resource_tag_rel_statement(self, resource_type: ResourceType = None, include_tag_name: bool = True) -> str:   
         node_label = (f"{resource_type.name.lower()}:{resource_type.name}" if resource_type is not None else 'resource')
         federated_statement = textwrap.dedent(f"""
-            MATCH (shared_tag:Tag {{key: "{self.federated_tag}"}})-[:TAG]->({node_label})
+            ({'shared_tag' if include_tag_name == True else ''}:Tag {{key: "{self.federated_tag}"}})-[:TAG]->({node_label})
+        """)
+        return federated_statement
+
+    def _prepare_federated_resource_tag_match_statement(self, resource_type: ResourceType = None) -> str:   
+        federated_statement = textwrap.dedent(f"""
+            MATCH {self._prepare_federated_resource_tag_rel_statement(resource_type=resource_type)}
         """)
         return federated_statement
 
@@ -210,7 +216,7 @@ class Neo4jFabricProxy(Neo4jProxy):
 
     def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
         table_where_clause = textwrap.dedent(f"""
-            WHERE exists({re.split('match', self._prepare_federated_resource_tag_match_statement(ResourceType.Table), flags=re.IGNORECASE)[1]})
+            WHERE exists({self._prepare_federated_resource_tag_rel_statement(reseource_type=ResourceType.Table, include_tag_name=False)})
         """)
         return self._get_fabric_query_statement(self._database_name, 
             self._prepare_federated_query_statement(statement=super()._get_dashboard_query_statement(table_where_clause), 
