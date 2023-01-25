@@ -1622,7 +1622,7 @@ class Neo4jProxy(BaseProxy):
         # OPTIONAL MATCH (user)-[:MANAGE_BY]->(manager:User)
         # RETURN user as user_record, manager as manager_record
         # """)
-        query = self._get_usage_query_statement()
+        query = self._get_user_query_statement()
         record = self._execute_cypher_query(statement=query,
                                             param_dict={'user_id': id})
         single_result = get_single_record(record)
