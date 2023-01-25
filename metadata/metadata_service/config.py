@@ -111,7 +111,8 @@ class LocalConfig(Config):
 
     PROXY_HOST = os.environ.get('PROXY_HOST', f'bolt://{LOCAL_HOST}')
     PROXY_PORT = os.environ.get('PROXY_PORT', 7687)
-    PROXY_CLIENT = PROXY_CLIENTS[os.environ.get('PROXY_CLIENT', 'NEO4J')]
+    proxy_client_key = os.environ.get('PROXY_CLIENT', 'NEO4J')
+    PROXY_CLIENT = PROXY_CLIENTS[proxy_client_key if proxy_client_key != '' else 'NEO4J']
     PROXY_ENCRYPTED = bool(distutils.util.strtobool(os.environ.get(PROXY_ENCRYPTED, 'True')))
     PROXY_VALIDATE_SSL = bool(distutils.util.strtobool(os.environ.get(PROXY_VALIDATE_SSL, 'False')))
 
