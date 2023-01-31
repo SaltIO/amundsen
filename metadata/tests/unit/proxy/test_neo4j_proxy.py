@@ -47,7 +47,7 @@ class TestNeo4jProxy(unittest.TestCase):
                            'name': 'gold'},
                        'schema': {
                            'name': 'foo_schema'},
-                       'tbl': {
+                       'table': {
                            'name': 'foo_table'},
                        'tbl_dscrpt': {
                            'description': 'foo description'}
