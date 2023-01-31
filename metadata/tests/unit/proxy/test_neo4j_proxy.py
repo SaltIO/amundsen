@@ -441,7 +441,7 @@ class TestNeo4jProxy(unittest.TestCase):
     def test_get_table_view_only(self) -> None:
         col_usage_return_value = copy.deepcopy(self.col_usage_return_value)
         for col in col_usage_return_value:
-            col['tbl']['is_view'] = True
+            col['table']['is_view'] = True
 
         with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
             mock_execute.side_effect = [
@@ -1558,108 +1558,104 @@ class TestNeo4jProxy(unittest.TestCase):
             self.assertEqual(expected.__repr__(), actual.__repr__())
 
     def test_get_feature_success(self) -> None:
-        try:
-            with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
-                mock_execute.return_value = [{
-                    'wmk_records': [
-                        {
-                            'key': 'test_feature_group/test_feature_name/1.2.3/high_watermark',
-                            'time': 'fake_time',
-                        },
-                        {
-                            'key': 'test_feature_group/test_feature_name/1.2.3/low_watermark',
-                            'time': 'fake_time',
-                        }
-                    ],
-                    'availability_records': [
-                        {
-                            'name': 'hive',
-                            'publisher_last_updated_epoch_ms': 1621250037268,
-                            'published_tag': '2021-05-16',
-                            'key': 'database://hive'
-                        },
-                        {
-                            'name': 'dynamodb',
-                            'publisher_last_updated_epoch_ms': 1621250037268,
-                            'published_tag': '2021-05-16',
-                            'key': 'database://dynamodb'
-                        }
-                    ],
-                    'prog_descriptions': [
-                        {
-                            'description_source': 'quality_report',
-                            'description': 'Test Test'
-                        }
-                    ],
-                    'owner_records': [
-                        {
-                            'key': 'tester@example.com',
-                            'email': 'tester@example.com'
-                        }
-                    ],
-                    'badge_records': [
-                        {
-                            'key': 'pii',
-                            'category': 'data'
-                        }
-                    ],
-                    'tag_records': [
-                        {
-                            'tag_type': 'default', 'key': 'test'
-                        },
-                    ],
-                    'desc': {
-                        'description': 'test feature description',
-                        'key': 'test_feature_group/test_feature_name/1.2.3/_description',
-                        'description_source': 'description'
+        with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
+            mock_execute.return_value = [{
+                'wmk_records': [
+                    {
+                        'key': 'test_feature_group/test_feature_name/1.2.3/high_watermark',
+                        'time': 'fake_time',
                     },
-                    'feature': {
-                        'last_updated_timestamp': 1,
-                        'data_type': 'bigint',
-                        'name': 'test_feature_name',
-                        'created_timestamp': 1,
-                        'version': '1.2.3',
-                        'key': 'test_feature_group/test_feature_name/1.2.3',
-                        'status': 'active',
-                        'entity': 'test_entity'
-                    },
-                    'fg': {
-                        'name': 'test_feature_group',
+                    {
+                        'key': 'test_feature_group/test_feature_name/1.2.3/low_watermark',
+                        'time': 'fake_time',
                     }
-                }]
+                ],
+                'availability_records': [
+                    {
+                        'name': 'hive',
+                        'publisher_last_updated_epoch_ms': 1621250037268,
+                        'published_tag': '2021-05-16',
+                        'key': 'database://hive'
+                    },
+                    {
+                        'name': 'dynamodb',
+                        'publisher_last_updated_epoch_ms': 1621250037268,
+                        'published_tag': '2021-05-16',
+                        'key': 'database://dynamodb'
+                    }
+                ],
+                'prog_descriptions': [
+                    {
+                        'description_source': 'quality_report',
+                        'description': 'Test Test'
+                    }
+                ],
+                'owner_records': [
+                    {
+                        'key': 'tester@example.com',
+                        'email': 'tester@example.com'
+                    }
+                ],
+                'badge_records': [
+                    {
+                        'key': 'pii',
+                        'category': 'data'
+                    }
+                ],
+                'tag_records': [
+                    {
+                        'tag_type': 'default', 'key': 'test'
+                    },
+                ],
+                'desc': {
+                    'description': 'test feature description',
+                    'key': 'test_feature_group/test_feature_name/1.2.3/_description',
+                    'description_source': 'description'
+                },
+                'feature': {
+                    'last_updated_timestamp': 1,
+                    'data_type': 'bigint',
+                    'name': 'test_feature_name',
+                    'created_timestamp': 1,
+                    'version': '1.2.3',
+                    'key': 'test_feature_group/test_feature_name/1.2.3',
+                    'status': 'active',
+                    'entity': 'test_entity'
+                },
+                'fg': {
+                    'name': 'test_feature_group',
+                }
+            }]
 
-                neo4j_proxy = Neo4jProxy(host='neo4j://example.com', port=0000)
-                feature = neo4j_proxy.get_feature(feature_uri='dummy_uri')
-                expected = Feature(key='test_feature_group/test_feature_name/1.2.3',
-                                name='test_feature_name',
-                                version='1.2.3', status='active',
-                                feature_group='test_feature_group', entity='test_entity',
-                                data_type='bigint', availability=['hive', 'dynamodb'],
-                                description='test feature description',
-                                owners=[User(email='tester@example.com')],
-                                badges=[Badge(badge_name='pii', category='data')],
-                                tags=[Tag(tag_name='test', tag_type='default')],
-                                programmatic_descriptions=[
-                                    ProgrammaticDescription(source='quality_report',
-                                                            text='Test Test'),
-                                ],
-                                watermarks=[FeatureWatermark(
-                                    key='test_feature_group/test_feature_name/1.2.3/high_watermark',
-                                    watermark_type='high_watermark',
-                                    time='fake_time'),
-                                    FeatureWatermark(
-                                        key='test_feature_group/test_feature_name/1.2.3/low_watermark',
-                                        watermark_type='low_watermark',
-                                        time='fake_time')],
-                                last_updated_timestamp=1,
-                                created_timestamp=1,
-                                )
+            neo4j_proxy = Neo4jProxy(host='neo4j://example.com', port=0000)
+            feature = neo4j_proxy.get_feature(feature_uri='dummy_uri')
+            expected = Feature(key='test_feature_group/test_feature_name/1.2.3',
+                            name='test_feature_name',
+                            version='1.2.3', status='active',
+                            feature_group='test_feature_group', entity='test_entity',
+                            data_type='bigint', availability=['hive', 'dynamodb'],
+                            description='test feature description',
+                            owners=[User(email='tester@example.com')],
+                            badges=[Badge(badge_name='pii', category='data')],
+                            tags=[Tag(tag_name='test', tag_type='default')],
+                            programmatic_descriptions=[
+                                ProgrammaticDescription(source='quality_report',
+                                                        text='Test Test'),
+                            ],
+                            watermarks=[FeatureWatermark(
+                                key='test_feature_group/test_feature_name/1.2.3/high_watermark',
+                                watermark_type='high_watermark',
+                                time='fake_time'),
+                                FeatureWatermark(
+                                    key='test_feature_group/test_feature_name/1.2.3/low_watermark',
+                                    watermark_type='low_watermark',
+                                    time='fake_time')],
+                            last_updated_timestamp=1,
+                            created_timestamp=1,
+                            )
 
-                self.assertEqual(str(expected), str(feature))
-        except Exception as e:
-            TestNeo4jProxy.LOGGER.exception("FAILED")
-            raise e
-
+            self.assertEqual(str(expected), str(feature))
+        
     def test_get_feature_not_found(self) -> None:
         with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
             mock_execute.return_value = []
