@@ -600,11 +600,11 @@ class TestNeo4jProxy(unittest.TestCase):
                                                                  column_name='test_column')
 
             column_description_query = textwrap.dedent("""
-            MATCH (tbl:Table {key: $tbl_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+            MATCH (tbl:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=column_description_query,
-                                            param_dict={'tbl_key': 'test_table',
+                                            param_dict={'table_key': 'test_table',
                                                         'column_name': 'test_column'})
 
             self.assertEqual(col_description, 'sample description')
@@ -622,11 +622,11 @@ class TestNeo4jProxy(unittest.TestCase):
                                                                  column_name='test_column')
 
             column_description_query = textwrap.dedent("""
-            MATCH (tbl:Table {key: $tbl_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+            MATCH (tbl:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=column_description_query,
-                                            param_dict={'tbl_key': 'test_table',
+                                            param_dict={'table_key': 'test_table',
                                                         'column_name': 'test_column'})
 
             self.assertIsNone(col_description)

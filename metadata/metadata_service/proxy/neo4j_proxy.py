@@ -713,7 +713,7 @@ class Neo4jProxy(BaseProxy):
         # RETURN d.description AS description;
         # """.format(node_label=resource_type.name))
 
-        description_query = self._get_description_query_statement()
+        description_query = self._get_description_query_statement(resource_type=resource_type)
 
         result = self._execute_cypher_query(statement=description_query,
                                             param_dict={'key': uri})
