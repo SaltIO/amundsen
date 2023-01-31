@@ -120,8 +120,10 @@ class LocalConfig(Config):
 
     SWAGGER_ENABLED = True
 
+
 class LocalFederatedConfig(LocalConfig):
     PROXY_DATABASE_NAME = os.environ.get('PROXY_DATABASE_NAME', neo4j.DEFAULT_DATABASE)
+
 
 class AtlasConfig(LocalConfig):
     PROXY_HOST = os.environ.get('PROXY_HOST', 'localhost')

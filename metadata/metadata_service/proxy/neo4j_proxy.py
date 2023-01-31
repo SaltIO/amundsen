@@ -289,8 +289,9 @@ class Neo4jProxy(BaseProxy):
                                          sort_order=sort_order, badges=self._make_badges(badges) if badges else [])
 
             # type_metadata_nodes maps each type metadata path to its corresponding TypeMetadata object
-            tm_key_regex = re.compile(
-                r'(?P<db>\w+):\/\/(?P<cluster>\w+)\.(?P<schema>\w+)\/(?P<table>\w+)\/(?P<col>\w+)\/type\/(?P<tm_path>.*)'
+            tm_key_regex = \
+            re.compile(
+            r'(?P<db>\w+):\/\/(?P<cluster>\w+)\.(?P<schema>\w+)\/(?P<table>\w+)\/(?P<col>\w+)\/type\/(?P<tm_path>.*)'
             )
             tm_key_match = tm_key_regex.search(type_metadata.key)
             if tm_key_match is None:
@@ -587,7 +588,8 @@ class Neo4jProxy(BaseProxy):
         # """)
 
         table_query_level_query = self._get_table_query_query_statement()
-        query_records = self._execute_cypher_query(statement=table_query_level_query, param_dict={'table_key': table_uri})
+        query_records = self._execute_cypher_query(statement=table_query_level_query, 
+            param_dict={'table_key': table_uri})
 
         table_query_records = get_single_record(query_records)
 
@@ -830,7 +832,8 @@ class Neo4jProxy(BaseProxy):
 
     def _get_column_description_query_statement(self) -> str:
         column_description_query = textwrap.dedent("""
-            MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+            MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]
+            ->(d:Description)
             RETURN d.description AS description;
         """)
         return column_description_query
@@ -847,7 +850,8 @@ class Neo4jProxy(BaseProxy):
         :return:
         """
         # column_description_query = textwrap.dedent("""
-        # MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+        # MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]
+        # ->(d:Description)
         # RETURN d.description AS description;
         # """)
 
@@ -1349,7 +1353,9 @@ class Neo4jProxy(BaseProxy):
             return neo4j_statistics
         return {}
 
-    def _get_global_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
+    def _get_global_popular_resources_uris_query_statement(self, 
+        resource_type: ResourceType = ResourceType.Table) -> str:
+        
         query = textwrap.dedent("""
             MATCH ({node_name}:{node_label})-[r:READ_BY]->(u:User)
             WITH {node_name}.key as resource_key, count(distinct u) as readers, sum(r.read_count) as total_reads
@@ -1389,7 +1395,9 @@ class Neo4jProxy(BaseProxy):
 
         return [record['resource_key'] for record in records]
 
-    def _get_personal_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
+    def _get_personal_popular_resources_uris_query_statement(self, 
+        resource_type: ResourceType = ResourceType.Table) -> str:
+        
         statement = textwrap.dedent("""
             MATCH (:User {{key:$user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->
                 (coUser:User)<-[coRead:READ_BY]-(resource:{resource_type})
@@ -1773,7 +1781,7 @@ class Neo4jProxy(BaseProxy):
         else:
             raise NotImplementedError(f'The relation type {relation_type} is not defined!')
         return relation
-        
+
     def _get_dashboard_by_user_relation_query_statement(self, user_email: str, relation_type: UserResourceRel) -> str:
         rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
                                                                       id='',
@@ -1812,10 +1820,10 @@ class Neo4jProxy(BaseProxy):
         #                                                               resource_type=ResourceType.Dashboard,
         #                                                               user_key=user_email)
 
-        # # FYI, to extract last_successful_execution, it searches for its execution ID which is always
-        # # _last_successful_execution
-        # # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L18
-        # # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
+        # FYI, to extract last_successful_execution, it searches for its execution ID which is always
+        # _last_successful_execution
+        # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L18
+        # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
 
         # query = textwrap.dedent(f"""
         # MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
@@ -2021,9 +2029,11 @@ class Neo4jProxy(BaseProxy):
 
     def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
         get_dashboard_detail_query = textwrap.dedent(f"""
-            MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+            MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]
+            ->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
             OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
-            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution) WHERE split(last_exec.key, '/')[5] = '_last_execution'
+            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution) 
+            WHERE split(last_exec.key, '/')[5] = '_last_execution'
             OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
             WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
             OPTIONAL MATCH (dashboard)-[:LAST_UPDATED_AT]->(t:Timestamp)
@@ -2275,8 +2285,10 @@ class Neo4jProxy(BaseProxy):
     def _get_both_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
         get_both_lineage_query = textwrap.dedent(u"""
             MATCH ({resource_name}:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH dpath=({resource_name})-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity:{resource_label})
-            OPTIONAL MATCH upath=({resource_name})-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity:{resource_label})
+            OPTIONAL MATCH dpath=({resource_name})-[downstream_len:HAS_DOWNSTREAM*..{depth}]->
+            (downstream_entity:{resource_label})
+            OPTIONAL MATCH upath=({resource_name})-[upstream_len:HAS_UPSTREAM*..{depth}]->
+            (upstream_entity:{resource_label})
             WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
             OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
             OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
@@ -2297,7 +2309,8 @@ class Neo4jProxy(BaseProxy):
             key:upstream_entity.key, badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
             END AS upstream_entities, CASE WHEN downstream_len IS NULL THEN []
             ELSE COLLECT(distinct{{level:SIZE(downstream_len), {resource_name}:split(downstream_entity.key,'://')[0],
-            key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
+            key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, 
+            parent:nodes(dpath)[-2].key}})
             END AS downstream_entities RETURN downstream_entities, upstream_entities
         """).format(depth=depth, resource_name=resource_type.name.lower(), resource_label=resource_type.name)
         return get_both_lineage_query
@@ -2305,7 +2318,8 @@ class Neo4jProxy(BaseProxy):
     def _get_upstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
         get_upstream_lineage_query = textwrap.dedent(u"""
             MATCH ({resource_name}:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH path=({resource_name})-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity:{resource_label})
+            OPTIONAL MATCH path=({resource_name})-[upstream_len:HAS_UPSTREAM*..{depth}]
+            ->(upstream_entity:{resource_label})
             WITH upstream_entity, upstream_len, path
             OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
             WITH CASE WHEN upstream_badge IS NULL THEN []
@@ -2324,7 +2338,8 @@ class Neo4jProxy(BaseProxy):
     def _get_downstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
         get_downstream_lineage_query = textwrap.dedent(u"""
             MATCH ({resource_name}:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH path=({resource_name})-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity:{resource_label})
+            OPTIONAL MATCH path=({resource_name})-[downstream_len:HAS_DOWNSTREAM*..{depth}]
+            ->(downstream_entity:{resource_label})
             WITH downstream_entity, downstream_len, path
             OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
             WITH CASE WHEN downstream_badge IS NULL THEN []
@@ -2335,7 +2350,8 @@ class Neo4jProxy(BaseProxy):
             sum(downstream_read.read_count) as downstream_read_count, path
             WITH CASE WHEN downstream_len IS NULL THEN []
             ELSE COLLECT(distinct{{level:SIZE(downstream_len), {resource_name}:split(downstream_entity.key,'://')[0],
-            key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
+            key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, 
+            parent:nodes(path)[-2].key}})
             END AS downstream_entities RETURN downstream_entities
         """).format(depth=depth, resource_name=resource_type.name.lower(), resource_label=resource_type.name)
         return get_downstream_lineage_query
@@ -2377,7 +2393,8 @@ class Neo4jProxy(BaseProxy):
         # key:upstream_entity.key, badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
         # END AS upstream_entities, CASE WHEN downstream_len IS NULL THEN []
         # ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-        # key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
+        # key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, 
+        # parent:nodes(dpath)[-2].key}})
         # END AS downstream_entities RETURN downstream_entities, upstream_entities
         # """).format(depth=depth, resource=resource_type.name)
         get_both_lineage_query = self._get_both_lineage_query_statement(resource_type, depth)
@@ -2413,7 +2430,8 @@ class Neo4jProxy(BaseProxy):
         # sum(downstream_read.read_count) as downstream_read_count, path
         # WITH CASE WHEN downstream_len IS NULL THEN []
         # ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-        # key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
+        # key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, 
+        # parent:nodes(path)[-2].key}})
         # END AS downstream_entities RETURN downstream_entities
         # """).format(depth=depth, resource=resource_type.name)
         get_downstream_lineage_query = self._get_downstream_lineage_query_statement(resource_type, depth)
