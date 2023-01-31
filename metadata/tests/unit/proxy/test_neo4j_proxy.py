@@ -600,7 +600,7 @@ class TestNeo4jProxy(unittest.TestCase):
                                                                  column_name='test_column')
 
             column_description_query = textwrap.dedent("""
-            MATCH (tbl:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+            MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=column_description_query,
@@ -622,7 +622,7 @@ class TestNeo4jProxy(unittest.TestCase):
                                                                  column_name='test_column')
 
             column_description_query = textwrap.dedent("""
-            MATCH (tbl:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+            MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=column_description_query,
@@ -669,7 +669,7 @@ class TestNeo4jProxy(unittest.TestCase):
                                                                                           '/test_type_metadata')
 
             type_metadata_description_query = textwrap.dedent("""
-            MATCH (n:Type_Metadata {key: $key})-[:DESCRIPTION]->(d:Description)
+            MATCH (type_metadata:Type_Metadata {key: $key})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=type_metadata_description_query,
@@ -690,7 +690,7 @@ class TestNeo4jProxy(unittest.TestCase):
                                                                                           '/test_type_metadata')
 
             type_metadata_description_query = textwrap.dedent("""
-            MATCH (n:Type_Metadata {key: $key})-[:DESCRIPTION]->(d:Description)
+            MATCH (type_metadata:Type_Metadata {key: $key})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=type_metadata_description_query,
@@ -1401,7 +1401,7 @@ class TestNeo4jProxy(unittest.TestCase):
             table_description = neo4j_proxy.get_dashboard_description(id='test_dashboard')
 
             dashboard_description_query = textwrap.dedent("""
-            MATCH (n:Dashboard {key: $key})-[:DESCRIPTION]->(d:Description)
+            MATCH (dashboard:Dashboard {key: $key})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=dashboard_description_query,
@@ -1421,7 +1421,7 @@ class TestNeo4jProxy(unittest.TestCase):
             table_description = neo4j_proxy.get_dashboard_description(id='test_dashboard')
 
             dashboard_description_query = textwrap.dedent("""
-            MATCH (n:Dashboard {key: $key})-[:DESCRIPTION]->(d:Description)
+            MATCH (dashboard:Dashboard {key: $key})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
             """)
             mock_execute.assert_called_with(statement=dashboard_description_query,
