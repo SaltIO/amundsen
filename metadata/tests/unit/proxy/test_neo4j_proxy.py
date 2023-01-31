@@ -1613,7 +1613,7 @@ class TestNeo4jProxy(unittest.TestCase):
                         'key': 'test_feature_group/test_feature_name/1.2.3/_description',
                         'description_source': 'description'
                     },
-                    'feat': {
+                    'feature': {
                         'last_updated_timestamp': 1,
                         'data_type': 'bigint',
                         'name': 'test_feature_name',
