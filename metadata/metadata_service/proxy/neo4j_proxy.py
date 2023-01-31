@@ -2653,7 +2653,7 @@ class Neo4jProxy(BaseProxy):
     def _get_resource_generation_code_query_statement(self, resource_type: ResourceType) -> str:
         neo4j_query = textwrap.dedent("""\
             MATCH ({resource_name}:{resource_label} {{key: $resource_key}})
-            OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->(feat)
+            OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->({resource_name})
             RETURN q as query_records
         """.format(resource_name=resource_type.name.lower(), resource_label=resource_type.name))
         return neo4j_query
