@@ -261,7 +261,9 @@ export enum BadgeStyle {
   LANDING = 'landing',
   STAGING = 'staging',
   WRANGLING = 'wrangling',
-  MARTS = 'marts'
+  MARTS = 'marts',
+  SNOWFLAKE = 'snowflake',
+  DBT = 'dbt'
 }
 
 export interface BadgeStyleConfig {

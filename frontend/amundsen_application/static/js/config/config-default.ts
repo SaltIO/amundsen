@@ -19,6 +19,14 @@ const configDefault: AppConfig = {
       style: BadgeStyle.LANDING,
       displayName: 'Landing',
     },
+    snowflake: {
+      style: BadgeStyle.SNOWFLAKE,
+      displayName: 'Snowflake',
+    },
+    dbt: {
+      style: BadgeStyle.DBT,
+      displayName: 'dbt',
+    },
   },
   browse: {
     curatedTags: [],
