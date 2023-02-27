@@ -35,6 +35,7 @@ class TableDetailAPI(Resource):
         try:
             LOGGER.info(f"DREW: table_uri={table_uri}")
             table = self.client.get_table(table_uri=table_uri)
+            LOGGER.info(f"DREW: table={table}")
             schema = TableSchema()
             return schema.dump(table), HTTPStatus.OK
 
