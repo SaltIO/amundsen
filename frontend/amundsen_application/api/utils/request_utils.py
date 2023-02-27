@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import Dict
-import logging
-LOGGER = logging.getLogger(__name__)
 
 import requests
 from flask import current_app as app
@@ -41,8 +39,6 @@ def request_metadata(*,     # type: ignore
         headers.update(app.config['REQUEST_HEADERS_METHOD'](app))
     elif app.config['METADATASERVICE_REQUEST_HEADERS']:
         headers.update(app.config['METADATASERVICE_REQUEST_HEADERS'])
-
-    LOGGER.info(f"DREW: request_metadata: timeout_sec={timeout_sec}")
     return request_wrapper(method=method,
                            url=url,
                            client=app.config['METADATASERVICE_REQUEST_CLIENT'],
@@ -98,13 +94,10 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
     :param data: Optional request payload
     :return:
     """
-    LOGGER.info(f"DREW: request_wrapper: B timeout_sec={timeout_sec}")
     # If no timeout specified, use the one from the configurations.
     timeout_sec = timeout_sec or app.config['REQUEST_SESSION_TIMEOUT_SEC']
-    LOGGER.info(f"DREW: request_wrapper: A timeout_sec={timeout_sec}")
 
     if client is not None:
-        LOGGER.info(f"DREW: request_wrapper: CLIENT NON NONE")
         if method == 'DELETE':
             return client.delete(url, headers=headers, raw_response=True, data=data, json=json)
         elif method == 'GET':
@@ -116,7 +109,6 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
         else:
             raise Exception('Method not allowed: {}'.format(method))
     else:
-        LOGGER.info(f"DREW: request_wrapper: CLIENT IS NONE")
         with build_session() as s:
             if method == 'DELETE':
                 return s.delete(url, headers=headers, timeout=timeout_sec, data=data, json=json)
