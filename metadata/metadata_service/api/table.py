@@ -4,7 +4,6 @@
 import json
 from http import HTTPStatus
 from typing import Any, Iterable, Mapping, Optional, Union
-import logging
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.lineage import LineageSchema
@@ -20,7 +19,6 @@ from metadata_service.entity.dashboard_summary import DashboardSummarySchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 
-LOGGER = logging.getLogger(__name__)
 
 class TableDetailAPI(Resource):
     """
@@ -33,16 +31,12 @@ class TableDetailAPI(Resource):
     @swag_from('swagger_doc/table/detail_get.yml')
     def get(self, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            LOGGER.info(f"DREW: table_uri={table_uri}")
             table = self.client.get_table(table_uri=table_uri)
-            LOGGER.info(f"DREW: table={table}")
             schema = TableSchema()
             return schema.dump(table), HTTPStatus.OK
 
-        # except NotFoundException:
-        #     return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
-        except Exception:
-            LOGGER.exception(f"DREW: ERROR={table_uri}")
+        except NotFoundException:
+            return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
 
 
 class TableLineageAPI(Resource):
