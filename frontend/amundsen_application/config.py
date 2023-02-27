@@ -54,7 +54,7 @@ class Config:
 
     # Request Timeout Configurations in Seconds
     # REQUEST_SESSION_TIMEOUT_SEC = 3
-    REQUEST_SESSION_TIMEOUT_SEC = os.getenv('REQUEST_SESSION_TIMEOUT_SEC', 3)
+    REQUEST_SESSION_TIMEOUT_SEC = int(os.getenv('REQUEST_SESSION_TIMEOUT_SEC', '3'))
 
     # Frontend Application
     FRONTEND_BASE = ''
