@@ -39,8 +39,8 @@ class TableDetailAPI(Resource):
             schema = TableSchema()
             return schema.dump(table), HTTPStatus.OK
 
-        except NotFoundException:
-            return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
+        # except NotFoundException:
+        #     return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
         except Exception:
             LOGGER.exception(f"DREW: ERROR={table_uri}")
 
