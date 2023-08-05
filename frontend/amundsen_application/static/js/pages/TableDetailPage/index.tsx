@@ -641,19 +641,19 @@ export class TableDetail extends React.Component<
       innerContent = <ErrorMessage />;
     } else {
       const data = tableData;
-      const editText = data.source
+      const editText = data.sources[0]
         ? `${Constants.EDIT_DESC_TEXT} ${getDescriptionSourceDisplayName(
-            data.source.source_type
+            data.sources[0].source_type
           )}`
         : '';
-      const ownersEditText = data.source
+      const ownersEditText = data.sources[0]
         ? // TODO rename getDescriptionSourceDisplayName to more generic since
           // owners also edited on the same file?
           `${Constants.EDIT_OWNERS_TEXT} ${getDescriptionSourceDisplayName(
-            data.source.source_type
+            data.sources[0].source_type
           )}`
         : '';
-      const editUrl = data.source ? data.source.source : '';
+      const editUrl = data.sources[0] ? data.sources[0].source : '';
       const tableNotice = getResourceNotices(
         ResourceType.table,
         `${data.cluster}.${data.database}.${data.schema}.${data.name}`
@@ -698,7 +698,7 @@ export class TableDetail extends React.Component<
             <div className="header-section header-links header-external-links">
               {this.renderTableAppDropdowns(data.table_writer, data.table_apps)}
               <LineageLink tableData={data} />
-              <SourceLink tableSource={data.source} />
+              <SourceLink tableSource={data.sources[0]} />
             </div>
             <div className="header-section header-buttons">
               <LineageButton tableData={data} />

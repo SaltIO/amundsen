@@ -53,6 +53,9 @@ const configDefault: AppConfig = {
   analytics: {
     plugins: [],
   },
+  announcements: {
+    enabled: false,
+  },
   columnLineage: {
     inAppListEnabled: false,
     inAppPageEnabled: false,
