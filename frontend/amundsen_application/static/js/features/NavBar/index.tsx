@@ -375,8 +375,7 @@ export const NavBar: React.FC<NavBarProps> = ({ loggedInUser, location }) => {
       <div className="row">
         <div className={`nav-bar ${isLightTheme && 'is-light'}`}>
           <div id="nav-bar-left" className="nav-bar-left">
-<<<<<<< HEAD
-            <Link to="/" onClick={logClick}>
+            {/* <Link to="/" onClick={logClick}>
               {AppConfig.logoPath 
                 ? 
                 <img
@@ -388,10 +387,8 @@ export const NavBar: React.FC<NavBarProps> = ({ loggedInUser, location }) => {
                 :
                 <span className="title-3">{getLogoTitle()}</span>
               }              
-            </Link>
-=======
+            </Link> */}
             <Logo />
->>>>>>> origin/main
           </div>
           {renderSearchBar(pathname)}
           <div id="nav-bar-right" className="ml-auto nav-bar-right">
