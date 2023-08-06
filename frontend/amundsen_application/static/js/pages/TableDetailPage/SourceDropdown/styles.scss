@@ -3,8 +3,8 @@
 
 @import 'variables';
 
-$app-dropdown-padding-top: 5px;
-$app-dropdown-max-size: 450px;
+$source-dropdown-padding-top: 5px;
+$source-dropdown-max-size: 450px;
 $menu-title-font-size: 12px;
 $menu-item-row-gap: 15px;
 $menu-item-content-height: 18px;
@@ -14,13 +14,13 @@ $menu-item-content-height: 18px;
 
   .sources-dropdown-button {
     border: 0;
-    padding: $app-dropdown-padding-top $spacer-1;
+    padding: $source-dropdown-padding-top $spacer-1;
   }
 
   .sources-dropdown-menu {
     padding-bottom: $spacer-1;
-    max-width: $app-dropdown-max-size;
-    max-height: $app-dropdown-max-size;
+    max-width: $source-dropdown-max-size;
+    max-height: $source-dropdown-max-size;
     overflow-y: scroll;
     line-height: normal;
   }
@@ -36,7 +36,7 @@ $menu-item-content-height: 18px;
   .sources-dropdown-menu-item-row {
     margin: 0 $spacer-1 0 $spacer-1;
 
-    &.airflow-app {
+    &.airflow-source {
       display: flex;
       gap: $menu-item-row-gap;
     }
