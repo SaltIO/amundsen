@@ -4,10 +4,12 @@
 import * as React from 'react';
 import { MenuItem, OverlayTrigger, Popover } from 'react-bootstrap';
 
+import AvatarLabel from 'components/AvatarLabel';
 import { TableSource } from 'interfaces';
 import { 
   DELAY_SHOW_POPOVER_MS,
-  SOURCE_TYPE_TO_NAME 
+  SOURCE_TYPE_TO_NAME,
+  SOURCE_TYPE_TO_IMAGE
 } from '../constants';
 import '../styles.scss';
 
@@ -18,7 +20,7 @@ export interface GenericMenuProps {
   handleClick: (event) => void;
 }
 
-const getMenuItem = (source: TableSource, handleClick) => (
+const getMenuItem = (source: TableSource, href, handleClick) => (
   <OverlayTrigger
     key={source.source}
     trigger={['hover', 'focus']}
@@ -27,7 +29,7 @@ const getMenuItem = (source: TableSource, handleClick) => (
     overlay={<Popover id="popover-trigger-hover-focus">{source.source}</Popover>}
   >    
     <MenuItem
-      href={source.source}
+      href={href}
       onClick={handleClick}
       target="_blank"
       rel="noopener noreferrer"
@@ -46,12 +48,22 @@ const GenericMenu: React.FC<GenericMenuProps> = ({
   let menuItems: React.ReactNode[] = [];
 
   tableSources.forEach((source, idx) => {
+    let href = source.source;
+    if (source.source != null && !source.source.startsWith("http")) {
+      href = null;
+    }
+
     menuItems = [
       ...menuItems,
-      <h5 key={source.source_type} className="application-dropdown-menu-title">
-        {SOURCE_TYPE_TO_NAME[source.source_type]}
-      </h5>,
-      getMenuItem(source, handleClick),
+      // <h5 key={source.source_type} className="application-dropdown-menu-title">
+      //   {SOURCE_TYPE_TO_NAME[source.source_type]}
+      // </h5>,
+      <AvatarLabel
+        label={SOURCE_TYPE_TO_NAME[source.source_type]}
+        src={SOURCE_TYPE_TO_IMAGE[source.source_type]}
+        round={true}
+      />,
+      getMenuItem(source, href, handleClick),
     ];
   });
 

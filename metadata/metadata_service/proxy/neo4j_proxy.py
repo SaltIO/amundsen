@@ -164,6 +164,8 @@ class Neo4jProxy(BaseProxy):
 
         joins, filters = self._exec_table_query_query(table_uri)
 
+        LOGGER.info(f"sources={sources}")
+
         table = Table(database=last_neo4j_record['db']['name'],
                       cluster=last_neo4j_record['clstr']['name'],
                       schema=last_neo4j_record['schema']['name'],

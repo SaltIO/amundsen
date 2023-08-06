@@ -79,6 +79,7 @@ import LineageLink from './LineageLink';
 import LineageList from './LineageList';
 import TableOwnerEditor from './TableOwnerEditor';
 import SourceLink from './SourceLink';
+import SourceDropdown from './SourceDropdown';
 import TableDashboardResourceList from './TableDashboardResourceList';
 import TableDescEditableText from './TableDescEditableText';
 import TableHeaderBullets from './TableHeaderBullets';
@@ -698,7 +699,8 @@ export class TableDetail extends React.Component<
             <div className="header-section header-links header-external-links">
               {this.renderTableAppDropdowns(data.table_writer, data.table_apps)}
               <LineageLink tableData={data} />
-              <SourceLink tableSource={data.sources[0]} />
+              <SourceDropdown tableSources={data.sources} />
+              {/* <SourceLink tableSource={data.sources[0]} /> */}
             </div>
             <div className="header-section header-buttons">
               <LineageButton tableData={data} />

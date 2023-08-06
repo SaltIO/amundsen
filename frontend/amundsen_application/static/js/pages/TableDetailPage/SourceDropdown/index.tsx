@@ -7,8 +7,6 @@ import { Dropdown } from 'react-bootstrap';
 import AvatarLabel from 'components/AvatarLabel';
 import { TableSource } from 'interfaces';
 import { logClick } from 'utils/analytics';
-import GithubMenu from './GithubMenu';
-import AWSS3Menu from './AWSS3Menu';
 import GenericMenu from './GenericMenu';
 import {
   SOURCES_LABEL,
@@ -40,39 +38,8 @@ const getImagePath = (tableSourceType) => {
   }
 };
 
-const isAirflowOrDatabricksApp = (appName) =>
-  appName.toLowerCase() === AIRFLOW.toLowerCase() ||
-  appName.toLowerCase() === DATABRICKS.toLowerCase();
-
-const sortByNameOrId = (a, b) =>
-  a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
-
-const hasSameNameAndKind = (app, name, kind) =>
-  // Checks if the app matches the given name and kind
-  // If its kind is empty, check if the given kind is the default Producing value
-  app.name === name &&
-  ((app.kind && app.kind === kind) || (!app.kind && kind === PRODUCING));
-
-const getSortedSourceTypes = (sources: TableSource[]) => {
-  // Sort app kinds by Producing then Consuming if they exist in the list, and then all others following
-  // If no kind is specified, default to Producing
-  const sourceTypes: string[] = [
-    ...new Set(sources.map((source) => (source.source_type ? source.source_type : SOURCE))),
-  ];
-
-  const producingKind = appKinds.filter(
-    (kind) => kind.toLowerCase() === PRODUCING
-  );
-  const consumingKind = appKinds.filter(
-    (kind) => kind.toLowerCase() === CONSUMING
-  );
-  const remainingKinds = appKinds.filter(
-    (kind) =>
-      kind.toLowerCase() !== PRODUCING && kind.toLowerCase() !== CONSUMING
-  );
-
-  return [...producingKind, ...consumingKind, ...remainingKinds];
-};
+const sortByTypeAndSource = (a, b) =>
+  a.source_type.localeCompare(b.source_type) && a.source.localeCompare(b.source);
 
 const handleClick = (event) => {
   event.stopPropagation();
@@ -83,8 +50,6 @@ const getDropdownMenuContents = (tableSources) => {
   return (
     <GenericMenu
       tableSources={tableSources}
-      getSortedSourceTypes={getSortedSourceTypes}
-      hasSameNameAndKind={hasSameNameAndKind}
       handleClick={handleClick}
     />
   );
@@ -97,7 +62,7 @@ const SourceDropdown: React.FC<SourceDropdownProps> = ({
     return null;
   }
 
-  tableSources.sort(sortByNameOrId);
+  tableSources.sort(sortByTypeAndSource);
 
   const image = DATABASE_LOGO_PATH;
   const avatarLabel = SOURCES_LABEL;
@@ -105,14 +70,14 @@ const SourceDropdown: React.FC<SourceDropdownProps> = ({
   return (
     <Dropdown
       className="header-link sources-dropdown"
-      id="application-dropdown"
+      id="sources-dropdown"
       pullRight
     >
       <Dropdown.Toggle className="sources-dropdown-button">
         <AvatarLabel
           label={avatarLabel}
           src={image}
-          round="true"
+          round={true}
         />
       </Dropdown.Toggle>
       <Dropdown.Menu className="sources-dropdown-menu">
