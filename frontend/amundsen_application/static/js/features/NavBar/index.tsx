@@ -235,17 +235,31 @@ export const Logo: React.FC = () => {
       ? GENERIC_DARK_LOGO_PATH
       : GENERIC_LIGHT_LOGO_PATH;
 
-  return (
-    <Link className="logo-link" to="/" onClick={logClick}>
-      <img
-        id="logo-icon"
-        className="logo-icon"
-        src={getLogoPath() || defaultLogo}
-        alt=""
-      />
-      <span className="logo-text">{getLogoTitle()}</span>
-    </Link>
-  );
+  if (getLogoTitle()) {
+    return (
+      <Link className="logo-link" to="/" onClick={logClick}>
+          <img
+            id="logo-icon"
+            className="logo-icon"
+            src={getLogoPath() || defaultLogo}
+            alt={getLogoTitle() || ""}
+          />
+      </Link>
+    );
+  }
+  else {
+    return (
+      <Link className="logo-link" to="/" onClick={logClick}>
+          <img
+            id="logo-icon"
+            className="logo-icon"
+            src={defaultLogo}
+            alt={getLogoTitle() || ""}
+          />
+          <span className="logo-text">{getLogoTitle() || ""}</span>
+      </Link>
+    );
+  }
 };
 
 type ProfileMenuProps = {
