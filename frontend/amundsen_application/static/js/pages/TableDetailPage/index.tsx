@@ -631,9 +631,9 @@ export class TableDetail extends React.Component<
       this.state;
     let innerContent: React.ReactNode;
 
-    console.log("DREW: isLoading="+isLoading)
-    console.log("DREW: statusCode="+statusCode)
-    console.log("DREW: tableData="+tableData)
+    // console.log("DREW: isLoading="+isLoading)
+    // console.log("DREW: statusCode="+statusCode)
+    // console.log("DREW: tableData="+tableData)
 
     // We want to avoid rendering the previous table's metadata before new data is fetched in componentDidMount
     if (isLoading || !this.didComponentMount) {
@@ -693,6 +693,8 @@ export class TableDetail extends React.Component<
                   cluster={data.cluster}
                   isView={data.is_view}
                 />
+              </div>
+              <div className="header-details">
                 {data.badges.length > 0 && <BadgeList badges={data.badges} />}
               </div>
             </div>
