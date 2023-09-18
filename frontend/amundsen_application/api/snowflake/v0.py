@@ -29,17 +29,10 @@ from amundsen_application.api.utils.search_utils import execute_search_document_
 LOGGER = logging.getLogger(__name__)
 
 
-metadata_snowflake_blueprint = Blueprint('metadata_snowflake', __name__, url_prefix='/api/metadata/v0')
+snowflake_blueprint = Blueprint('snowflake', __name__, url_prefix='/api/snowflake/v0')
 
-SNOWFLAKE_ENDPOINT = '/snowflake'
-SNOWFLAKE_TABLE_ENDPOINT = f'{SNOWFLAKE_ENDPOINT}/table'
+SNOWFLAKE_TABLE_ENDPOINT = '/snowflake/table'
 
-
-def _get_snowflake_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + SNOWFLAKE_ENDPOINT
 
 def _get_snowflake_table_endpoint() -> str:
     metadata_service_base = app.config['METADATASERVICE_BASE']
@@ -47,7 +40,7 @@ def _get_snowflake_table_endpoint() -> str:
         raise Exception('METADATASERVICE_BASE must be configured')
     return metadata_service_base + SNOWFLAKE_TABLE_ENDPOINT
     
-@metadata_snowflake_blueprint.route('/snowflake/get_snowflake_table_shares', methods=['GET'])
+@snowflake_blueprint.route('/get_snowflake_table_shares', methods=['GET'])
 def get_snowflake_table_shares() -> Response:
     try:
         snowflake_table_endpoint = _get_snowflake_table_endpoint()
