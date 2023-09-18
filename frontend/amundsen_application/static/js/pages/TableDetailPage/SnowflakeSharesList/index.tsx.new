@@ -1,0 +1,337 @@
+// Copyright Contributors to the Amundsen project.
+// SPDX-License-Identifier: Apache-2.0
+// import React, { useState } from 'react';
+// import { Modal, OverlayTrigger, Popover } from 'react-bootstrap';
+import * as React from 'react';
+import { Modal, OverlayTrigger, Popover } from 'react-bootstrap';
+import Linkify from 'react-linkify';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
+
+import { ResourceType, TableResource } from 'interfaces/Resources';
+import { SnowflakeTableShare } from 'interfaces/Snowflake';
+import { GlobalState } from 'ducks/rootReducer';
+import TableListItem from 'components/ResourceListItem/TableListItem';
+import { getHighlightedTableMetadata } from 'components/ResourceListItem/MetadataHighlightList/utils';
+import AvatarLabel from 'components/AvatarLabel';
+import LoadingSpinner from 'components/LoadingSpinner';
+import {
+  PreviewData,
+  SnowflakeListingStatsQueryParams,
+} from 'interfaces';
+
+import { logClick } from 'utils/analytics';
+import { TableMetadata } from 'interfaces/TableMetadata';
+import { NO_SNOWFLAKE_SHARES_INFO } from '../constants';
+
+
+
+import './styles.scss';
+
+
+
+const BUTTON_IMAGE = '/static/images/snowflake.png';
+
+enum LoadingStatus {
+  ERROR = 'error',
+  FORBIDDEN = 'forbidden',
+  LOADING = 'loading',
+  SUCCESS = 'success',
+  UNAUTHORIZED = 'unauthorized',
+  UNAVAILABLE = 'unavailable',
+}
+
+export interface StateFromProps {
+  shares: SnowflakeTableShare;
+  status: LoadingStatus;
+  tableData: TableMetadata;
+}
+
+export interface DispatchFromProps {
+//   getSnowflakeListingStats: (queryParams: TablePreviewQueryParams) => void;
+}
+
+export interface ComponentProps {
+  modalTitle: string;
+}
+
+type SnowflakeSharesProps = StateFromProps &
+  DispatchFromProps &
+  ComponentProps;
+
+interface SnowflakeListingStatsButtonState {
+  showModal: boolean;
+}
+
+export function getStatusFromCode(httpErrorCode: number | null) {
+  switch (httpErrorCode) {
+    case null:
+      return LoadingStatus.LOADING;
+    case 200:
+      // ok
+      return LoadingStatus.SUCCESS;
+    case 401:
+      // user is unauthorized to see content
+      return LoadingStatus.UNAUTHORIZED;
+    case 403:
+      // user is authorized, but forbidden from resource
+      return LoadingStatus.FORBIDDEN;
+    case 501:
+      // preview client was not configured
+      return LoadingStatus.UNAVAILABLE;
+    default:
+      // default to generic error
+      return LoadingStatus.ERROR;
+  }
+}
+
+
+// export interface SnowflakeSharesProps {
+//   shares: SnowflakeTableShare[];
+//   tableDetails?: TableMetadata;
+// }
+
+export class SnowflakeSharesList extends React.Component<
+  SnowflakeSharesProps,
+  SnowflakeListingStatsButtonState
+> {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      showModal: false,
+    };
+  }
+
+  componentDidMount() {
+    const { tableData, shares } = this.props;
+  }
+
+  handleClose = () => {
+    this.setState({ showModal: false });
+  };
+
+  handleClick = (e) => {
+    // const { tableData, getSnowflakeListingStats, listing } = this.props;
+    const { tableData, listing } = this.props;
+
+    logClick(e);
+
+    // getSnowflakeListingStats({
+    //   list_global_name: listing.global_name
+    // });
+
+    this.setState({ showModal: true });
+  };
+
+  renderModalBody() {
+    const { snowflakeListingStats, status } = this.props;
+
+    if (status === LoadingStatus.LOADING) {
+      return <LoadingSpinner />;
+    }
+
+    if (status === LoadingStatus.SUCCESS) {
+      // return <PreviewDataTable isLoading={false} previewData={previewData} />;
+      return <table/>
+    }
+
+    if (status === LoadingStatus.UNAUTHORIZED) {
+      return (
+        <div>
+          <Linkify>{snowflakeListingStats.error_text}</Linkify>
+        </div>
+      );
+    }
+
+    return null;
+  }
+
+  renderSnowflakeListingStatsButton() {
+    const { listing, status } = this.props;
+
+    // Based on the state, the preview button will show different things.
+    let buttonText = 'Loading...';
+    let disabled = true;
+    let popoverText = 'The Snowflake Listing Stats are loading';
+
+    
+    buttonText = 'Stats';
+    disabled = false;
+
+    const statsButton = (
+      <button
+        id="snowflake-listing-stats-button"
+        className="btn btn-default btn-lg"
+        disabled={disabled}
+        onClick={this.handleClick}
+      >
+        <AvatarLabel
+          label={buttonText}
+          src={BUTTON_IMAGE}
+          round={true}
+        />
+      </button>
+    );
+
+    if (!disabled) {
+      return statsButton;
+    }
+
+    // when button is disabled, render button with Popover
+    const popoverHover = (
+      <Popover id="popover-trigger-hover">{popoverText}</Popover>
+    );
+
+    return (
+      <OverlayTrigger
+        trigger={['hover', 'focus']}
+        placement="top"
+        delayHide={200}
+        overlay={popoverHover}
+      >
+        {/* Disabled buttons don't trigger hover/focus events so we need a wrapper */}
+        <div className="overlay-trigger">{statsButton}</div>
+      </OverlayTrigger>
+    );
+  }
+
+  render() {
+    const { modalTitle } = this.props;
+    const { showModal } = this.state;
+
+    return (
+      <>
+        <div className="list-group">
+          {shares.map((share, index) => {
+
+            return (
+              <div key={index}>
+                <div className="share-item">
+                  <div className="share-info">
+                    {share.owner_account}.{share.name}
+                  </div>
+                  {share.listing && (
+                    <div className="listing-info">
+                      <span>{share.listing.name}</span>
+                      {share.listing.title && (
+                        <div>
+                          <div className=".desc">{share.listing.title}</div>
+                          <div className=".desc">{share.listing.subtitle}</div>
+                          <div className=".desc">{share.listing.description}</div>
+                        </div>
+                    )}
+            
+        {this.renderSnowflakeListingStatsButton()}
+        <Modal
+          className="listing-stats-modal"
+          show={showModal}
+          onHide={this.handleClose}
+        >
+          <Modal.Header className="text-center" closeButton>
+            <Modal.Title>{modalTitle}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>{this.renderModalBody()}</Modal.Body>
+        </Modal>
+      </>
+    );
+  }
+
+  // if (shares.length === 0) {
+  //   return (
+  //     <div className="resource-list">
+  //       <div className="empty-message body-placeholder">{NO_SNOWFLAKE_SHARES_INFO}</div>
+  //     </div>
+  //   );
+  // }
+
+  // const [showModal, setShowModal] = useState(false);
+  
+  // return (
+  //   <>
+  //     <div className="list-group">
+  //       {shares.map((share, index) => {
+  //         const logging = {
+  //           index,
+  //           source: `snowflake_table_shares_list`,
+  //         };
+
+  //         return (
+  //           <div key={index}>
+  //             <div className="share-item">
+  //               <div className="share-info">
+  //                 {share.owner_account}.{share.name}
+  //               </div>
+  //               {share.listing && (
+  //                 <div className="listing-info">
+  //                   <span>{share.listing.name}</span>
+  //                   {share.listing.title && (
+  //                     <div>
+  //                       <div className=".desc">{share.listing.title}</div>
+  //                       <div className=".desc">{share.listing.subtitle}</div>
+  //                       <div className=".desc">{share.listing.description}</div>
+  //                     </div>
+  //                   )}
+  //                   <button
+  //                     id="snowflake-listing-button"
+  //                     className="btn btn-default btn-lg"
+  //                     // disabled={disabled}
+  //                     onClick={() => setShowModal(true)}
+  //                   >
+  //                     <AvatarLabel
+  //                       label="Stats"
+  //                       src={BUTTON_IMAGE}
+  //                       round={true}
+  //                     />
+  //                   </button>
+  //                   <button onClick={() => setShowModal(true)}>Open Modal</button>
+  //                   {showModal && (
+  //                       <div>
+  //                           {/* Modal content */}
+  //                           {/* <div className="modal-content">
+  //                               API Data goes here
+  //                               <button onClick={() => setShowModal(false)}>Close Modal</button>
+  //                           </div> */}
+  //                           {/* Modal background */}
+  //                           {/* <div onClick={() => setShowModal(false)} className="modal-background"> */}
+  //                           <Modal
+  //                             className="listing-modal-content"
+  //                             show={showModal}
+  //                             onHide={this.setState({ showModal: false })}
+  //                           >
+  //                             <Modal.Header className="text-center" closeButton>
+  //                               <Modal.Title>{modalTitle}</Modal.Title>
+  //                             </Modal.Header>
+  //                             <Modal.Body>{this.renderModalBody()}</Modal.Body>
+  //                           </Modal>
+
+  //                           </div>
+  //                       </div>
+  //                   )}  
+  //                 </div>              
+  //               )}
+  //             </div>
+  //           </div>
+  //         )
+  //        })}
+  //     </div>  
+  //   </>
+  // );
+}
+
+export const mapStateToProps = (state: GlobalState) => ({
+  previewData: state.tableMetadata.preview.data,
+  status: getStatusFromCode(state.tableMetadata.preview.status),
+  tableData: state.tableMetadata.tableData,
+});
+
+export const mapDispatchToProps = (dispatch: any) => {
+  // bindActionCreators({ getSnowflakeListingStats }, dispatch);
+}
+
+export default connect<StateFromProps, DispatchFromProps, ComponentProps>(
+  mapStateToProps,
+  mapDispatchToProps
+)(SnowflakeSharesList);
+
+// export default SnowflakeSharesList;

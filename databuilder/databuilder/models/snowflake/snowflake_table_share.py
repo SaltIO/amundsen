@@ -42,6 +42,7 @@ class SnowflakeTableShare(GraphSerializable):
                  share_kind: str,
                  data_exchange_name: str = None,
                  listing_global_name: str = None,
+                 listing_name: str = None,
                  listing_title: str = None,
                  listing_subtitle: str = None,
                  listing_desc: str = None) -> None:
@@ -55,6 +56,7 @@ class SnowflakeTableShare(GraphSerializable):
         self.share_kind = share_kind
         self.data_exchange_name = data_exchange_name
         self.listing_global_name = listing_global_name
+        self.listing_name = listing_name
         self.listing_title = listing_title
         self.listing_subtitle = listing_subtitle
         self.listing_desc = listing_desc
@@ -107,7 +109,7 @@ class SnowflakeTableShare(GraphSerializable):
             label=SnowflakeTableShare.SHARE_LABEL,
             attributes={
                 'owner_account': self.owner_account,
-                'share_name': self.share_name
+                'name': self.share_name
             }
         )
         yield share_node
@@ -118,6 +120,7 @@ class SnowflakeTableShare(GraphSerializable):
                 label=SnowflakeTableShare.LISTING_LABEL,
                 attributes={
                     'global_name': self.listing_global_name,
+                    'name': self.listing_name,
                     'title': self.listing_title,
                     'subtitle': self.listing_subtitle,
                     'description': self.listing_desc
