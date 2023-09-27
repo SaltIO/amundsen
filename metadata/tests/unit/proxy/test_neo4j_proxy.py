@@ -185,11 +185,13 @@ class TestNeo4jProxy(unittest.TestCase):
                     'category': 'table_status'
                 }
             ],
-            'src': {
-                'source': '/source_file_loc',
-                'key': 'some key',
-                'source_type': 'github'
-            },
+            'srcs': [
+                {
+                    'source': '/source_file_loc',
+                    'key': 'some key',
+                    'source_type': 'github'
+                }
+            ],
             'prog_descriptions': [
                 {
                     'description_source': 's3_crawler',
