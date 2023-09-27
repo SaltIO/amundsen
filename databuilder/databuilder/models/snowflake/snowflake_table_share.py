@@ -2,33 +2,33 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import (
-    Iterator, Optional, Union,
+    Iterator, Optiona,
 )
 
-from amundsen_common.utils.atlas import AtlasCommonParams, AtlasTableTypes
-from amundsen_rds.models import RDSModel
+# from amundsen_common.utils.atlas import AtlasCommonParams, AtlasTableTypes
+# from amundsen_rds.models import RDSModel
 # from amundsen_rds.models.table import SnowflakeTableShare as RDSSnowflakeTableShare
 
-from databuilder.models.atlas_entity import AtlasEntity
-from databuilder.models.atlas_relationship import AtlasRelationship
-from databuilder.models.atlas_serializable import AtlasSerializable
+# from databuilder.models.atlas_entity import AtlasEntity
+# from databuilder.models.atlas_relationship import AtlasRelationship
+# from databuilder.models.atlas_serializable import AtlasSerializable
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.graph_serializable import GraphSerializable
 from databuilder.models.table_metadata import TableMetadata
-from databuilder.models.table_serializable import TableSerializable
+# from databuilder.models.table_serializable import TableSerializable
 from databuilder.serializers.atlas_serializer import get_entity_attrs
-from databuilder.utils.atlas import AtlasRelationshipTypes, AtlasSerializedEntityOperation
+# from databuilder.utils.atlas import AtlasRelationshipTypes, AtlasSerializedEntityOperation
 
 
 # class SnowflakeTableShare(GraphSerializable, TableSerializable, AtlasSerializable):
 class SnowflakeTableShare(GraphSerializable):
-    SHARE_LABEL = 'Snowflakeshare'    
+    SHARE_LABEL = 'Snowflakeshare'
     SHARE_KEY_FORMAT = 'snowflake://{owner_account}.{share_name}/_share'
     SHARE_TABLE_RELATION_TYPE = 'SNOWFLAKE_SHARE_OF'
     TABLE_SHARE_RELATION_TYPE = 'SNOWFLAKE_SHARE'
 
-    LISTING_LABEL = 'Snowflakelisting'    
+    LISTING_LABEL = 'Snowflakelisting'
     LISTING_KEY_FORMAT = 'snowflake://{listing_global_name}/_listing'
     LISTING_SHARE_RELATION_TYPE = 'SNOWFLAKE_LISTING_OF'
     SHARE_LISTING_RELATION_TYPE = 'SNOWFLAKE_LISTING'
@@ -66,7 +66,6 @@ class SnowflakeTableShare(GraphSerializable):
         # self._record_iter = self._create_record_iterator()
         # self._atlas_entity_iterator = self._create_next_atlas_entity()
         # self._atlas_relation_iterator = self._create_atlas_relation_iterator()
-        
 
     def create_next_node(self) -> Optional[GraphNode]:
         # return the string representation of the data
@@ -89,15 +88,16 @@ class SnowflakeTableShare(GraphSerializable):
 
     def get_listing_model_key(self) -> str:
         return SnowflakeTableShare.LISTING_KEY_FORMAT.format(listing_global_name=self.listing_global_name.lower())
-    
+
     def get_share_model_key(self) -> str:
-        return SnowflakeTableShare.SHARE_KEY_FORMAT.format(owner_account=self.owner_account.lower(), share_name=self.share_name.lower())
-    
+        return SnowflakeTableShare.SHARE_KEY_FORMAT.format(owner_account=self.owner_account.lower(),
+                                                           share_name=self.share_name.lower())
+
     def get_table_model_key(self) -> str:
         return TableMetadata.TABLE_KEY_FORMAT.format(db=self.database.lower(),
-                                                        cluster=self.cluster.lower(),
-                                                        schema=self.schema.lower(),
-                                                        tbl=self.table.lower())
+                                                     cluster=self.cluster.lower(),
+                                                     schema=self.schema.lower(),
+                                                     tbl=self.table.lower())
 
     def _create_node_iterator(self) -> Iterator[GraphNode]:
         """
