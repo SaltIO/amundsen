@@ -27,7 +27,7 @@ jobs:
       - name: Set up pip to use AWS CodeArtifact
         run: |
           # Get authorization token and configure pip
-          aws codeartifact login --tool pip --repository foodtruck.python.artifact.repository --domain foodtruck-codeartifact-domain --domain-owner 812753953378)
+          aws codeartifact login --tool pip --repository foodtruck.python.artifact.repository --domain foodtruck-codeartifact-domain --domain-owner 812753953378
       - name: Install dependencies
         run: make install_deps && pip3 uninstall -y amundsen-common && pip3 install -e ../common
         working-directory: ./metadata
