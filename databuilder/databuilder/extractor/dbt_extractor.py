@@ -155,7 +155,7 @@ class DbtExtractor(Extractor):
         # Combine the lists of default required keys and also the required keys to
         # support source extraction, if _extract_sources set to True)
         expected_manifest_keys = DBT_MANIFEST_REQD_KEYS + \
-                                 (DBT_MANIFEST_REQD_KEYS_SOURCES if self._extract_sources else [])
+                                (DBT_MANIFEST_REQD_KEYS_SOURCES if self._extract_sources else [])
         for manifest_key in expected_manifest_keys:
             if manifest_key not in self._dbt_manifest:
                 raise InvalidDbtInputs(

@@ -185,7 +185,7 @@ class TestNeo4jProxy(unittest.TestCase):
                     'category': 'table_status'
                 }
             ],
-            'srcs': [
+            'sources': [
                 {
                     'source': '/source_file_loc',
                     'key': 'some key',
@@ -1663,7 +1663,7 @@ class TestNeo4jProxy(unittest.TestCase):
                             )
 
             self.assertEqual(str(expected), str(feature))
-        
+
     def test_get_feature_not_found(self) -> None:
         with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
             mock_execute.return_value = []

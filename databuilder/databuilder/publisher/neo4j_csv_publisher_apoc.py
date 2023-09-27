@@ -310,13 +310,16 @@ class Neo4jCsvPublisherApoc(Publisher):
         # TODO: check out https://neo4j.com/docs/cypher-manual/current/query-tuning/advanced-example/
         if self.is_create_only_node(node_records[0]):
             return """
-                    CALL apoc.periodic.iterate('UNWIND $rows AS row RETURN row', '
-                        CALL apoc.merge.node([row.label], {key:row.key}, row,
-                        {published_tag:$tag,publisher_last_updated_epoch_ms:timestamp()})
-                        YIELD node RETURN COUNT(*);
-                    ',
-                    {batchSize: $batch_size, iterateList: True, parallel: False, params: { rows: $batch, tag: $publish_tag }})
-                """
+                CALL apoc.periodic.iterate('UNWIND $rows AS row RETURN row', '
+                    CALL apoc.merge.node([row.label], {key:row.key}, row,
+                    {published_tag:$tag,publisher_last_updated_epoch_ms:timestamp()})
+                    YIELD node RETURN COUNT(*);
+                ',
+                {batchSize: $batch_size}
+                {iterateList: True}
+                {parallel: False}
+                {params: { rows: $batch, tag: $publish_tag }})
+            """
 
         return """
             CALL apoc.periodic.iterate('UNWIND $rows AS row RETURN row', '

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import (
-    Iterator, Optiona,
+    Iterator, Optional,
 )
 
 # from amundsen_common.utils.atlas import AtlasCommonParams, AtlasTableTypes
@@ -17,7 +17,7 @@ from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.graph_serializable import GraphSerializable
 from databuilder.models.table_metadata import TableMetadata
 # from databuilder.models.table_serializable import TableSerializable
-from databuilder.serializers.atlas_serializer import get_entity_attrs
+# from databuilder.serializers.atlas_serializer import get_entity_attrs
 # from databuilder.utils.atlas import AtlasRelationshipTypes, AtlasSerializedEntityOperation
 
 
