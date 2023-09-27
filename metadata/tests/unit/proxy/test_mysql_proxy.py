@@ -107,7 +107,7 @@ class TestMySQLProxy(unittest.TestCase):
         table.owners = [RDSUser(rk='tester@example.com', email='tester@example.com')]
         table.tags = [RDSTag(rk='test', tag_type='default')]
         table.badges = [RDSBadge(rk='golden', category='table_status')]
-        table.source = RDSTableSource(rk='some key', source_type='github', source='/source_file_loc')
+        table.sources = [RDSTableSource(rk='some key', source_type='github', source='/source_file_loc')]
         table.programmatic_descriptions = [
             RDSTableProgrammaticDescription(description_source='s3_crawler', description='Test Test Test'),
             RDSTableProgrammaticDescription(description_source='quality_report', description='Test Test')

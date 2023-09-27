@@ -408,8 +408,8 @@ class TestNeo4jProxy(unittest.TestCase):
                                  Application(**self.app_consuming, kind='Consuming')
                              ],
                              last_updated_timestamp=1,
-                             source=Source(source='/source_file_loc',
-                                           source_type='github'),
+                             sources=[Source(source='/source_file_loc',
+                                           source_type='github')],
                              is_view=False,
                              programmatic_descriptions=[
                                  ProgrammaticDescription(source='quality_report',
@@ -496,8 +496,8 @@ class TestNeo4jProxy(unittest.TestCase):
                                  Application(**self.app_consuming, kind='Consuming')
                              ],
                              last_updated_timestamp=1,
-                             source=Source(source='/source_file_loc',
-                                           source_type='github'),
+                             sources=[Source(source='/source_file_loc',
+                                           source_type='github')],
                              is_view=True,
                              programmatic_descriptions=[
                                  ProgrammaticDescription(source='quality_report',
