@@ -38,7 +38,7 @@ class SnowflakeTableShareSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class SnowflakeTableShares:
-    snowflake_table_shares: Optional[List[SnowflakeTableShare]] = []    
+    snowflake_table_shares: Optional[List[SnowflakeTableShare]] = []
 
 
 class SnowflakeTableSharesSchema(AttrsSchema):
