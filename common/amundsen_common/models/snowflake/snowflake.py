@@ -7,6 +7,7 @@ import attr
 
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
+
 @attr.s(auto_attribs=True, kw_only=True)
 class SnowflakeListing:
     global_name: str
@@ -15,10 +16,12 @@ class SnowflakeListing:
     subtitle: Optional[str]
     description: Optional[str]
 
+
 class SnowflakeListingSchema(AttrsSchema):
     class Meta:
         target = SnowflakeListing
         register_as_scheme = True
+
 
 @attr.s(auto_attribs=True, kw_only=True)
 class SnowflakeTableShare:
@@ -26,15 +29,17 @@ class SnowflakeTableShare:
     name: str
     listing: Optional[SnowflakeListing] = None
 
+
 class SnowflakeTableShareSchema(AttrsSchema):
     class Meta:
         target = SnowflakeTableShare
         register_as_scheme = True
 
+
 @attr.s(auto_attribs=True, kw_only=True)
 class SnowflakeTableShares:
-    snowflake_table_shares: Optional[List[SnowflakeTableShare]] = []
-    
+    snowflake_table_shares: Optional[List[SnowflakeTableShare]] = []    
+
 
 class SnowflakeTableSharesSchema(AttrsSchema):
     class Meta:
