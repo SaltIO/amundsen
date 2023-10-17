@@ -83,8 +83,7 @@ export class ReportDashboardIssue extends React.Component<
     const {
       dashboardKey,
       dashboardMetadata: { cluster, product, group_name, name },
-      dashboardOwners,
-      frequentUsers,
+      dashboardOwners
     } = this.props;
     const { issuePriority } = this.state;
     const title = formData.get('title') as string;
@@ -92,7 +91,7 @@ export class ReportDashboardIssue extends React.Component<
     const projectKey = issueTrackingProjectSelectionEnabled()
       ? (formData.get('project_key') as string)
       : '';
-    const resourcePath = `/dashboard/${product}_dashboard://${cluster}.${group_name}/${name}`;
+    const resourcePath = `/dashboard/${encodeURIComponent(dashboardKey)}`;
 
     return {
       title,
@@ -108,13 +107,14 @@ export class ReportDashboardIssue extends React.Component<
 
   getNotificationPayload = (): NotificationPayload => {
     const {
+      dashboardKey,
       dashboardMetadata: { cluster, product, group_name, name },
       dashboardOwners,
       userEmail,
     } = this.props;
     const owners = dashboardOwners;
     const resourceName = `${group_name}.${name}`;
-    const resourcePath = `/dashboard/${product}_dashboard://${cluster}.${group_name}/${name}`;
+    const resourcePath = `/dashboard/${encodeURIComponent(dashboardKey)}`;
 
     return {
       recipients: owners,
@@ -240,7 +240,7 @@ export class ReportDashboardIssue extends React.Component<
               </div>
             </form>
             <div className="data-owner-notification">
-              {Constants.DASHBOARD_OWNERS_NOTE
+              {Constants.DASHBOARD_OWNERS_NOTE}
             </div>
           </div>
         )}
