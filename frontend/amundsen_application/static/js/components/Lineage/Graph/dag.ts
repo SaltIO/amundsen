@@ -344,7 +344,7 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
             .attr("height", nodeRectHeight);  // Using full height to test
         nodeLabel.attr("clip-path", "url(#clip-rect)");
 
-        const nodeTitle = nodeGroup.append("title").text((d: D3LineageItem) => d.name);
+        const nodeTitle = nodeGroup.append("title").text((d: D3LineageItem) => `${d.cluster}.${d.schema}.${d.name}`);
 
         // simulation.on("tick", () => {
         //     link
