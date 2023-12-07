@@ -14,6 +14,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 class UpdateFrequency(Enum):
+    ANNUALLY = "annually"
+    QUARTERLY = "quarterly"
     MONTHLY = "monthly"
     WEEKLY = "weekly"
     DAILY = "daily"
