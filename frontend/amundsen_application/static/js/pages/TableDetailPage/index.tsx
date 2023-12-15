@@ -103,7 +103,7 @@ import RequestDescriptionText from './RequestDescriptionText';
 import RequestMetadataForm from './RequestMetadataForm';
 import ListSortingDropdown from './ListSortingDropdown';
 import SnowflakeSharesList from './SnowflakeSharesList';
-import UpdateFrequencyDropdown from './UpdateFrequencyDropdown';
+import TableUpdateFrequencyEditor from './TableUpdateFrequencyEditor';
 
 import * as Constants from './constants';
 import { AIRFLOW, DATABRICKS } from './ApplicationDropdown/constants';
@@ -853,10 +853,17 @@ export class TableDetail extends React.Component<
                     </time>
                   </section>
                   <section className="editable-section">
-                    <div className="section-title">
-                      {Constants.UPDATE_FREQUENCY_TITLE}
-                    </div>
-                    <UpdateFrequencyDropdown updateFrequency={data.update_frequency} />
+                    <EditableSection
+                      title={Constants.UPDATE_FREQUENCY_TITLE}
+                      readOnly={!data.is_editable}
+                      editText={editText}
+                      editUrl={editUrl || undefined}
+                    >
+                      <TableUpdateFrequencyEditor
+                        value={data.update_frequency}
+                        editable={data.is_editable}
+                      />
+                    </EditableSection>
                   </section>
                   <section className="metadata-section">
                     <div className="section-title">

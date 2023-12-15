@@ -979,7 +979,7 @@ describe('generateExploreUrl', () => {
     resource_reports: [],
     watermarks: [],
     programmatic_descriptions: {},
-    update_frequency: null
+    update_frequency: { isLoading: false, frequency: '' }
   };
 
   it('calls `exploreUrlGenerator` with table metadata', () => {

@@ -1,342 +1,328 @@
 // Copyright Contributors to the Amundsen project.
 // SPDX-License-Identifier: Apache-2.0
 
+import * as autosize from 'autosize';
 import * as React from 'react';
-import { Link } from 'react-router-dom';
-import { Modal } from 'react-bootstrap';
+import * as ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-import LoadingSpinner from 'components/LoadingSpinner';
-import { ResourceType, UpdateMethod, UpdateOwnerPayload } from 'interfaces';
-import { logClick, logAction } from 'utils/analytics';
-
+import LoadingSpinnerOverlay from 'components/LoadingSpinnerOverlay';
 import { EditableSectionChildProps } from 'components/EditableSection';
+import { logClick } from 'utils/analytics';
+
+import {
+  CANCEL_BUTTON_TEXT,
+  REFRESH_BUTTON_TEXT,
+  REFRESH_MESSAGE,
+  ADD_MESSAGE,
+  UPDATE_BUTTON_TEXT,
+} from './constants';
+
+import { PROPOSITION_LABEL } from 'features/Feedback/constants';
+
+export interface StateFromProps {
+  isLoading: boolean;
+  refreshValue?: string;
+}
 
 export interface DispatchFromProps {
-  onUpdateList: (
-    updateArray: UpdateOwnerPayload[],
+  onSubmitValue?: (
+    newValue: string,
     onSuccess?: () => any,
     onFailure?: () => any
   ) => void;
 }
 
 export interface ComponentProps {
-  errorText?: string | null;
-  resourceType: ResourceType;
+  editable?: boolean;
+  maxLength?: number;
+  value?: string;
+  allowDangerousHtml?: boolean;
 }
 
-interface OwnerAvatarLabelProps extends AvatarLabelProps {
-  link?: string;
-  isExternal?: boolean;
-}
-
-export interface StateFromProps {
-  isLoading: boolean;
-  itemProps: OwnerItemProps;
-}
-
-export type OwnerEditorProps = ComponentProps &
+export type UpdateFrequencyEditorProps = ComponentProps &
   DispatchFromProps &
   StateFromProps &
   EditableSectionChildProps;
 
-export type OwnerItemProps = { [id: string]: OwnerAvatarLabelProps };
-
-interface OwnerEditorState {
-  errorText: string | null;
-  itemProps: OwnerItemProps;
-  tempItemProps: { [id: string]: AvatarLabelProps };
+interface UpdateFrequencyEditorState {
+  value?: string;
+  isDisabled: boolean;
 }
 
-export class OwnerEditor extends React.Component<
-  OwnerEditorProps,
-  OwnerEditorState
+class UpdateFrequencyEditor extends React.Component<
+  UpdateFrequencyEditorProps,
+  UpdateFrequencyEditorState
 > {
-  private inputRef: React.RefObject<HTMLInputElement>;
+  readonly textAreaRef: React.RefObject<HTMLTextAreaElement>;
+  readonly aiTextAreaRef: React.RefObject<HTMLTextAreaElement>;
 
-  public static defaultProps: Partial<OwnerEditorProps> = {
-    errorText: null,
-    isLoading: false,
-    itemProps: {},
-    onUpdateList: () => undefined,
+  public static defaultProps: UpdateFrequencyEditorProps = {
+    editable: true,
+    maxLength: 500,
+    value: '',
   };
 
-  constructor(props: OwnerEditorProps) {
+  constructor(props: UpdateFrequencyEditorProps) {
     super(props);
+    this.textAreaRef = React.createRef<HTMLTextAreaElement>();
+    this.aiTextAreaRef = React.createRef<HTMLTextAreaElement>();
 
     this.state = {
-      errorText: props.errorText || null,
-      itemProps: props.itemProps,
-      tempItemProps: props.itemProps,
+      isDisabled: false,
+      value: props.value,
     };
-
-    this.inputRef = React.createRef();
   }
 
-  componentDidUpdate(prevProps) {
-    const { itemProps } = this.props;
+  componentDidUpdate(prevProps: UpdateFrequencyEditorProps) {
+    const { value: stateValue, isDisabled } = this.state;
+    const {
+      value: propValue,
+      isEditing,
+      refreshValue,
+      getLatestValue
+    } = this.props;
 
-    // TODO - itemProps is a new object and this check needs to be fixed
-    if (prevProps.itemProps !== itemProps) {
-      this.setState({
-        itemProps,
-        tempItemProps: itemProps,
-      });
+    // console.log(`refreshValue=${refreshValue}`)
+    // console.log(`stateValue=${stateValue}`)
+    // console.log(`propValue=${propValue}`)
+    // console.log(`prevProps.value=${prevProps.value}`)
+
+    if (prevProps.value !== propValue) {
+      this.setState({ value: propValue });
+    }
+    else if (isEditing && !prevProps.isEditing) {
+      const textArea = this.textAreaRef.current;
+
+      if (textArea) {
+        autosize(textArea);
+        textArea.focus();
+      }
+
+      if (getLatestValue) {
+        getLatestValue();
+      }
+    }
+    else if ((refreshValue || stateValue) &&
+              refreshValue !== stateValue &&
+              !isDisabled) {
+      // disable the component if a refresh is needed
+      this.setState({ isDisabled: true });
     }
   }
 
-  handleShow = () => {
+  handleExitEditMode = (e: React.MouseEvent<HTMLButtonElement>) => {
+    logClick(e, {
+      label: 'Cancel Editable Text',
+    });
+    this.exitEditMode();
+  };
+
+  exitEditMode = () => {
     const { setEditMode } = this.props;
 
-    if (setEditMode) {
-      setEditMode(true);
+    setEditMode?.(false);
+  };
+
+  handleEnterEditMode = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { setEditMode } = this.props;
+
+    logClick(e, {
+      label: 'Add Editable Text',
+    });
+    setEditMode?.(true);
+  };
+
+  handleRefreshText = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { refreshValue } = this.props;
+    const textArea = this.textAreaRef.current;
+
+    this.setState({ value: refreshValue, isDisabled: false });
+    logClick(e, {
+      label: 'Refresh Editable Text',
+    });
+
+    if (textArea && refreshValue) {
+      textArea.value = refreshValue;
+      autosize.update(textArea);
     }
   };
 
-  handleCancelEdit = () => {
-    const { setEditMode } = this.props;
-    const { itemProps } = this.state;
-
-    this.setState({ tempItemProps: itemProps });
-    if (setEditMode) {
-      setEditMode(false);
-    }
-    logAction({
-      command: 'click',
-      target_id: 'cancel-owner-edit',
-      label: 'Cancel Owner Edit',
-    });
-  };
-
-  handleSaveEdit = () => {
-    const { itemProps, tempItemProps } = this.state;
-    const { setEditMode, onUpdateList } = this.props;
-
-    const updateArray: UpdateOwnerPayload[] = [];
-
-    Object.keys(itemProps).forEach((key) => {
-      if (!tempItemProps.hasOwnProperty(key)) {
-        updateArray.push({ method: UpdateMethod.DELETE, id: key });
-      }
-    });
-    Object.keys(tempItemProps).forEach((key) => {
-      if (!itemProps.hasOwnProperty(key)) {
-        updateArray.push({ method: UpdateMethod.PUT, id: key });
-      }
-    });
+  handleUpdateText = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { setEditMode, onSubmitValue } = this.props;
+    const newValue = this.textAreaRef.current?.value;
 
     const onSuccessCallback = () => {
-      if (setEditMode) {
-        setEditMode(false);
-      }
+      setEditMode?.(false);
+      this.setState({ value: newValue });
     };
     const onFailureCallback = () => {
-      this.setState({
-        errorText: Constants.DEFAULT_ERROR_TEXT,
-      });
-      if (setEditMode) {
-        setEditMode(false);
-      }
+      this.exitEditMode();
     };
 
-    onUpdateList(updateArray, onSuccessCallback, onFailureCallback);
-    logAction({
-      command: 'click',
-      target_id: 'save-owner-edit',
-      label: 'Save Owner Edit',
+    logClick(e, {
+      label: 'Update Editable Text',
     });
+
+    if (newValue) {
+      onSubmitValue?.(newValue, onSuccessCallback, onFailureCallback);
+    }
   };
 
-  handleRecordAddItem = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const { tempItemProps } = this.state;
+  handleAIEnabledChange = (event) => {
+    this.setState({ isAIEnabled: event.target.checked});
+  };
 
-    if (this.inputRef.current) {
-      const { value } = this.inputRef.current;
+  handleGenerateDescription = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { getGPTResponse } = this.props;
 
-      if (value) {
-        this.inputRef.current.value = '';
-
-        const newTempItemProps = {
-          ...tempItemProps,
-          [value]: { label: value },
-        };
-
-        this.setState({ tempItemProps: newTempItemProps });
-        logAction({
-          command: 'click',
-          target_id: 'add-owner-email',
-          label: 'Add Owner Email',
-          target_type: 'button',
-        });
+    const onSuccessCallback = (gptResponse: GetGPTResponseResponse) => {
+      this.setState({ isGPTResponseLoading: false, aiError: false});
+      if (gptResponse.payload.gptResponse && gptResponse.payload.gptResponse.message && gptResponse.payload.gptResponse.message.content) {
+        const textArea = this.textAreaRef.current;
+        if (textArea) {
+          textArea.value = gptResponse.payload.gptResponse.message.content
+          autosize.update(textArea);
+        }
       }
+    };
+    const onFailureCallback = (gptResponse: GetGPTResponseResponse) => {
+      this.setState({ isGPTResponseLoading: false, aiError: true});
+    };
+
+    if (this.aiTextAreaRef.current && this.aiTextAreaRef.current.value) {
+      getGPTResponse?.(this.aiTextAreaRef.current.value, onSuccessCallback, onFailureCallback);
+      this.setState({ isGPTResponseLoading: true, aiError: false});
     }
-  };
-
-  recordDeleteItem = (deletedKey: string) => {
-    const { tempItemProps } = this.state;
-
-    const newTempItemProps = Object.keys(tempItemProps)
-      .filter((key) => key !== deletedKey)
-      .reduce((obj, key) => ({ ...obj, [key]: tempItemProps[key] }), {});
-
-    this.setState({ tempItemProps: newTempItemProps });
-  };
-
-  renderModalBody = () => {
-    const { isEditing, isLoading } = this.props;
-    const { tempItemProps } = this.state;
-
-    if (!isEditing) {
-      return null;
-    }
-
-    if (isLoading) {
-      return (
-        <Modal.Body>
-          <LoadingSpinner />
-        </Modal.Body>
-      );
-    }
-
-    return (
-      <Modal.Body>
-        <form className="component-form" onSubmit={this.handleRecordAddItem}>
-          {/* eslint-disable jsx-a11y/no-autofocus */}
-          <input
-            id="add-item-input"
-            autoFocus
-            placeholder={`Please enter ${getUserIdLabel()}`}
-            ref={this.inputRef}
-          />
-          {/* eslint-enable jsx-a11y/no-autofocus */}
-          <button className="btn btn-default add-button" type="submit">
-            {Constants.ADD_ITEM}
-          </button>
-        </form>
-        <ul className="component-list">
-          {Object.keys(tempItemProps).map((key) => (
-            <li key={`modal-list-item:${key}`}>
-              {React.createElement(AvatarLabel, tempItemProps[key])}
-              <button
-                className="btn btn-flat-icon delete-button"
-                onClick={() => this.recordDeleteItem(key)}
-                type="button"
-              >
-                <span className="sr-only">{Constants.DELETE_ITEM}</span>
-                <img className="icon icon-delete" alt="" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Modal.Body>
-    );
   };
 
   render() {
-    const { isEditing, readOnly, resourceType } = this.props;
-    const { errorText, itemProps } = this.state;
-    const hasItems = Object.keys(itemProps).length > 0;
+    const { isEditing, editable, maxLength, allowDangerousHtml } = this.props;
+    const { value = '', isDisabled, isAIEnabled, isGPTResponseLoading, aiError } = this.state;
 
-    if (errorText) {
+    if (isGPTResponseLoading) {
       return (
-        <div className="owner-editor-component">
-          <span className="status-message">{errorText}</span>
+        <LoadingSpinnerOverlay isLoading={true} />
+      )
+    }
+
+    if (!isEditing) {
+      return (
+        <div className="editable-text">
+          <div className="markdown-wrapper">
+            <ReactMarkdown
+              allowDangerousHtml={!!allowDangerousHtml}
+              plugins={[remarkGfm]}
+            >
+              {value}
+            </ReactMarkdown>
+          </div>
+          {editable && !value && (
+            <button
+              className="edit-link btn btn-link"
+              style={{ fontFamily: 'IBM Plex Mono'}}
+              onClick={this.handleEnterEditMode}
+              data-type="add-editable-text"
+              type="button"
+            >
+              {ADD_MESSAGE}
+            </button>
+          )}
         </div>
       );
     }
 
-    const ownerList = hasItems ? (
-      <ul className="component-list">
-        {Object.keys(itemProps).map((key) => {
-          const owner = itemProps[key];
-          const avatarLabel = React.createElement(AvatarLabel, owner);
-
-          let listItem: React.ReactNode;
-
-          if (owner.link === undefined) {
-            listItem = avatarLabel;
-          } else if (owner.isExternal) {
-            listItem = (
-              <a
-                href={owner.link}
-                target="_blank"
-                id={`${resourceType}-owners:${key}`}
-                data-type={`${resourceType}-owners`}
-                onClick={logClick}
-                rel="noopener noreferrer"
-              >
-                {avatarLabel}
-              </a>
-            );
-          } else {
-            listItem = (
-              <Link
-                to={owner.link}
-                id={`${resourceType}-owners:${key}`}
-                data-type={`${resourceType}-owners`}
-                onClick={logClick}
-              >
-                {avatarLabel}
-              </Link>
-            );
-          }
-
-          return <li key={`list-item:${key}`}>{listItem}</li>;
-        })}
-      </ul>
-    ) : null;
-
     return (
-      <div className="owner-editor-component">
-        {ownerList}
-        {readOnly && !hasItems && (
-          <AvatarLabel
-            avatarClass="gray-avatar"
-            labelClass="text-placeholder"
-            label={Constants.NO_OWNER_TEXT}
-          />
+      <div className="editable-text">
+        {/* Conditionally render the additional textarea and button */}
+          {isAIEnabled && (
+            <>
+              <textarea
+                className="editable-textarea"
+                rows={2}
+                maxLength={maxLength}
+                ref={this.aiTextAreaRef}
+                placeholder="Enter prompt here..."
+                disabled={isDisabled}
+                aria-label="Editable text area"
+              />
+              <button
+                className="btn btn-primary update-button"
+                onClick={this.handleGenerateDescription}
+                type="button"
+                data-type="update-editable-text"
+              >
+                Generate Description
+              </button>
+            </>
+          )}
+          {aiError && (
+            <h2 className="label label-danger refresh-message">
+              There was a problem accessing the AI service. Plesae try again later.
+            </h2>
+          )}
+        {aiEnabled() && (
+          <div className="editable-textarea-controls">
+            <label>
+              <input
+                type="checkbox"
+                checked={isAIEnabled}
+                onChange={this.handleAIEnabledChange}
+              />
+              Enable AI
+            </label>
+          </div>
         )}
-        {!readOnly && !hasItems && (
+        <textarea
+          className="editable-textarea"
+          rows={2}
+          maxLength={maxLength}
+          ref={this.textAreaRef}
+          placeholder="Enter description here..."
+          defaultValue={value}
+          disabled={isDisabled}
+          aria-label="Editable text area"
+        />
+        <div className="editable-textarea-controls">
+          {isDisabled && (
+            <>
+              <h2 className="label label-danger refresh-message">
+                {REFRESH_MESSAGE}
+              </h2>
+              <button
+                className="btn btn-primary refresh-button"
+                onClick={this.handleRefreshText}
+                data-type="refresh-editable-text"
+                type="button"
+              >
+                <img className="icon icon-refresh" alt="" />
+                {REFRESH_BUTTON_TEXT}
+              </button>
+            </>
+          )}
+          {!isDisabled && (
+            <button
+              className="btn btn-primary update-button"
+              onClick={this.handleUpdateText}
+              type="button"
+              data-type="update-editable-text"
+            >
+              {UPDATE_BUTTON_TEXT}
+            </button>
+          )}
           <button
+            className="btn btn-default cancel-button"
+            onClick={this.handleExitEditMode}
             type="button"
-            className="btn btn-flat-icon add-item-button"
-            onClick={this.handleShow}
+            data-type="cancel-editable-text"
           >
-            <img className="icon icon-plus-circle" alt="" />
-            <span style={{ fontFamily: 'IBM Plex Mono'}}>{Constants.ADD_OWNER}</span>
+            {CANCEL_BUTTON_TEXT}
           </button>
-        )}
-        {!readOnly && (
-          <Modal
-            className="owner-editor-modal"
-            show={isEditing}
-            onHide={this.handleCancelEdit}
-          >
-            <Modal.Header className="text-center" closeButton={false}>
-              <Modal.Title>{Constants.OWNED_BY}</Modal.Title>
-            </Modal.Header>
-            {this.renderModalBody()}
-            <Modal.Footer>
-              <button
-                type="button"
-                className="btn btn-default"
-                onClick={this.handleCancelEdit}
-              >
-                {Constants.CANCEL_TEXT}
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={this.handleSaveEdit}
-              >
-                {Constants.SAVE_TEXT}
-              </button>
-            </Modal.Footer>
-          </Modal>
-        )}
+        </div>
       </div>
     );
   }
 }
 
-export default OwnerEditor;
+export default UpdateFrequencyEditor;
+

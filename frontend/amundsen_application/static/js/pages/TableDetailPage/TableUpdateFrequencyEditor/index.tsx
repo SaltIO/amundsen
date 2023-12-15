@@ -16,15 +16,16 @@ import UpdateFrequencyEditor, {
 export const mapStateToProps = (state: GlobalState) => {
   return {
     isLoading: state.tableMetadata.update_frequency.isLoading,
-    itemProps: state.tableMetadata.update_frequency.frequency,
+    refreshValue: state.tableMetadata.update_frequency.frequency,
   };
 };
 
 export const mapDispatchToProps = (dispatch: any) =>
-  bindActionCreators({ onUpdateList: updateTableUpdateFrequency }, dispatch);
+  bindActionCreators({ onSubmitValue: updateTableUpdateFrequency }, dispatch);
 
 export default connect<StateFromProps, DispatchFromProps, ComponentProps>(
   mapStateToProps,
   mapDispatchToProps
 )(UpdateFrequencyEditor);
+
 

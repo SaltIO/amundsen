@@ -80,6 +80,11 @@ export interface TableOwners {
   owners: User[];
 }
 
+export interface TableUpdateFrequency {
+  isLoading: boolean;
+  frequency?: string | null;
+}
+
 export interface ProgrammaticDescription {
   source: string;
   text: string;
@@ -115,7 +120,7 @@ export interface TableMetadata {
   resource_reports: ResourceReport[];
   watermarks: Watermark[];
   programmatic_descriptions: TableProgrammaticDescriptions;
-  update_frequency?: string | null;
+  update_frequency: TableUpdateFrequency;
 }
 
 export interface UpdateOwnerPayload {
