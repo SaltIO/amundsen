@@ -162,7 +162,7 @@ class UpdateFrequencyEditor extends React.Component<
           Update frequency
         </Dropdown.Toggle>
         <Dropdown.Menu className="sources-dropdown-menu">
-          <Dropdown.Item as="button" ...{updateFrequency === 'daily' ? 'active' : ''}>Daily</Dropdown.Item>
+          <Dropdown.Item as="button">Daily</Dropdown.Item>
           <Dropdown.Item as="button">Weekly</Dropdown.Item>
           <Dropdown.Item as="button">Monthly</Dropdown.Item>
           <Dropdown.Item as="button">Quarterly</Dropdown.Item>
