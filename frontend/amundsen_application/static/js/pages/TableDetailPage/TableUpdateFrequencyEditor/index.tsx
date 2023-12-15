@@ -15,8 +15,8 @@ import UpdateFrequencyEditor, {
 
 export const mapStateToProps = (state: GlobalState) => {
   return {
-    isLoading: state.tableMetadata.update_frequency.isLoading,
-    refreshValue: state.tableMetadata.update_frequency.frequency,
+    isLoading: state.tableMetadata.tableData.update_frequency.isLoading,
+    refreshValue: state.tableMetadata.tableData.update_frequency.frequency,
   };
 };
 

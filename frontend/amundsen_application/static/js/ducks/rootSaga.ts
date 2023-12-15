@@ -119,7 +119,7 @@ export default function* rootSaga() {
     updateResourceTagsWatcher(),
     updateSearchStateWatcher(),
     updateTableDescriptionWatcher(),
-    UpdateTableUpdateFrequencyWatcher(),
+    updateTableUpdateFrequencyWatcher(),
     updateTableOwnerWatcher(),
     updateTypeMetadataDescriptionWatcher(),
     urlDidUpdateWatcher(),
