@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from 'react';
-import { Dropdown } from 'react-bootstrap';
 
 import { EditableSectionChildProps } from 'components/EditableSection';
 
@@ -24,9 +23,7 @@ export interface DispatchFromProps {
 export interface ComponentProps {
   isLoading: false,
   editable?: boolean;
-  maxLength?: number;
   value?: string | null;
-  allowDangerousHtml?: boolean;
 }
 
 export type UpdateFrequencyEditorProps = ComponentProps &
@@ -43,20 +40,17 @@ class UpdateFrequencyEditor extends React.Component<
   UpdateFrequencyEditorProps,
   UpdateFrequencyEditorState
 > {
-  readonly textAreaRef: React.RefObject<HTMLTextAreaElement>;
-  readonly aiTextAreaRef: React.RefObject<HTMLTextAreaElement>;
+  readonly selectRef: React.RefObject<HTMLInputSelect>;
 
   public static defaultProps: UpdateFrequencyEditorProps = {
     isLoading: false,
     editable: true,
-    maxLength: 500,
     value: '',
   };
 
   constructor(props: UpdateFrequencyEditorProps) {
     super(props);
-    this.textAreaRef = React.createRef<HTMLTextAreaElement>();
-    this.aiTextAreaRef = React.createRef<HTMLTextAreaElement>();
+    this.selectRef = React.createRef<HTMLInputSelect>();
 
     this.state = {
       isDisabled: false,
@@ -72,11 +66,6 @@ class UpdateFrequencyEditor extends React.Component<
       refreshValue
     } = this.props;
 
-    // console.log(`refreshValue=${refreshValue}`)
-    // console.log(`stateValue=${stateValue}`)
-    // console.log(`propValue=${propValue}`)
-    // console.log(`prevProps.value=${prevProps.value}`)
-
     if (prevProps.value !== propValue) {
       this.setState({ value: propValue });
     }
@@ -86,50 +75,13 @@ class UpdateFrequencyEditor extends React.Component<
               refreshValue !== stateValue &&
               !isDisabled) {
       // disable the component if a refresh is needed
-      //this.setState({ isDisabled: true });
+      this.setState({ isDisabled: true });
     }
   }
 
-  handleExitEditMode = (e: React.MouseEvent<HTMLButtonElement>) => {
-    logClick(e, {
-      label: 'Cancel Editable Text',
-    });
-    this.exitEditMode();
-  };
-
-  exitEditMode = () => {
-    const { setEditMode } = this.props;
-
-    setEditMode?.(false);
-  };
-
-  handleEnterEditMode = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const { setEditMode } = this.props;
-
-    logClick(e, {
-      label: 'Add Editable Text',
-    });
-    setEditMode?.(true);
-  };
-
-  handleRefreshText = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const { refreshValue } = this.props;
-    const textArea = this.textAreaRef.current;
-
-    //this.setState({ value: refreshValue, isDisabled: false });
-    logClick(e, {
-      label: 'Refresh Editable Text',
-    });
-
-    //if (textArea && refreshValue) {
-    //  textArea.value = refreshValue;
-    //  autosize.update(textArea);
-    //}
-  };
-
-  handleUpdateText = (e: React.MouseEvent<HTMLButtonElement>) => {
+  setSelectValue = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { setEditMode, onSubmitValue } = this.props;
-    const newValue = this.textAreaRef.current?.value;
+    const newValue = this.selectRef.current?.value;
 
     const onSuccessCallback = () => {
       setEditMode?.(false);
@@ -149,27 +101,25 @@ class UpdateFrequencyEditor extends React.Component<
   };
 
   render() {
-    const { isEditing, editable, maxLength, allowDangerousHtml } = this.props;
+    const { isEditing, editable } = this.props;
     const { value = '', isDisabled } = this.state;
     const updateFrequency = 'daily';
 
     return (
-      <Dropdown
-        className="header-link sources-dropdown"
-        id="sources-dropdown"
-      >
-        <Dropdown.Toggle className="sources-dropdown-button">
-          Update frequency
-        </Dropdown.Toggle>
-        <Dropdown.Menu className="sources-dropdown-menu">
-          <Dropdown.Item as="button">Daily</Dropdown.Item>
-          <Dropdown.Item as="button">Weekly</Dropdown.Item>
-          <Dropdown.Item as="button">Monthly</Dropdown.Item>
-          <Dropdown.Item as="button">Quarterly</Dropdown.Item>
-          <Dropdown.Item as="button">Annually</Dropdown.Item>
-        </Dropdown.Menu>
-      </Dropdown>
-    )
+        <select
+            onBlur={(
+                ev: React.ChangeEvent<HTMLSelectElement>,
+            ): void => setSelectValue(ev.target.value)}
+            id="update-table-frequency-dropdown"
+            ref={this.selectRef}
+        >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="annually">Annually</option>
+        </select>
+    );
   }
 }
 
