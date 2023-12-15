@@ -7,14 +7,6 @@ import { Dropdown, MenuItem, OverlayTrigger, Popover } from 'react-bootstrap';
 
 import { logClick } from 'utils/analytics';
 
-import {
-  SOURCES_LABEL,
-  DATABASE_LOGO_PATH,
-  DELAY_SHOW_POPOVER_MS,
-  SOURCE_TYPE_TO_NAME,
-  SOURCE_TYPE_TO_IMAGE,
-} from './constants';
-
 import './styles.scss';
 
 export interface UpdateFrequencyDropdownProps {
@@ -47,4 +39,4 @@ const UpdateFrequencyDropdown: React.FC<UpdateFrequencyDropdownProps> = ({
   );
 };
 
-export default SourceDropdown;
+export default UpdateFrequencyDropdown;

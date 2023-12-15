@@ -103,13 +103,13 @@ import RequestDescriptionText from './RequestDescriptionText';
 import RequestMetadataForm from './RequestMetadataForm';
 import ListSortingDropdown from './ListSortingDropdown';
 import SnowflakeSharesList from './SnowflakeSharesList';
+import UpdateFrequencyDropdown from './UpdateFrequencyDropdown';
 
 import * as Constants from './constants';
 import { AIRFLOW, DATABRICKS } from './ApplicationDropdown/constants';
 import { STATUS_CODES } from '../../constants';
 
 import './styles.scss';
-
 
 const DASHBOARDS_PER_PAGE = 10;
 const TABLE_SOURCE = 'table_page';
@@ -856,6 +856,7 @@ export class TableDetail extends React.Component<
                     <div className="section-title">
                       {Constants.UPDATE_FREQUENCY_TITLE}
                     </div>
+                    <UpdateFrequencyDropdown updateFrequency={data.update_frequency} />
                   </section>
                   <section className="metadata-section">
                     <div className="section-title">
