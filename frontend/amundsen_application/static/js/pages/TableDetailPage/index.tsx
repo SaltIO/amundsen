@@ -861,6 +861,7 @@ export class TableDetail extends React.Component<
                     >
                       <TableUpdateFrequencyEditor
                         value={data.update_frequency.frequency}
+                        isLoading={false}
                         editable={data.is_editable}
                       />
                     </EditableSection>
