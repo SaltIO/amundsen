@@ -346,6 +346,11 @@ class Neo4jFabricProxy(Neo4jProxy):
                                description: str) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_column_description() is not supported')
 
+    def put_table_update_frequency(self, *,
+                                   table_uri: str,
+                                   frequency: str) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_table_update_frequency() is not supported')
+
     @timer_with_counter
     def add_resource_owner(self, *,
                            uri: str,
