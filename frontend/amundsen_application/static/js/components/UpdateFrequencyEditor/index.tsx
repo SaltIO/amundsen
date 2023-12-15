@@ -79,9 +79,9 @@ class UpdateFrequencyEditor extends React.Component<
     }
   }
 
-  setSelectValue = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  setSelectValue = (value) => {
     const { setEditMode, onSubmitValue } = this.props;
-    const newValue = this.selectRef.current?.value;
+    const newValue = value;
 
     const onSuccessCallback = () => {
       setEditMode?.(false);
@@ -92,7 +92,7 @@ class UpdateFrequencyEditor extends React.Component<
     };
 
     logClick(e, {
-      label: 'Update Editable Text',
+      label: 'Update Select',
     });
 
     if (newValue) {
@@ -107,11 +107,9 @@ class UpdateFrequencyEditor extends React.Component<
 
     return (
         <select
-            onBlur={(
-                ev: React.ChangeEvent<HTMLSelectElement>,
-            ): void => setSelectValue(ev.target.value)}
+            value={value}
+            onChange={e => setSelectValue(e.target.value)}
             id="update-table-frequency-dropdown"
-            ref={this.selectRef}
         >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
