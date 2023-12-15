@@ -56,7 +56,7 @@ describe('ExploreButton', () => {
         resource_reports: [],
         watermarks: [],
         programmatic_descriptions: {},
-        update_frequency: { isLoading: false, frequency: '' },
+        update_frequency: '',
         ...tableDataOverrides,
       },
     };

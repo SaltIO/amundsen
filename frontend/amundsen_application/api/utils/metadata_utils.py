@@ -141,9 +141,8 @@ def marshall_table_full(table_dict: Dict) -> Dict:
     results['programmatic_descriptions'] = _convert_prog_descriptions(prog_descriptions)
 
     update_frequency = results['update_frequency']
-    results['update_frequency'] = {}
-    results['update_frequency']['isLoading'] = False
-    results['update_frequency']['frequency'] = update_frequency
+    results['update_frequency'] = update_frequency
+    results['update_frequency']
 
     columns = results['columns']
     for col in columns:

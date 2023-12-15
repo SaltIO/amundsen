@@ -8,8 +8,8 @@ import { EditableSectionChildProps } from 'components/EditableSection';
 import { logClick } from 'utils/analytics';
 
 export interface StateFromProps {
-  isLoading: boolean;
   refreshValue?: string;
+  options: string[];
 }
 
 export interface DispatchFromProps {
@@ -21,32 +21,31 @@ export interface DispatchFromProps {
 }
 
 export interface ComponentProps {
-  isLoading: false,
   editable?: boolean;
   value?: string;
 }
 
-export type UpdateFrequencyEditorProps = ComponentProps &
+export type EditableSelectProps = ComponentProps &
   DispatchFromProps &
   StateFromProps &
   EditableSectionChildProps;
 
-interface UpdateFrequencyEditorState {
+interface EditableSelectState {
   value?: string;
   isDisabled: boolean;
 }
 
-class UpdateFrequencyEditor extends React.Component<
-  UpdateFrequencyEditorProps,
-  UpdateFrequencyEditorState
+class EditableSelect extends React.Component<
+  EditableSelectProps,
+  EditableSelectState
 > {
-  public static defaultProps: UpdateFrequencyEditorProps = {
-    isLoading: false,
+  public static defaultProps: EditableSelectProps = {
     editable: true,
     value: '',
+    options: [''],
   };
 
-  constructor(props: UpdateFrequencyEditorProps) {
+  constructor(props: EditableSelectProps) {
     super(props);
 
     this.state = {
@@ -55,7 +54,7 @@ class UpdateFrequencyEditor extends React.Component<
     };
   }
 
-  componentDidUpdate(prevProps: UpdateFrequencyEditorProps) {
+  componentDidUpdate(prevProps: EditableSelectProps) {
     const { value: stateValue, isDisabled } = this.state;
     const {
       value: propValue,
@@ -94,7 +93,7 @@ class UpdateFrequencyEditor extends React.Component<
   };
 
   render() {
-    const { isEditing, editable } = this.props;
+    const { isEditing, editable, options } = this.props;
     const { value = '', isDisabled } = this.state;
 
     return (
@@ -102,16 +101,17 @@ class UpdateFrequencyEditor extends React.Component<
             value={value}
             onChange={e => this.setSelectValue(e.target.value)}
             id="update-table-frequency-dropdown"
+            disabled={isDisabled || !editable} // If you want to control the disabled state of the dropdown
         >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annually">Annually</option>
-        </select>
+            {options.map(option => (
+                <option key={option} value={option.toLowerCase()}>
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                </option>
+            ))}
+        </select>        
     );
   }
 }
 
-export default UpdateFrequencyEditor;
+export default EditableSelect;
 

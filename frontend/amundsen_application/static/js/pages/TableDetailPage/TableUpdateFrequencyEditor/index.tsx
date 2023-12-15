@@ -7,16 +7,16 @@ import { bindActionCreators } from 'redux';
 import { GlobalState } from 'ducks/rootReducer';
 import { updateTableUpdateFrequency } from 'ducks/tableMetadata/reducer';
 
-import UpdateFrequencyEditor, {
+import EditableSelect, {
   ComponentProps,
   DispatchFromProps,
   StateFromProps,
-} from 'components/UpdateFrequencyEditor';
+} from 'components/EditableSelect';
 
 export const mapStateToProps = (state: GlobalState) => {
   return {
-    isLoading: state.tableMetadata.tableData.update_frequency.isLoading,
-    refreshValue: state.tableMetadata.tableData.update_frequency.frequency,
+    refreshValue: state.tableMetadata.tableData.update_frequency,
+    options: ['daily', 'weekly', 'monthly', 'quarterly', 'annually'],
   };
 };
 
@@ -26,6 +26,6 @@ export const mapDispatchToProps = (dispatch: any) =>
 export default connect<StateFromProps, DispatchFromProps, ComponentProps>(
   mapStateToProps,
   mapDispatchToProps
-)(UpdateFrequencyEditor);
+)(EditableSelect);
 
 
