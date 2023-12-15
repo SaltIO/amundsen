@@ -37,6 +37,8 @@ import {
   UpdateTypeMetadataDescriptionRequest,
   UpdateTableDescription,
   UpdateTableDescriptionRequest,
+  UpdateTableUpdateFrequency,
+  UpdateTableUpdateFrequencyRequest,
   UpdateTableOwner,
 } from './types';
 
@@ -72,7 +74,10 @@ export const initialTableDataState: TableMetadata = {
   resource_reports: [],
   watermarks: [],
   programmatic_descriptions: {},
-  update_frequency: null
+  update_frequency: { 
+    isLoading: true,
+    frequency: ''
+  }
 };
 
 export const emptyQualityChecks = {
@@ -199,6 +204,21 @@ export function updateTableDescription(
       onFailure,
     },
     type: UpdateTableDescription.REQUEST,
+  };
+}
+
+export function updateTableUpdateFrequency(
+  newValue: string,
+  onSuccess?: () => any,
+  onFailure?: () => any
+): UpdateTableUpdateFrequencyRequest {
+  return {
+    payload: {
+      newValue,
+      onSuccess,
+      onFailure,
+    },
+    type: UpdateTableUpdateFrequency.REQUEST,
   };
 }
 

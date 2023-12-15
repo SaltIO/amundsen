@@ -107,6 +107,17 @@ export function updateTableDescription(
   });
 }
 
+export function updateTableUpdateFrequency(
+  frequency: string,
+  tableData: TableMetadata
+) {
+  return axios.put(`${API_PATH}/put_table_update_frequency`, {
+    frequency,
+    key: tableData.key,
+    source: 'user',
+  });
+}
+
 export function getTableOwners(key: string) {
   const tableParams = getTableQueryParams({ key });
 

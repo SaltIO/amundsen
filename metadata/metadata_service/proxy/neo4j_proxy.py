@@ -874,6 +874,20 @@ class Neo4jProxy(BaseProxy):
                                       description=description)
 
     @timer_with_counter
+    def put_table_update_frequency(self, *,
+                                   table_uri: str,
+                                   frequency: str) -> None:
+        """
+        Update table description with one from user
+        :param table_uri: Table uri (key in Neo4j)
+        :param description: new value for table description
+        """
+
+        #self.put_resource_description(resource_type=ResourceType.Table,
+        #                              uri=table_uri,
+        #                              description=description)
+
+    @timer_with_counter
     def put_type_metadata_description(self, *,
                                       type_metadata_key: str,
                                       description: str) -> None:
