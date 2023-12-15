@@ -82,7 +82,7 @@ export interface TableOwners {
 
 export interface TableUpdateFrequency {
   isLoading: boolean;
-  frequency?: string | null;
+  frequency?: string;
 }
 
 export interface ProgrammaticDescription {

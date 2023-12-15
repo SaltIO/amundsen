@@ -9,7 +9,7 @@ import { logClick } from 'utils/analytics';
 
 export interface StateFromProps {
   isLoading: boolean;
-  refreshValue?: string | null;
+  refreshValue?: string;
 }
 
 export interface DispatchFromProps {
@@ -23,7 +23,7 @@ export interface DispatchFromProps {
 export interface ComponentProps {
   isLoading: false,
   editable?: boolean;
-  value?: string | null;
+  value?: string;
 }
 
 export type UpdateFrequencyEditorProps = ComponentProps &
@@ -32,7 +32,7 @@ export type UpdateFrequencyEditorProps = ComponentProps &
   EditableSectionChildProps;
 
 interface UpdateFrequencyEditorState {
-  value?: string | null;
+  value?: string;
   isDisabled: boolean;
 }
 
@@ -81,16 +81,12 @@ class UpdateFrequencyEditor extends React.Component<
     const newValue = value;
 
     const onSuccessCallback = () => {
-      setEditMode?.(false);
+      //setEditMode?.(false);
       this.setState({ value: newValue });
     };
     const onFailureCallback = () => {
-      this.exitEditMode();
+      //this.exitEditMode();
     };
-
-    logClick(e, {
-      label: 'Update Select',
-    });
 
     if (newValue) {
       onSubmitValue?.(newValue, onSuccessCallback, onFailureCallback);
@@ -104,7 +100,7 @@ class UpdateFrequencyEditor extends React.Component<
     return (
         <select
             value={value}
-            onChange={e => setSelectValue(e.target.value)}
+            onChange={e => this.setSelectValue(e.target.value)}
             id="update-table-frequency-dropdown"
         >
             <option value="daily">Daily</option>
