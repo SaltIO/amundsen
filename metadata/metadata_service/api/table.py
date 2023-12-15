@@ -135,6 +135,29 @@ class TableDescriptionAPI(Resource):
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
+class TableUpdateFrequencyAPI(Resource):
+    """
+    TableDescriptionAPI supports PUT and GET operation to upsert table description
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(TableUpdateFrequencyAPI, self).__init__()
+
+    @swag_from('swagger_doc/common/update_frequency_put.yml')
+    def put(self, id: str) -> Iterable[Any]:
+        """
+        Updates table description (passed as a request body)
+        :param table_uri:
+        :return:
+        """
+        try:
+            frequency = json.loads(request.data).get('frequency')
+            self.client.put_table_update_frequency(table_uri=id, frequency=frequency)
+            return None, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
 class TableTagAPI(Resource):
     """
