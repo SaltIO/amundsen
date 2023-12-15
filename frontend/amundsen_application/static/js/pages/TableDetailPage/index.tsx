@@ -860,12 +860,6 @@ export class TableDetail extends React.Component<
                     </div>
                     <WatermarkLabel watermarks={data.watermarks} />
                   </section>
-                  <EditableSection title={Constants.TAG_TITLE}>
-                    <TagInput
-                      resourceType={ResourceType.table}
-                      uriKey={tableData.key}
-                    />
-                  </EditableSection>
                   {isTableQualityCheckEnabled() && (
                     <TableQualityChecksLabel tableKey={tableData.key} />
                   )}
@@ -893,6 +887,12 @@ export class TableDetail extends React.Component<
                   )}
                 </section>
               </section>
+              <EditableSection title={Constants.TAG_TITLE}>
+                <TagInput
+                  resourceType={ResourceType.table}
+                  uriKey={tableData.key}
+                />
+              </EditableSection>
               {this.renderProgrammaticDesc(
                 data.programmatic_descriptions.other
               )}
