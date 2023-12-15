@@ -40,8 +40,6 @@ class UpdateFrequencyEditor extends React.Component<
   UpdateFrequencyEditorProps,
   UpdateFrequencyEditorState
 > {
-  readonly selectRef: React.RefObject<HTMLInputSelect>;
-
   public static defaultProps: UpdateFrequencyEditorProps = {
     isLoading: false,
     editable: true,
@@ -50,7 +48,6 @@ class UpdateFrequencyEditor extends React.Component<
 
   constructor(props: UpdateFrequencyEditorProps) {
     super(props);
-    this.selectRef = React.createRef<HTMLInputSelect>();
 
     this.state = {
       isDisabled: false,
