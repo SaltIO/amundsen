@@ -10,25 +10,28 @@ import { logClick } from 'utils/analytics';
 import './styles.scss';
 
 export interface UpdateFrequencyDropdownProps {
-  updateFrequency: string;
+	updateFrequency?: string | null;
 }
+
+const handleSelect = (event) => {
+  event.stopPropagation();
+  logClick(event);
+  console.log('Choice!!!')
+  console.log(evt)
+};
 
 const UpdateFrequencyDropdown: React.FC<UpdateFrequencyDropdownProps> = ({
   updateFrequency,
 }: UpdateFrequencyDropdownProps) => {
-  //if (updateFrequency === null) {
-  //  return null;
-  //}
-
   return (
     <Dropdown
       className="header-link sources-dropdown"
       id="sources-dropdown"
     >
       <Dropdown.Toggle className="sources-dropdown-button">
-        Choose update frequency
+        Update frequency
       </Dropdown.Toggle>
-      <Dropdown.Menu className="sources-dropdown-menu">
+      <Dropdown.Menu className="sources-dropdown-menu" onSelect={handleSelect}>
         <Dropdown.Item as="button">Daily</Dropdown.Item>
         <Dropdown.Item as="button">Weekly</Dropdown.Item>
         <Dropdown.Item as="button">Monthly</Dropdown.Item>
