@@ -838,22 +838,20 @@ export class TableDetail extends React.Component<
               )}
               <section className="two-column-layout">
                 <section className="left-column">
-                  {!!data.last_updated_timestamp && (
-                    <section className="metadata-section">
-                      <div className="section-title">
-                        {
-                          data.update_frequency != null
-                          ? `${Constants.LAST_UPDATED_TITLE} (${data.update_frequency})`
-                          : Constants.LAST_UPDATED_TITLE
-                        }
-                      </div>
-                      <time className="time-body-text">
-                        {formatDateTimeShort({
-                          epochTimestamp: data.last_updated_timestamp,
-                        })}
-                      </time>
-                    </section>
-                  )}
+                  <section className="metadata-section">
+                    <div className="section-title">
+                      {
+                        data.update_frequency != null
+                        ? `${Constants.LAST_UPDATED_TITLE} (${data.update_frequency})`
+                        : Constants.LAST_UPDATED_TITLE
+                      }
+                    </div>
+                    <time className="time-body-text">
+                      {formatDateTimeShort({
+                        epochTimestamp: data.last_updated_timestamp,
+                      })}
+                    </time>
+                  </section>
                   <section className="metadata-section">
                     <div className="section-title">
                       {Constants.DATE_RANGE_TITLE}
