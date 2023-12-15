@@ -46,6 +46,7 @@ import {
   getTypeMetadataDescriptionWatcher,
   updateColumnDescriptionWatcher,
   updateTableDescriptionWatcher,
+  updateTableUpdateFrequencyWatcher,
   updateTypeMetadataDescriptionWatcher,
 } from './tableMetadata/sagas';
 import { getLastIndexedWatcher } from './lastIndexed/sagas';

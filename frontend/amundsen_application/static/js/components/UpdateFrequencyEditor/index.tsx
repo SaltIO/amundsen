@@ -10,7 +10,7 @@ import { logClick } from 'utils/analytics';
 
 export interface StateFromProps {
   isLoading: boolean;
-  refreshValue?: string;
+  refreshValue?: string | null;
 }
 
 export interface DispatchFromProps {
@@ -25,7 +25,7 @@ export interface ComponentProps {
   isLoading: false,
   editable?: boolean;
   maxLength?: number;
-  value?: string;
+  value?: string | null;
   allowDangerousHtml?: boolean;
 }
 
@@ -35,7 +35,7 @@ export type UpdateFrequencyEditorProps = ComponentProps &
   EditableSectionChildProps;
 
 interface UpdateFrequencyEditorState {
-  value?: string;
+  value?: string | null;
   isDisabled: boolean;
 }
 
@@ -47,6 +47,7 @@ class UpdateFrequencyEditor extends React.Component<
   readonly aiTextAreaRef: React.RefObject<HTMLTextAreaElement>;
 
   public static defaultProps: UpdateFrequencyEditorProps = {
+    isLoading: false,
     editable: true,
     maxLength: 500,
     value: '',
