@@ -162,21 +162,21 @@ class UpdateFrequencyEditor extends React.Component<
           Update frequency
         </Dropdown.Toggle>
         <Dropdown.Menu className="sources-dropdown-menu">
-        <Dropdown.Item as="button"
-        {updateFrequency === 'daily' ? 'active' : ''}
-        >Daily</Dropdown.Item>
-        <Dropdown.Item as="button"
-        {updateFrequency === 'weekly' ? 'active' : ''}
-        >Weekly</Dropdown.Item>
-        <Dropdown.Item as="button"
-        {updateFrequency === 'monthly' ? 'active' : ''}
-        >Monthly</Dropdown.Item>
-        <Dropdown.Item as="button"
-        {updateFrequency === 'quarterly' ? 'active' : ''}
-        >Quarterly</Dropdown.Item>
-        <Dropdown.Item as="button"
-        {updateFrequency === 'annually' ? 'active' : ''}
-        >Annually</Dropdown.Item>
+          <Dropdown.Item as="button"
+          {updateFrequency === 'daily' ? 'active' : ''}
+          >Daily</Dropdown.Item>
+          <Dropdown.Item as="button"
+          {updateFrequency === 'weekly' ? 'active' : ''}
+          >Weekly</Dropdown.Item>
+          <Dropdown.Item as="button"
+          {updateFrequency === 'monthly' ? 'active' : ''}
+          >Monthly</Dropdown.Item>
+          <Dropdown.Item as="button"
+          {updateFrequency === 'quarterly' ? 'active' : ''}
+          >Quarterly</Dropdown.Item>
+          <Dropdown.Item as="button"
+          {updateFrequency === 'annually' ? 'active' : ''}
+          >Annually</Dropdown.Item>
       </Dropdown.Menu>
       </Dropdown>
     )
