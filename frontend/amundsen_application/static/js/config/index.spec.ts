@@ -1137,7 +1137,7 @@ describe('getColumnLineageLink', () => {
       resource_reports: [],
       watermarks: [],
       programmatic_descriptions: {},
-      update_frequency: null
+      update_frequency: { isLoading: true, frequency: '' }
     };
     const columnName = 'column_name';
     const actual = ConfigUtils.getColumnLineageLink(tableData, columnName);

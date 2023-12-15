@@ -23,9 +23,6 @@ describe('mapStateToProps', () => {
       ...globalState,
       tableMetadata: {
         ...globalState.tableMetadata,
-        //tableOwners: {
-        //  isLoading: false,
-        //},
       },
     };
   });
