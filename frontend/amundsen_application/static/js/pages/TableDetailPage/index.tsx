@@ -860,7 +860,7 @@ export class TableDetail extends React.Component<
                       editUrl={editUrl || undefined}
                     >
                       <TableUpdateFrequencyEditor
-                        value={data.update_frequency}
+                        value={data.update_frequency.frequency}
                         editable={data.is_editable}
                       />
                     </EditableSection>
