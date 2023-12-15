@@ -100,7 +100,6 @@ class UpdateFrequencyEditor extends React.Component<
   render() {
     const { isEditing, editable } = this.props;
     const { value = '', isDisabled } = this.state;
-    const updateFrequency = 'daily';
 
     return (
         <select
