@@ -893,9 +893,9 @@ class Neo4jProxy(BaseProxy):
         """)
 
         upsert_update_frequency_table_relation_query = textwrap.dedent("""
-        MATCH (n1:Update_Frequency {{key: $uf_key}}), (n2:Table {{key: $table_key}})
+        MATCH (n1:Update_Frequency {key: $uf_key}), (n2:Table {key: $table_key})
         MERGE (n2)-[r2:UPDATE_FREQUENCY]->(n1)
-        MERGE (n1)-[r2:UPDATE_FREQUENCY_OF]->(n2)
+        MERGE (n1)-[r1:UPDATE_FREQUENCY_OF]->(n2)
         RETURN n1.key, n2.key
         """)
 

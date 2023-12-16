@@ -16,7 +16,7 @@ import EditableSelect, {
 export const mapStateToProps = (state: GlobalState) => {
   return {
     refreshValue: state.tableMetadata.tableData.update_frequency,
-    options: ['daily', 'weekly', 'monthly', 'quarterly', 'annually'],
+    options: ['none', 'daily', 'weekly', 'monthly', 'quarterly', 'annually'],
   };
 };
 

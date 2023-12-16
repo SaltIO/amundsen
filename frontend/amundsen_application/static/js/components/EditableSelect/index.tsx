@@ -85,6 +85,7 @@ class EditableSelect extends React.Component<
     };
     const onFailureCallback = () => {
       //this.exitEditMode();
+      console.log("select failed")
     };
 
     if (newValue) {
@@ -98,7 +99,7 @@ class EditableSelect extends React.Component<
 
     return (
         <select
-            value={value}
+            value={value == null ? 'none' : value}
             onChange={e => this.setSelectValue(e.target.value)}
             id="update-table-frequency-dropdown"
             disabled={isDisabled || !editable} // If you want to control the disabled state of the dropdown
@@ -108,7 +109,7 @@ class EditableSelect extends React.Component<
                     {option.charAt(0).toUpperCase() + option.slice(1)}
                 </option>
             ))}
-        </select>        
+        </select>
     );
   }
 }

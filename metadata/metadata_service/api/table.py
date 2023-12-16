@@ -144,8 +144,8 @@ class TableUpdateFrequencyAPI(Resource):
         self.client = get_proxy_client()
         super(TableUpdateFrequencyAPI, self).__init__()
 
-    @swag_from('swagger_doc/common/update_frequency_put.yml')
-    def put(self, id: str) -> Iterable[Any]:
+    @swag_from('swagger_doc/table/update_frequency_put.yml')
+    def put(self, table_uri: str) -> Iterable[Any]:
         """
         Updates table description (passed as a request body)
         :param table_uri:
@@ -153,7 +153,7 @@ class TableUpdateFrequencyAPI(Resource):
         """
         try:
             frequency = json.loads(request.data).get('frequency')
-            self.client.put_table_update_frequency(table_uri=id, frequency=frequency)
+            self.client.put_table_update_frequency(table_uri=table_uri, frequency=frequency)
             return None, HTTPStatus.OK
 
         except NotFoundException:
