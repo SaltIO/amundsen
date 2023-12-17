@@ -118,6 +118,12 @@ export function updateTableUpdateFrequency(
   });
 }
 
+export function deleteTableUpdateFrequency(
+  tableData: TableMetadata
+) {
+  return axios.delete(`${API_PATH}/delete_table_update_frequency?table_key=${tableData.key}&source=user`);
+}
+
 export function getTableOwners(key: string) {
   const tableParams = getTableQueryParams({ key });
 

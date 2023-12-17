@@ -39,6 +39,8 @@ import {
   UpdateTableDescriptionRequest,
   UpdateTableUpdateFrequency,
   UpdateTableUpdateFrequencyRequest,
+  DeleteTableUpdateFrequency,
+  DeleteTableUpdateFrequencyRequest,
   UpdateTableOwner,
 } from './types';
 
@@ -216,6 +218,19 @@ export function updateTableUpdateFrequency(
       onFailure,
     },
     type: UpdateTableUpdateFrequency.REQUEST,
+  };
+}
+
+export function deleteTableUpdateFrequency(
+  onSuccess?: () => any,
+  onFailure?: () => any
+): DeleteTableUpdateFrequencyRequest {
+  return {
+    payload: {
+      onSuccess,
+      onFailure,
+    },
+    type: DeleteTableUpdateFrequency.REQUEST,
   };
 }
 

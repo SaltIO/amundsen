@@ -927,6 +927,47 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    def delete_table_update_frequency(self, *,
+                                      table_uri: str) -> None:
+        """
+        Delete table update frequency with one from user
+        :param table_uri: Table uri (key in Neo4j)
+        """
+        # start neo4j transaction
+        uf_key = table_uri + '/updatefrequency'
+
+        delete_update_frequency_query = textwrap.dedent("""
+        MATCH (u:Update_Frequency {key: $uf_key})
+        DETACH DELETE u
+        RETURN u
+        """)
+
+        start = time.time()
+
+        try:
+            tx = self._driver.session(database=self._database_name).begin_transaction()
+
+            result = tx.run(delete_update_frequency_query, {'uf_key': uf_key})
+
+            if not result.single():
+                raise NotFoundException(f'Failed to delete the update frequency of table {table_uri} does not exist')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+            LOGGER.exception('Failed to execute update process')
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate exception back to api
+            raise e
+
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
     def put_type_metadata_description(self, *,
                                       type_metadata_key: str,
                                       description: str) -> None:

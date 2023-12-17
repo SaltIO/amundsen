@@ -97,6 +97,11 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def delete_table_update_frequency(self, *,
+                                      table_uri: str) -> None:
+        pass
+
+    @abstractmethod
     def add_tag(self, *, id: str, tag: str, tag_type: str, resource_type: ResourceType) -> None:
         pass
 

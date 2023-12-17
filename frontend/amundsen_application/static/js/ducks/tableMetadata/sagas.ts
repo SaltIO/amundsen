@@ -38,6 +38,8 @@ import {
   UpdateTableDescriptionRequest,
   UpdateTableUpdateFrequency,
   UpdateTableUpdateFrequencyRequest,
+  DeleteTableUpdateFrequency,
+  DeleteTableUpdateFrequencyRequest,
   GetTableQualityChecksRequest,
   GetTableQualityChecks,
 } from './types';
@@ -147,6 +149,30 @@ export function* updateTableUpdateFrequencyWorker(
 }
 export function* updateTableUpdateFrequencyWatcher(): SagaIterator {
   yield takeEvery(UpdateTableUpdateFrequency.REQUEST, updateTableUpdateFrequencyWorker);
+}
+
+export function* deleteTableUpdateFrequencyWorker(
+  action: DeleteTableUpdateFrequencyRequest
+): SagaIterator {
+  const { payload } = action;
+  const state = yield select();
+
+  try {
+    yield call(
+      API.deleteTableUpdateFrequency,
+      state.tableMetadata.tableData
+    );
+    if (payload.onSuccess) {
+      yield call(payload.onSuccess);
+    }
+  } catch (e) {
+    if (payload.onFailure) {
+      yield call(payload.onFailure);
+    }
+  }
+}
+export function* deleteTableUpdateFrequencyWatcher(): SagaIterator {
+  yield takeEvery(DeleteTableUpdateFrequency.REQUEST, deleteTableUpdateFrequencyWorker);
 }
 
 export function* getColumnDescriptionWorker(
