@@ -86,7 +86,7 @@ class EditableSelect extends React.Component<
               refreshValue !== stateValue &&
               !isDisabled) {
       // disable the component if a refresh is needed
-      this.setState({ isDisabled: true });
+      // this.setState({ isDisabled: true });
     }
   }
 
