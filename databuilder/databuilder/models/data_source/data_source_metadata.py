@@ -70,6 +70,7 @@ class DataChannel(GraphSerializable):
 
     class DataChannelType(Enum):
         DATA_FEED = 'data_feed'
+        DATA_SHARE = 'data_share'
         API = 'api'
         SFTP = 'sftp'
 
