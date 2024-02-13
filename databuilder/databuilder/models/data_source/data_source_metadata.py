@@ -10,7 +10,6 @@ from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.graph_serializable import GraphSerializable
 
 
-@staticmethod
 def convert_to_uri_safe_str(input_string: str) -> str:
     return re.sub(r'\W+', '_', input_string).lower()
 
