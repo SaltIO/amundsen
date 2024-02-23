@@ -821,7 +821,7 @@ class Neo4jProxy(BaseProxy):
         desc_key = uri + '/_description'
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "user_add"
+        published_tag = "edited"
 
         upsert_desc_query = textwrap.dedent("""
         MERGE (u:Description {key: $desc_key})
@@ -902,7 +902,7 @@ class Neo4jProxy(BaseProxy):
         uf_key = table_uri + '/updatefrequency'
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "user_add"
+        published_tag = "edited"
 
         upsert_update_frequency_query = textwrap.dedent("""
         MERGE (u:Update_Frequency {key: $uf_key})
@@ -1061,7 +1061,7 @@ class Neo4jProxy(BaseProxy):
         desc_key = column_uri + '/_description'
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "user_add"
+        published_tag = "edited"
 
         upsert_desc_query = textwrap.dedent("""
             MERGE (u:Description {key: $desc_key})
@@ -1151,7 +1151,7 @@ class Neo4jProxy(BaseProxy):
         """
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "user_add"
+        published_tag = "edited"
 
         create_owner_query = textwrap.dedent("""
         MERGE (u:User {key: $user_email})
@@ -1247,7 +1247,7 @@ class Neo4jProxy(BaseProxy):
                     'and resource type {}'.format(badge_name, id, category, resource_type.name))
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "user_add"
+        published_tag = "edited"
 
         validation_query = \
             'MATCH (n:{resource_type} {{key: $key}}) return n'.format(resource_type=resource_type.name)
@@ -1374,7 +1374,7 @@ class Neo4jProxy(BaseProxy):
                                                                                     resource_type.name))
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "user_add"
+        published_tag = "edited"
 
         validation_query = \
             'MATCH (n:{resource_type} {{key: $key}}) return n'.format(resource_type=resource_type.name)

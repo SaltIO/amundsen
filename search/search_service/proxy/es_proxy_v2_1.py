@@ -98,38 +98,18 @@ class ElasticsearchProxyV2_1():
     DATA_PROVIDER_MAPPING = {
         **GENERAL_MAPPING,
         # 'badges': 'badges.keyword',
-        # 'tag': 'tags.keyword',
+        'tag': 'tags.keyword',
         'name': 'name.keyword',
-        'data_channel_names': 'data_channel_names.keyword',
-        'data_channel_types': 'data_channel_types.keyword',
-        'data_channel_descriptions': 'data_channel_descriptions.keyword',
-        'data_location_names': 'data_location_names.keyword',
-        'data_location_types': 'data_location_types.keyword',
     }
 
     FILE_MAPPING = {
         **GENERAL_MAPPING,
         # 'badges': 'badges.keyword',
-        # 'tag': 'tags.keyword',
-        'name': 'name.keyword',
-        'data_channel_names': 'data_channel_names.keyword',
-        'data_channel_types': 'data_channel_types.keyword',
-        'data_channel_descriptions': 'data_channel_descriptions.keyword',
-        'data_location_names': 'data_location_names.keyword',
-        'data_location_types': 'data_location_types.keyword',
-    }
-
-    FILE_MAPPING = {
-        **GENERAL_MAPPING,
-        # 'badges': 'badges.keyword',
-        # 'tag': 'tags.keyword',
+        'tag': 'tags.keyword',
         'name': 'name.keyword',
         'type': 'type.keyword',
         'path': 'path.keyword',
         'is_directory': 'is_directory.keyword',
-        'data_location_name': 'data_location_name.keyword',
-        'data_channel_name': 'data_channel_name.keyword',
-        'data_provider_name': 'data_provider_name.keyword',
     }
 
     RESOURCE_TO_MAPPING = {
