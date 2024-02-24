@@ -30,7 +30,7 @@ class Neo4jSearchDataExtractor(Extractor):
         OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descs:Programmatic_Description)
         WITH db, cluster, schema, schema_description, table, table_description,
         COLLECT(prog_descs.description) as programmatic_descriptions
-        OPTIONAL MATCH (table)-[:TAGGED_BY]->(tags:Tag) WHERE tags.tag_type='default'
+        OPTIONAL MATCH (table)-[:TAGGED_BY]->(tags:Tag) // WHERE tags.tag_type='default'
         WITH db, cluster, schema, schema_description, table, table_description, programmatic_descriptions,
         COLLECT(DISTINCT tags.key) as tags
         OPTIONAL MATCH (table)-[:HAS_BADGE]->(badges:Badge)
@@ -98,7 +98,7 @@ class Neo4jSearchDataExtractor(Extractor):
          WITH dashboard, dbg, db_descr, dbg_descr, cluster, last_exec, COLLECT(DISTINCT query.name) as query_names,
          COLLECT(DISTINCT chart.name) as chart_names,
          total_usage
-         OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tags:Tag) WHERE tags.tag_type='default'
+         OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tags:Tag) // WHERE tags.tag_type='default'
          WITH dashboard, dbg, db_descr, dbg_descr, cluster, last_exec, query_names, chart_names, total_usage,
          COLLECT(DISTINCT tags.key) as tags
          OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badges:Badge)
@@ -144,30 +144,33 @@ class Neo4jSearchDataExtractor(Extractor):
     DEFAULT_NEO4J_DATA_PROVIDER_CYPHER_QUERY = textwrap.dedent(
         """
         MATCH (dp:Data_Provider)
-        OPTIONAL MATCH (dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp)
-        OPTIONAL MATCH (dl:Data_Location)-[:DATA_LOCATION_OF]->(dc)
+        //OPTIONAL MATCH (dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp)
+        //OPTIONAL MATCH (dl:Data_Location)-[:DATA_LOCATION_OF]->(dc)
+        OPTIONAL MATCH (dp)-[:TAGGED_BY]->(tags:Tag)
         {publish_tag_filter}
-        WITH dp, dc, dl
+        WITH dp, COLLECT(DISTINCT tags.key) as tags //, dc, dl
         RETURN
         dp.name as name,
         dp.key as key,
         dp.desc as description,
-        collect(distinct dc.name) as data_channel_names,
-        collect(distinct dc.type) as data_channel_types,
-        collect(distinct dc.desc) as data_channel_descriptions,
-        collect(distinct dl.name) as data_location_names,
-        collect(distinct dl.type) as data_location_types
+        //collect(distinct dc.name) as data_channel_names,
+        //collect(distinct dc.type) as data_channel_types,
+        //collect(distinct dc.desc) as data_channel_descriptions,
+        //collect(distinct dl.name) as data_location_names,
+        //collect(distinct dl.type) as data_location_types
+        tags
         """
     )
 
     DEFAULT_NEO4J_FILE_CYPHER_QUERY = textwrap.dedent(
         """
         MATCH (f:File)
-        OPTIONAL MATCH (dl:Data_Location)-[:FILE]->(f)
-        OPTIONAL MATCH (dc:Data_Channel)-[:DATA_LOCATION]->(dl)
-        OPTIONAL MATCH (dp:Data_Provider)-[:DATA_CHANNEL]->(dc)
+        //OPTIONAL MATCH (dl:Data_Location)-[:FILE]->(f)
+        //OPTIONAL MATCH (dc:Data_Channel)-[:DATA_LOCATION]->(dl)
+        //OPTIONAL MATCH (dp:Data_Provider)-[:DATA_CHANNEL]->(dc)
+        OPTIONAL MATCH (f)-[:TAGGED_BY]->(tags:Tag)
         {publish_tag_filter}
-        WITH f, dp, dc, dl
+        WITH f, COLLECT(DISTINCT tags.key) as tags //,dp, dc, dl
         RETURN
         f.name as name,
         f.key as key,
@@ -175,9 +178,10 @@ class Neo4jSearchDataExtractor(Extractor):
         f.type as type,
         f.path as path,
         f.is_directory as is_directory,
-        dl.name as data_location_name,
-        dc.name as data_channel_name,
-        dp.name as data_provider_name
+        //dl.name as data_location_name,
+        //dc.name as data_channel_name,
+        //dp.name as data_provider_name
+        tags
         """
     )
 
