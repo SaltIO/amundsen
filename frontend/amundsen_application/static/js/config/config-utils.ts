@@ -1,5 +1,5 @@
 import AppConfig from 'config/config';
-import { BadgeStyle, BadgeStyleConfig } from 'config/config-types';
+import { DefaultBadgeStyle, BadgeStyleConfig } from 'config/config-types';
 import { convertText, CaseType } from 'utils/text';
 
 import { TableMetadata } from 'interfaces/TableMetadata';
@@ -221,13 +221,16 @@ export function getIconNotRequiredStatTypes(): string[] | undefined {
 /*
  * Given a badge name, this will return a badge style and a display name.
  * If these are not specified by config, it will default to some simple rules:
- * use BadgeStyle.DEFAULT and badge name as display name.
+ * use DefaultBadgeStyle.DEFAULT and badge name as display name.
  */
 export function getBadgeConfig(badgeName: string): BadgeStyleConfig {
+  console.log(`badgename=${badgeName}`);
+  console.log(`AppConfig.badges`);
+  console.log(AppConfig.badges);
   const config: object = AppConfig.badges[badgeName] || {};
 
   return {
-    style: BadgeStyle.DEFAULT,
+    style: DefaultBadgeStyle.DEFAULT,
     displayName: convertText(badgeName, CaseType.TITLE_CASE),
     ...config,
   };

@@ -7,6 +7,9 @@ import {
 
 import { Widget } from '../interfaces/Widgets';
 
+import { CustomBadgeStyle } from './config-types-custom';
+import { HostBadgeStyle } from './config-types-host';
+
 /**
  * AppConfig and AppConfigCustom should share the same definition, except each field in AppConfigCustom
  * is optional. If you choose to override one of the configs, you must provide the full type definition
@@ -273,25 +276,18 @@ interface TableResourceConfig extends BaseResourceConfig {
   stats?: StatsConfig;
 }
 
-export enum BadgeStyle {
+export enum DefaultBadgeStyle {
   DANGER = 'negative',
   DEFAULT = 'neutral',
   INFO = 'info',
   PRIMARY = 'primary',
   SUCCESS = 'positive',
   WARNING = 'warning',
-  LANDING = 'landing',
-  STAGING = 'staging',
-  WRANGLING = 'wrangling',
-  MARTS = 'marts',
-  SNOWFLAKE = 'snowflake',
-  MYSQL = 'mysql',
-  MSSQL = 'mssql',
-  DBT = 'dbt',
-  WATERMARK = 'watermark',
-  CREDIQ = 'crediq',
-  CREFC = 'crefc'
 }
+
+// Merge the badges
+// export const BadgeStyle = { ...DefaultBadgeStyle, ...CustomBadgeStyle, ...HostBadgeStyle };
+export type BadgeStyle = DefaultBadgeStyle | CustomBadgeStyle | HostBadgeStyle;
 
 export interface BadgeStyleConfig {
   style: BadgeStyle;
