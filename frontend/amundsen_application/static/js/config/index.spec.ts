@@ -2,7 +2,7 @@ import AppConfig from 'config/config';
 import * as ConfigUtils from 'config/config-utils';
 import configDefault from 'config/config-default';
 import {
-  BadgeStyle,
+  DefaultBadgeStyle,
   NoticeSeverity,
   VisualLinkConfig,
 } from 'config/config-types';
@@ -672,11 +672,11 @@ describe('getTableSortCriterias', () => {
 describe('getBadgeConfig', () => {
   AppConfig.badges = {
     test_1: {
-      style: BadgeStyle.DANGER,
+      style: DefaultBadgeStyle.DANGER,
       displayName: 'badge display value 1',
     },
     test_2: {
-      style: BadgeStyle.DANGER,
+      style: DefaultBadgeStyle.DANGER,
       displayName: 'badge display value 2',
     },
   };
@@ -693,7 +693,7 @@ describe('getBadgeConfig', () => {
     const badgeName = 'Not_configured_badge';
     const badgeConfig = ConfigUtils.getBadgeConfig(badgeName);
 
-    expect(badgeConfig.style).toEqual(BadgeStyle.DEFAULT);
+    expect(badgeConfig.style).toEqual(DefaultBadgeStyle.DEFAULT);
     expect(badgeConfig.displayName).toEqual(badgeName);
   });
 });

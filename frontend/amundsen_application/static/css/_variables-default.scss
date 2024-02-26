@@ -30,24 +30,31 @@ $text-inverse: $white !default;
 $column-name-color: $indigo70;
 $link-color: $brand-color-4;
 $link-hover-color: $brand-color-5;
-$font-family-body: 'Open Sans',
-sans-serif !default;
+// $font-family-body: 'Open Sans',
+// sans-serif !default;
+$font-family-body: 'PPMori', sans-serif !default;
+
 $font-weight-body-extralight: 100 !default;
 $font-weight-body-light: 200 !default;
 $font-weight-body-regular: 400 !default;
 $font-weight-body-semi-bold: 600 !default;
 $font-weight-body-bold: 700 !default;
-$font-family-header: 'Roboto',
-sans-serif !default;
+// $font-family-header: 'Roboto',
+// sans-serif !default;
+$font-family-header: 'PPMori', sans-serif !default;
+
 $font-weight-header-regular: 500 !default;
 $font-weight-header-bold: 700 !default;
-$font-family-monospace-code: 'Space Mono',
-menlo,
-monospace !default;
-$font-family-serif: georgia,
-'Times New Roman',
-times,
-serif !default;
+// $font-family-monospace-code: 'Space Mono',
+// menlo,
+// monospace !default;
+$font-family-monospace-code: 'IBM Plex Mono', menlo, monospace;
+
+// $font-family-serif: georgia,
+// 'Times New Roman',
+// times,
+// serif !default;
+$font-family-serif: 'PPMori', 'Times New Roman', times, serif !default;
 $font-size-small: 12px !default;
 $font-size-base: 14px !default;
 $font-size-large: 16px !default;
@@ -67,8 +74,6 @@ $badge-marts-color: $green30;
 $badge-snowflake-color: $cyan40;
 $badge-dbt-color: $orange40;
 $badge-watermark-color: $teal30;
-$badge-crediq-color: $blue20;
-$badge-crefc-color: $cyan40;
 
 $badge-overlay: $gray100;
 $badge-opacity-light: 0.14;
@@ -97,7 +102,8 @@ $icon-bg-dark: $gray60 !default;
 $icon-bg-disabled: $gray20 !default;
 $red-triangle-warning: $sunset60;
 // Header, Body, & Footer
-$nav-bar-color: $indigo100;
+// $nav-bar-color: $indigo100;
+$nav-bar-color: $black;
 $light-nav-bar-color: $white;
 $nav-bar-height: 48px;
 $body-min-width: 1048px;
@@ -175,3 +181,4 @@ $caption-font-weight: $font-weight-body-bold;
 $hover-box-shadow: 0 0 1px 0 rgba(0, 0, 0, 0.12),
 0 2px 3px 0 rgba(0, 0, 0, 0.16);
 $popover-border-radius: 12px;
+

@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 
-import { BadgeStyle } from 'config/config-types';
+import { DefaultBadgeStyle } from 'config/config-types';
 import { convertText, CaseType } from 'utils/text';
 
 import './styles.scss';
@@ -11,13 +11,13 @@ import './styles.scss';
 export interface FlagProps {
   caseType?: CaseType | null;
   text: string;
-  labelStyle?: BadgeStyle;
+  labelStyle?: DefaultBadgeStyle;
 }
 
 const Flag: React.FC<FlagProps> = ({
   caseType = null,
   text = '',
-  labelStyle = BadgeStyle.DEFAULT,
+  labelStyle = DefaultBadgeStyle.DEFAULT,
 }: FlagProps) => (
   // TODO: After upgrading to Bootstrap 4, this component should leverage badges
   // https://getbootstrap.com/docs/4.1/components/badge/

@@ -1,0 +1,4 @@
+// Placeholder
+export enum HostBadgeStyle {
+
+}

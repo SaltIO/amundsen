@@ -3,7 +3,7 @@
 
 import React from 'react';
 
-import { BadgeStyle } from 'config/config-types';
+import { DefaultBadgeStyle } from 'config/config-types';
 import { CaseType } from 'utils/text';
 import StorySection from '../StorySection';
 import Flag from '.';
@@ -27,42 +27,42 @@ export const Flags = () => (
       <Flag
         caseType={CaseType.SENTENCE_CASE}
         text="Test Flag"
-        labelStyle={BadgeStyle.DEFAULT}
+        labelStyle={DefaultBadgeStyle.DEFAULT}
       />
     </StorySection>
     <StorySection title="Primary Style Flag">
       <Flag
         caseType={CaseType.SENTENCE_CASE}
         text="Test Flag"
-        labelStyle={BadgeStyle.PRIMARY}
+        labelStyle={DefaultBadgeStyle.PRIMARY}
       />
     </StorySection>
     <StorySection title="Informational Style Flag">
       <Flag
         caseType={CaseType.SENTENCE_CASE}
         text="Test Flag"
-        labelStyle={BadgeStyle.INFO}
+        labelStyle={DefaultBadgeStyle.INFO}
       />
     </StorySection>
     <StorySection title="Success Style Flag">
       <Flag
         caseType={CaseType.SENTENCE_CASE}
         text="Test Flag"
-        labelStyle={BadgeStyle.SUCCESS}
+        labelStyle={DefaultBadgeStyle.SUCCESS}
       />
     </StorySection>
     <StorySection title="Warning Style Flag">
       <Flag
         caseType={CaseType.SENTENCE_CASE}
         text="Test Flag"
-        labelStyle={BadgeStyle.WARNING}
+        labelStyle={DefaultBadgeStyle.WARNING}
       />
     </StorySection>
     <StorySection title="Danger Style Flag">
       <Flag
         caseType={CaseType.SENTENCE_CASE}
         text="Test Flag"
-        labelStyle={BadgeStyle.DANGER}
+        labelStyle={DefaultBadgeStyle.DANGER}
       />
     </StorySection>
   </>

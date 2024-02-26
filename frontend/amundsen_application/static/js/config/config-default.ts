@@ -1,60 +1,37 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { FilterType, ResourceType, SortDirection } from '../interfaces';
-import { AppConfig, BadgeStyle } from './config-types';
+import { AppConfig, BadgeStyle, DefaultBadgeStyle } from './config-types';
+
 
 const configDefault: AppConfig = {
+  badges: {
+    negative: {
+      style: DefaultBadgeStyle.DANGER,
+      displayName: 'Danger',
+    },
+    neutral: {
+      style: DefaultBadgeStyle.DEFAULT,
+      displayName: 'Default',
+    },
+    primary: {
+      style: DefaultBadgeStyle.PRIMARY,
+      displayName: 'Primary',
+    },
+    positive: {
+      style: DefaultBadgeStyle.SUCCESS,
+      displayName: 'Success',
+    },
+    warning: {
+      style: DefaultBadgeStyle.WARNING,
+      displayName: 'Warning',
+    }
+  },
   navAppSuite: null,
   navTheme: 'dark',
   nestedColumns: {
     maxNestedColumns: 500,
   },
   productTour: {},
-  badges: {
-    marts: {
-      style: BadgeStyle.MARTS,
-      displayName: 'Marts',
-    },
-    wrangling: {
-      style: BadgeStyle.WRANGLING,
-      displayName: 'Wrangling',
-    },
-    staging: {
-      style: BadgeStyle.STAGING,
-      displayName: 'Staging',
-    },
-    landing: {
-      style: BadgeStyle.LANDING,
-      displayName: 'Landing',
-    },
-    snowflake: {
-      style: BadgeStyle.SNOWFLAKE,
-      displayName: 'Snowflake',
-    },
-    mysql: {
-      style: BadgeStyle.MYSQL,
-      displayName: 'MySQL',
-    },
-    mssql: {
-      style: BadgeStyle.MSSQL,
-      displayName: 'MSSQL',
-    },
-    dbt: {
-      style: BadgeStyle.DBT,
-      displayName: 'dbt',
-    },
-    watermark: {
-      style: BadgeStyle.WATERMARK,
-      displayName: 'Watermark',
-    },
-    crediq: {
-      style: BadgeStyle.CREDIQ,
-      displayName: 'Cred iQ',
-    },
-    crefc: {
-      style: BadgeStyle.CREFC,
-      displayName: 'CREFC',
-    },
-  },
   browse: {
     curatedTags: [],
     showAllTags: true,
@@ -624,3 +601,4 @@ const configDefault: AppConfig = {
 };
 
 export default configDefault;
+

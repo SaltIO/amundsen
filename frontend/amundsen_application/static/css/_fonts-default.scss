@@ -47,3 +47,60 @@
   font-weight: $font-weight-body-bold;
   src: url('../fonts/OpenSans-Bold.ttf') format('truetype');
 }
+
+// CMD+RVL
+
+// PPMori
+@font-face {
+  font-family: 'PPMori';
+  font-style: normal;
+  font-weight: $font-weight-body-regular;
+  src: url('../fonts/PPMori-Regular.woff2') format('woff2'),
+       url('../fonts/PPMori-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'PPMori';
+  font-style: normal;
+  font-weight: $font-weight-body-bold;
+  src: url('../fonts/PPMori-Bold.woff2') format('woff2'),
+       url('../fonts/PPMori-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'PPMori';
+  font-style: normal;
+  font-weight: $font-weight-body-semi-bold;
+  src: url('../fonts/PPMori-Bold.woff2') format('woff2'),
+       url('../fonts/PPMori-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'PPMori';
+  font-style: normal;
+  font-weight: $font-weight-body-extralight;
+  src: url('../fonts/PPMori-Extralight.woff2') format('woff2'),
+       url('../fonts/PPMori-Extralight.ttf') format('truetype');
+}
+
+// IBM Plex Mono
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: $font-weight-body-regular;
+  src: url('../fonts/IBMPlexMono-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: $font-weight-body-bold;
+  src: url('../fonts/IBMPlexMono-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: $font-weight-body-light;
+  src: url('../fonts/IBMPlexMono-Light.ttf') format('truetype');
+}
