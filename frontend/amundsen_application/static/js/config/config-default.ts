@@ -601,3 +601,4 @@ const configDefault: AppConfig = {
 };
 
 export default configDefault;
+

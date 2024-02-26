@@ -10,6 +10,8 @@ import _ from 'lodash';
 // Any defined members of customHost will override configCustom.
 // const appConfig: AppConfig = { ...configDefault, ...configCustom, ...configHost };
 
+console.log("starting appconfig")
+
 // Merge badges
 const mergedBadges = _.merge(
     {},
@@ -18,76 +20,12 @@ const mergedBadges = _.merge(
     (configHost.badges ? configHost.badges : {})
 );
 
-// Merge Table Supported Sources
-const mergedTableSupportedSourcesConfig = _.merge(
+// Merge resourceConfig
+const mergedResourceConfig = _.merge(
     {},
-    configDefault.resourceConfig[ResourceType.table].supportedSources,
-    (configCustom.resourceConfig &&
-     ResourceType.table in configCustom.resourceConfig &&
-     configCustom?.resourceConfig[ResourceType.table]?.supportedSources ?
-        configCustom.resourceConfig[ResourceType.table].supportedSources :
-        {}
-    ),
-    (configHost.resourceConfig &&
-     ResourceType.table in configHost.resourceConfig &&
-     configHost.resourceConfig[ResourceType.table]?.supportedSources ?
-        configHost.resourceConfig[ResourceType.table].supportedSources :
-        {}
-    )
-);
-
-// Merge Dashboard Supported Sources
-const mergedDashboardSupportedSourcesConfig = _.merge(
-    {},
-    configDefault.resourceConfig[ResourceType.dashboard].supportedSources,
-    (configCustom.resourceConfig &&
-     ResourceType.dashboard in configCustom.resourceConfig &&
-     configCustom.resourceConfig[ResourceType.dashboard]?.supportedSources ?
-        configCustom.resourceConfig[ResourceType.dashboard].supportedSources :
-        {}
-    ),
-    (configHost.resourceConfig &&
-     ResourceType.dashboard in configHost.resourceConfig &&
-     configHost.resourceConfig[ResourceType.dashboard]?.supportedSources ?
-        configHost.resourceConfig[ResourceType.dashboard].supportedSources :
-        {}
-    )
-);
-
-// Merge Data Provider Supported Sources
-const mergedDataProviderSupportedSourcesConfig = _.merge(
-    {},
-    configDefault.resourceConfig[ResourceType.data_provider].supportedSources,
-    (configCustom.resourceConfig &&
-     ResourceType.data_provider in configCustom.resourceConfig &&
-     configCustom.resourceConfig[ResourceType.data_provider]?.supportedSources ?
-        configCustom.resourceConfig[ResourceType.data_provider].supportedSources :
-        {}
-    ),
-    (configHost.resourceConfig &&
-     ResourceType.data_provider in configHost.resourceConfig &&
-     configHost.resourceConfig[ResourceType.data_provider]?.supportedSources ?
-        configHost.resourceConfig[ResourceType.data_provider].supportedSources :
-        {}
-    )
-);
-
-// Merge File Supported Sources
-const mergedFileSupportedSourcesConfig = _.merge(
-    {},
-    configDefault.resourceConfig[ResourceType.file].supportedSources,
-    (configCustom.resourceConfig &&
-     ResourceType.file in configCustom.resourceConfig &&
-     configCustom.resourceConfig[ResourceType.file]?.supportedSources ?
-        configCustom.resourceConfig[ResourceType.file].supportedSources :
-        {}
-    ),
-    (configHost.resourceConfig &&
-     ResourceType.file in configHost.resourceConfig &&
-     configHost.resourceConfig[ResourceType.file]?.supportedSources ?
-        configHost.resourceConfig[ResourceType.file].supportedSources :
-        {}
-    )
+    configDefault.resourceConfig,
+    configCustom.resourceConfig,
+    configHost.resourceConfig
 );
 
 
@@ -97,20 +35,10 @@ const appConfig: AppConfig = {
     ...configCustom,
     ...configHost,
     badges: mergedBadges, // Use the merged result
+    resourceConfig: mergedResourceConfig
 };
 
-// Apply the merged supported sources
-if (appConfig.resourceConfig && ResourceType.table in appConfig.resourceConfig && appConfig.resourceConfig[ResourceType.table]?.supportedSources) {
-    appConfig.resourceConfig[ResourceType.table].supportedSources = mergedTableSupportedSourcesConfig
-}
-if (appConfig.resourceConfig && ResourceType.dashboard in appConfig.resourceConfig && appConfig.resourceConfig[ResourceType.dashboard]?.supportedSources) {
-    appConfig.resourceConfig[ResourceType.dashboard].supportedSources = mergedDashboardSupportedSourcesConfig
-}
-if (appConfig.resourceConfig && ResourceType.data_provider in appConfig.resourceConfig && appConfig.resourceConfig[ResourceType.data_provider]?.supportedSources) {
-    appConfig.resourceConfig[ResourceType.data_provider].supportedSources = mergedDataProviderSupportedSourcesConfig
-}
-if (appConfig.resourceConfig && ResourceType.file in appConfig.resourceConfig && appConfig.resourceConfig[ResourceType.file]?.supportedSources) {
-    appConfig.resourceConfig[ResourceType.file].supportedSources = mergedFileSupportedSourcesConfig
-}
+console.log("AppConfig");
+console.log(JSON.stringify(appConfig, null, 2));
 
 export default appConfig;
