@@ -262,7 +262,7 @@ type NoticesConfigType = Record<string, NoticeType>;
  * filterCategories - Optional configuration for any filters that can be applied to this resource
  */
 interface BaseResourceConfig {
-  displayName: string;
+  displayName?: string;
   filterCategories?: FilterConfig;
   supportedSources?: SourcesConfig;
   notices?: NoticesConfigType;
