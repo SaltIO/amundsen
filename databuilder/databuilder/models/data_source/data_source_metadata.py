@@ -222,7 +222,7 @@ class DataLocation(GraphSerializable):
         )
 
     def get_key(self) -> str:
-        return DataLocationType.DATA_LOCATION_NODE_KEY.format(
+        return DataLocation.DataLocationType.DATA_LOCATION_NODE_KEY.format(
             name=convert_to_uri_safe_str(self.name),
             type=self.type)
 
@@ -314,15 +314,19 @@ class File(GraphSerializable):
     FILE_NODE_ATTR_PATH = 'path'
     FILE_NODE_ATTR_DESC = 'desc'
     FILE_NODE_ATTR_TYPE = 'type'
+    FILE_NODE_ATTR_CATEGORY = 'category'
     FILE_NODE_ATTR_IS_DIRECTORY= 'is_directory'
 
     FILE_RELATION_TYPE = 'FILE'
     FILE_OF_RELATION_TYPE = 'FILE_OF'
 
+    FILE_DESCRIPTION_KEY_FORMAT = '{product}_dashboard://{cluster}.{dashboard_group}/{dashboard_name}/_description'
+
     def __init__(self,
                  name: str,
                  desc: str,
                  type: str,
+                 catagory: str,
                  path: str,
                  is_directory: bool,
                  data_location: DataLocation,
@@ -331,6 +335,7 @@ class File(GraphSerializable):
         self.name = name
         self.desc = desc
         self.type = type
+        self.catagory = catagory
         self.path = path
         self.is_directory = is_directory
 
@@ -340,7 +345,7 @@ class File(GraphSerializable):
         self._relation_iter = self._create_relation_iterator()
 
     def __repr__(self) -> str:
-        return f'File({self.name!r}, {self.desc!r}, {self.type!r}, {self.path!r}, {self.is_directory!r})'
+        return f'File({self.name!r}, {self.desc!r}, {self.type!r}, {self.category!r}, {self.path!r}, {self.is_directory!r})'
 
     def create_next_node(self) -> Optional[GraphNode]:
         try:
@@ -362,6 +367,7 @@ class File(GraphSerializable):
                 self.FILE_NODE_ATTR_NAME: self.name,
                 self.FILE_NODE_ATTR_DESC: self.desc,
                 self.FILE_NODE_ATTR_TYPE: self.type,
+                self.FILE_NODE_ATTR_CATEGORY: self.catagory,
                 self.FILE_NODE_ATTR_PATH: self.path,
                 self.FILE_NODE_ATTR_IS_DIRECTORY: self.is_directory
             }
@@ -380,4 +386,4 @@ class File(GraphSerializable):
             )
 
     def get_key(self) -> str:
-        return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.name)}"
+        return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"
