@@ -108,8 +108,12 @@ class ElasticsearchProxyV2_1():
         'tag': 'tags.keyword',
         'name': 'name.keyword',
         'type': 'type.keyword',
+        'category': 'category.keyword',
         'path': 'path.keyword',
         'is_directory': 'is_directory.keyword',
+        'data_location_type': 'data_location_type.keyword',
+        'data_location_name': 'data_location_name.keyword',
+        'tag': 'tags.keyword',
     }
 
     RESOURCE_TO_MAPPING = {

@@ -551,6 +551,34 @@ const configDefault: AppConfig = {
           type: FilterType.INPUT_SELECT,
         },
         {
+          categoryId: 'type',
+          displayName: 'Type',
+          helpText:
+            'Enter one or more comma separated values with exact file types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'category',
+          displayName: 'Category',
+          helpText:
+            'Enter one or more comma separated values with exact file categories or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_location_type',
+          displayName: 'Data Location Type',
+          helpText:
+            'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_location_name',
+          displayName: 'Data Location Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
           categoryId: 'tag',
           displayName: 'Tag',
           helpText:

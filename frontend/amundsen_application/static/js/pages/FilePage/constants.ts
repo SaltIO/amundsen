@@ -4,7 +4,6 @@ export const ERROR_MESSAGE = 'Something went wrong...';
 export const EDIT_DESC_TEXT = 'Click to edit description in';
 export const EDIT_OWNERS_TEXT = 'Click to edit owners in';
 
-export const COLUMN_URL_KEY = 'column';
 export const DATE_RANGE_TITLE = 'Date Range';
 export const DESCRIPTION_TITLE = 'Description';
 export const FREQ_USERS_TITLE = 'Frequent Users';
@@ -18,10 +17,8 @@ export const EXPAND_ALL_NESTED_LABEL = 'Expand all nested';
 export const ESC_BUTTON_KEY = 'Escape';
 export const MIN_WIDTH_DISPLAY_BTN = 1100;
 export const MIN_WIDTH_DISPLAY_BTN_WITH_OPEN_PANEL = 1350;
-export const NO_LINEAGE_INFO = 'No lineage info available';
-export const NO_SNOWFLAKE_SHARES_INFO = 'No Snowflake Shares info available';
-export const UPDATE_FREQUENCY_TITLE = 'Update Frequency';
 
-export enum FILE_TABS {
-  TABLE = 'tables',
+export enum PROSPECTUS_FILE_TABS {
+  FILE_TABLES = 'file_tables',
+  PROSPECTUS_WATERFALL_SCHEMES = 'prospectus_waterfall_schemes',
 }

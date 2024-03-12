@@ -38,7 +38,7 @@ const appConfig: AppConfig = {
     resourceConfig: mergedResourceConfig
 };
 
-console.log("AppConfig");
-console.log(JSON.stringify(appConfig, null, 2));
+// console.log("AppConfig");
+// console.log(JSON.stringify(appConfig, null, 2));
 
 export default appConfig;

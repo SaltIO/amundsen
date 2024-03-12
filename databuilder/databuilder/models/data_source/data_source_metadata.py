@@ -172,7 +172,7 @@ class DataLocation(GraphSerializable):
     def __init__(self,
                  name: str,
                  type: str,
-                 data_channel: DataChannel
+                 data_channel: DataChannel = None
                  ) -> None:
 
         self.name = name
@@ -234,8 +234,8 @@ class FilesystemDataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 data_channel: DataChannel,
-                 drive: str
+                 drive: str,
+                 data_channel: DataChannel = None
                  ) -> None:
 
         super().__init__(name=name, type='filesystem', data_channel=data_channel)
@@ -261,8 +261,8 @@ class AwsS3DataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 data_channel: DataChannel,
-                 bucket: str
+                 bucket: str,
+                 data_channel: DataChannel = None
                  ) -> None:
 
         super().__init__(name=name, type='aws_s3', data_channel=data_channel)
@@ -287,8 +287,8 @@ class SharepointDataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 data_channel: DataChannel,
-                 document_library: str
+                 document_library: str,
+                 data_channel: DataChannel = None
                  ) -> None:
 
         super().__init__(name=name, type='sharepoint', data_channel=data_channel)
@@ -320,22 +320,20 @@ class File(GraphSerializable):
     FILE_RELATION_TYPE = 'FILE'
     FILE_OF_RELATION_TYPE = 'FILE_OF'
 
-    FILE_DESCRIPTION_KEY_FORMAT = '{product}_dashboard://{cluster}.{dashboard_group}/{dashboard_name}/_description'
 
     def __init__(self,
                  name: str,
                  desc: str,
                  type: str,
-                 catagory: str,
+                 category: str,
                  path: str,
                  is_directory: bool,
-                 data_location: DataLocation,
-                 ) -> None:
+                 data_location: DataLocation = None) -> None:
 
         self.name = name
         self.desc = desc
         self.type = type
-        self.catagory = catagory
+        self.category = category
         self.path = path
         self.is_directory = is_directory
 
@@ -367,14 +365,14 @@ class File(GraphSerializable):
                 self.FILE_NODE_ATTR_NAME: self.name,
                 self.FILE_NODE_ATTR_DESC: self.desc,
                 self.FILE_NODE_ATTR_TYPE: self.type,
-                self.FILE_NODE_ATTR_CATEGORY: self.catagory,
+                self.FILE_NODE_ATTR_CATEGORY: self.category,
                 self.FILE_NODE_ATTR_PATH: self.path,
                 self.FILE_NODE_ATTR_IS_DIRECTORY: self.is_directory
             }
         )
 
     def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
-        if self.start_key and self.start_label:
+        if self.data_location:
             yield GraphRelationship(
                 start_label=DataLocation.DATA_LOCATION_NODE_LABEL,
                 start_key=self.data_location.get_key(),
@@ -387,3 +385,127 @@ class File(GraphSerializable):
 
     def get_key(self) -> str:
         return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"
+
+class FileTable(GraphSerializable):
+
+    FILE_TABLE_NODE_LABEL = 'File_Table'
+    FILE_TABLE_NODE_ATTR_NAME = 'name'
+    FILE_TABLE_NODE_ATTR_CONTENT = 'content'
+
+    FILE_TABLE_RELATION_TYPE = 'FILE_TABLE'
+    FILE_TABLE_OF_RELATION_TYPE = 'FILE_TABLE_OF'
+
+    def __init__(self,
+                 name: str,
+                 content: str,
+                 file: File,
+                 ) -> None:
+
+        self.name = name
+        self.content = content
+        self.file = file
+
+        self._node_iter = self._create_node_iterator()
+        self._relation_iter = self._create_relation_iterator()
+
+    def __repr__(self) -> str:
+        return f'FileTable({self.name!r}, {self.content!r})'
+
+    def create_next_node(self) -> Optional[GraphNode]:
+        try:
+            return next(self._node_iter)
+        except StopIteration:
+            return None
+
+    def create_next_relation(self) -> Optional[GraphRelationship]:
+        try:
+            return next(self._relation_iter)
+        except StopIteration:
+            return None
+
+    def _create_node_iterator(self) -> Iterator[GraphNode]:
+        yield GraphNode(
+            key=self.get_key(),
+            label=self.FILE_TABLE_NODE_LABEL,
+            attributes={
+                self.FILE_TABLE_NODE_ATTR_NAME: self.name,
+                self.FILE_TABLE_NODE_ATTR_CONTENT: self.content,
+            }
+        )
+
+    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
+        if self.file:
+            yield GraphRelationship(
+                start_label=File.FILE_NODE_LABEL,
+                start_key=self.file.get_key(),
+                end_label=self.FILE_TABLE_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.FILE_TABLE_RELATION_TYPE,
+                reverse_type=self.FILE_TABLE_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+    def get_key(self) -> str:
+        return f"{self.file.get_key()}/_filetable/{convert_to_uri_safe_str(self.name)}"
+
+class ProspectusWaterfallScheme(GraphSerializable):
+
+    PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL = 'Prospectus_Waterfall_Scheme'
+    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME = 'name'
+    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME = 'scheme'
+
+    PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME'
+    PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME_OF'
+
+    def __init__(self,
+                 name: str,
+                 scheme: str,
+                 file: File,
+                 ) -> None:
+
+        self.name = name
+        self.scheme = scheme
+        self.file = file
+
+        self._node_iter = self._create_node_iterator()
+        self._relation_iter = self._create_relation_iterator()
+
+    def __repr__(self) -> str:
+        return f'ProspectusWaterfallScheme({self.name!r}, {self.content!r})'
+
+    def create_next_node(self) -> Optional[GraphNode]:
+        try:
+            return next(self._node_iter)
+        except StopIteration:
+            return None
+
+    def create_next_relation(self) -> Optional[GraphRelationship]:
+        try:
+            return next(self._relation_iter)
+        except StopIteration:
+            return None
+
+    def _create_node_iterator(self) -> Iterator[GraphNode]:
+        yield GraphNode(
+            key=self.get_key(),
+            label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
+            attributes={
+                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME: self.name,
+                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME: self.scheme,
+            }
+        )
+
+    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
+        if self.file:
+            yield GraphRelationship(
+                start_label=File.FILE_NODE_LABEL,
+                start_key=self.file.get_key(),
+                end_label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE,
+                reverse_type=self.PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+    def get_key(self) -> str:
+        return f"{self.file.get_key()}/_prospectuswaterfallscheme/{convert_to_uri_safe_str(self.name)}"

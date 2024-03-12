@@ -17,38 +17,98 @@ import { UpdateSearchStateRequest } from 'ducks/search/types';
 import { logClick } from 'utils/analytics';
 
 import { ResourceType } from 'interfaces/Resources';
+import { FileMetadata } from 'interfaces';
+
 
 export interface HeaderBulletsProps {
-  name: string;
+  fileData: FileMetadata;
 }
 export interface DispatchFromProps {
-  searchDatabase: (databaseText: string) => UpdateSearchStateRequest;
+  searchFileType: (fileType: string) => UpdateSearchStateRequest;
+  searchFileCategory: (fileCategory: string) => UpdateSearchStateRequest;
+  searchDataLocationType: (dataLocationType: string) => UpdateSearchStateRequest;
+  searchDataLocationName: (dataLocationName: string) => UpdateSearchStateRequest;
 }
 
 export type FileHeaderBulletsProps = HeaderBulletsProps & DispatchFromProps;
 
 export class FileHeaderBullets extends React.Component<FileHeaderBulletsProps> {
-  handleClick = (e) => {
-    const { name, searchDatabase } = this.props;
+  handleFileTypeClick = (e) => {
+    const { fileData, searchFileType } = this.props;
 
     logClick(e, {
       target_type: 'file',
-      label: name,
+      label: fileData.type,
     });
-    searchDatabase(name);
+    searchFileType(fileData.type);
+  };
+
+  handleFileCategoryClick = (e) => {
+    const { fileData, searchFileCategory } = this.props;
+
+    logClick(e, {
+      target_type: 'file',
+      label: fileData.category,
+    });
+    searchFileCategory(fileData.category);
+  };
+
+  handleDataLocationTypeClick = (e) => {
+    const { fileData, searchDataLocationType } = this.props;
+
+    if (fileData.dataLocation) {
+      logClick(e, {
+        target_type: 'file',
+        label: fileData.dataLocation.type,
+      });
+      searchDataLocationType(fileData.dataLocation.type);
+    }
+  };
+
+  handleDataLocationNameClick = (e) => {
+    const { fileData, searchDataLocationName } = this.props;
+
+    if (fileData.dataLocation) {
+      logClick(e, {
+        target_type: 'file',
+        label: fileData.dataLocation.name,
+      });
+      searchDataLocationName(fileData.dataLocation.name);
+    }
   };
 
   render() {
-    const { name } = this.props;
+    const { fileData } = this.props;
 
     return (
       <ul className="header-bullets">
         <li>{getDisplayNameByResource(ResourceType.file)}</li>
+        {fileData.dataLocation && (
+          <li>
+            <Link to="/search" onClick={this.handleDataLocationTypeClick}>
+              {fileData.dataLocation.type}
+            </Link>
+          </li>
+        )}
+        {fileData.dataLocation && (
+          <li>
+            <Link to="/search" onClick={this.handleDataLocationNameClick}>
+              {fileData.dataLocation.name}
+            </Link>
+          </li>
+        )}
         <li>
-          <Link to="/search" onClick={this.handleClick}>
-            {getSourceDisplayName(name || '', ResourceType.file)}
+          <Link to="/search" onClick={this.handleFileTypeClick}>
+            {getSourceDisplayName(fileData.type || '', ResourceType.file)}
           </Link>
         </li>
+        {fileData.category && (
+          <li>
+            <Link to="/search" onClick={this.handleFileCategoryClick}>
+              {fileData.category}
+            </Link>
+          </li>
+        )}
       </ul>
     );
   }
@@ -57,10 +117,31 @@ export class FileHeaderBullets extends React.Component<FileHeaderBulletsProps> {
 export const mapDispatchToProps = (dispatch: any) =>
   bindActionCreators(
     {
-      searchDatabase: (databaseText: string) =>
+      searchFileType: (fileType: string) =>
         updateSearchState({
           filters: {
-            [ResourceType.file]: { name: { value: databaseText } },
+            [ResourceType.file]: { type: { value: fileType } },
+          },
+          submitSearch: true,
+        }),
+      searchFileCategory: (fileCategory: string) =>
+        updateSearchState({
+          filters: {
+            [ResourceType.file]: { category: { value: fileCategory } },
+          },
+          submitSearch: true,
+        }),
+      searchDataLocationType: (dataLocationType: string) =>
+        updateSearchState({
+          filters: {
+            [ResourceType.file]: { data_location_type: { value: dataLocationType } },
+          },
+          submitSearch: true,
+        }),
+      searchDataLocationName: (dataLocationName: string) =>
+        updateSearchState({
+          filters: {
+            [ResourceType.file]: { data_location_name: { value: dataLocationName } },
           },
           submitSearch: true,
         }),

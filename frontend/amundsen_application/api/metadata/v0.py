@@ -683,6 +683,41 @@ def update_dashboard_tags() -> Response:
         payload = jsonify({'msg': message})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+@metadata_blueprint.route('/update_file_tags', methods=['PUT', 'DELETE'])
+def update_file_tags() -> Response:
+
+    @action_logging
+    def _log_update_file_tags(*, uri_key: str, method: str, tag: str) -> None:
+        pass  # pragma: no cover
+
+    try:
+        args = request.get_json()
+        method = request.method
+
+        file_endpoint = _get_file_endpoint()
+        uri_key = get_query_param(args, 'key')
+        tag = get_query_param(args, 'tag')
+        url = f'{file_endpoint}/{uri_key}/tag/{tag}'
+
+        _log_update_file_tags(uri_key=uri_key, method=method, tag=tag)
+
+        response = request_metadata(url=url, method=method)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+        else:
+            message = f'Encountered error: {method} file tag failed'
+            logging.error(message)
+
+        payload = jsonify({'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        message = 'Encountered exception: ' + str(e)
+        logging.exception(message)
+        payload = jsonify({'msg': message})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
 @metadata_blueprint.route('/user', methods=['GET'])
 def get_user() -> Response:

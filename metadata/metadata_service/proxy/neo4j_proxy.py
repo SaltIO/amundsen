@@ -5,6 +5,7 @@ import logging
 import re
 import textwrap
 import time
+import json
 from random import randint
 from typing import (Any, Dict, Iterable, List, Optional, Tuple,  # noqa: F401
                     Union, no_type_check)
@@ -25,7 +26,7 @@ from amundsen_common.models.table import (Application, Badge, Column,
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.user import UserSchema
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare, SnowflakeListing
-from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File)
+from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable, ProspectusWaterfallScheme, ProspectusScheme)
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
@@ -3052,8 +3053,11 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
             OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_LOCATION]->(data_location)
             OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
-            WITH file, data_provider, data_channel, data_location
-            RETURN file, data_location, data_channel, data_provider
+            OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+            OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
+            OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
+            WITH file, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+            RETURN file, data_location, data_channel, data_provider, tags, file_tables, prospectus_waterfall_schemes
         """)
         return data_provider_query
 
@@ -3068,42 +3072,7 @@ class Neo4jProxy(BaseProxy):
 
         record = get_single_record(records)
 
-        LOGGER.info(f"record={record}")
-
-        # data_channels = []
-        # for rec in record.get("data_channels", None):
-        #     LOGGER.info(f"rec={rec}")
-        #     data_channel_rec = rec["data_channel"]
-        #     LOGGER.info(f"data_channel_rec={data_channel_rec}")
-        #     data_locations = []
-        #     for data_location_rec in rec.get("data_locations", None):
-        #         LOGGER.info(f"data_location_rec={data_location_rec}")
-        #         type = data_location_rec.get("type", None)
-        #         if "aws_s3" == type:
-        #             data_location = AwsS3DataLocation(name=data_location_rec["name"],
-        #                                                 key=data_location_rec["key"],
-        #                                                 type=type,
-        #                                                 bucket=data_location_rec["bucket"])
-        #         elif "filesystem" == type:
-        #             data_location = FilesystemDataLocation(name=data_location_rec["name"],
-        #                                                     key=data_location_rec["key"],
-        #                                                     type=type,
-        #                                                     drive=data_location_rec["drive"])
-        #         else:
-        #             data_location = DataLocation(name=data_location_rec["name"],
-        #                                             key=data_location_rec["key"],
-        #                                             type=type)
-
-        #         data_locations.append(data_location)
-
-        #     data_channel = DataChannel(name=data_channel_rec["name"],
-        #                                 key=data_channel_rec["key"],
-        #                                 description=data_channel_rec.get("description", None),
-        #                                 license=data_channel_rec.get("license", None),
-        #                                 type=data_channel_rec["type"],
-        #                                 url=data_channel_rec.get("url", None),
-        #                                 data_locations=data_locations)
-        #     data_channels.append(data_channel)
+        # LOGGER.info(f"record={record}")
 
         data_location_rec = record.get("data_location", None)
         data_location: DataLocation = None
@@ -3130,15 +3099,59 @@ class Neo4jProxy(BaseProxy):
                                         website=data_provider_rec.get("website", None),
                                         data_channels=([data_channel] if data_channel else []))
 
+
+        tags = []
+        tag_records = record['tags']
+        if tag_records:
+            for tag_record in tag_records:
+                tag = Tag(tag_name=tag_record['key'],
+                          tag_type=tag_record['tag_type'])
+                tags.append(tag)
+
+        file_tables_rec = record.get("file_tables", None)
+        file_tables: List[FileTable] = None
+        if file_tables_rec and len(file_tables_rec) > 0:
+            file_tables: List[FileTable] = []
+            for file_table_rec in file_tables_rec:
+                file_table = FileTable(name=file_table_rec["name"],
+                                       content=file_table_rec["content"])
+                file_tables.append(file_table)
+
+        prospectus_waterfall_schemes_rec = record.get("prospectus_waterfall_schemes", None)
+        prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = None
+        if prospectus_waterfall_schemes_rec and len(prospectus_waterfall_schemes_rec) > 0:
+            prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = []
+            for prospectus_waterfall_scheme_rec in prospectus_waterfall_schemes_rec:
+
+                schemes = prospectus_waterfall_scheme_rec["scheme"]
+                schemes = schemes.replace("'", '"')
+                schemes = json.loads(schemes)
+
+                prospectus_schemes: List[ProspectusScheme] = None
+                if schemes and len(schemes) > 0:
+                    prospectus_schemes: List[ProspectusScheme] = []
+                    for scheme in schemes:
+                        prospectus_scheme = ProspectusScheme(shortName=scheme["short name"],
+                                                             details=scheme["details"])
+                        prospectus_schemes.append(prospectus_scheme)
+
+                prospectus_waterfall_scheme = ProspectusWaterfallScheme(name=prospectus_waterfall_scheme_rec["name"],
+                                                                        scheme=prospectus_schemes)
+                prospectus_waterfall_schemes.append(prospectus_waterfall_scheme)
+
         file_rec = record["file"]
         file = File(name=file_rec["name"],
                     key=file_rec["key"],
                     description=file_rec.get("desc", None),
                     type=file_rec.get("type", None),
+                    category=file_rec.get("category", None),
                     path=file_rec.get("path", None),
                     is_directory=file_rec.get("is_directory", None),
-                    data_location=data_location,
-                    data_channel=data_channel,
-                    data_provider=data_provider)
+                    dataLocation=data_location,
+                    tags=tags,
+                    # data_channel=data_channel,
+                    # data_provider=data_provider,
+                    fileTables=file_tables,
+                    prospectusWaterfallSchemes=prospectus_waterfall_schemes)
 
         return file

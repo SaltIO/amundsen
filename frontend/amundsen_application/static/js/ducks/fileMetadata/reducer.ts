@@ -26,6 +26,9 @@ export const initialFileDataState: FileMetadata = {
   key: '',
   name: '',
   description: '',
+  path: '',
+  type: '',
+  category: '',
   is_editable: true
 };
 
