@@ -54,9 +54,8 @@ import { FormattedDataType } from 'interfaces/ColumnList';
 
 import FileHeaderBullets from './FileHeaderBullets';
 
-import TableDescEditableText from '../TableDetailPage/TableDescEditableText';
+import FileDescEditableText from './FileDescEditableText';
 import RequestDescriptionText from '../TableDetailPage/RequestDescriptionText';
-import RequestMetadataForm from '../TableDetailPage/RequestMetadataForm';
 
 import * as Constants from './constants';
 import { STATUS_CODES } from '../../constants';
@@ -393,8 +392,8 @@ export class FilePage extends React.Component<
                 editUrl={undefined}
               >
                 {
-                <TableDescEditableText
-                  maxLength={getMaxLength('tableDescLength')}
+                <FileDescEditableText
+                  maxLength={getMaxLength('fileDescLength')}
                   value={fileData.description}
                   editable={fileData.is_editable}
                 />

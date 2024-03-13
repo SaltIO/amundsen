@@ -45,6 +45,7 @@ const configDefault: AppConfig = {
   },
   editableText: {
     tableDescLength: 750,
+    fileDescLength: 750,
     columnDescLength: 250,
   },
   analytics: {

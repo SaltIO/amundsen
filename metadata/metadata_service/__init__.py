@@ -44,7 +44,7 @@ from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
                                        UserFollowsAPI, UserOwnAPI, UserOwnsAPI,
                                        UserReadsAPI)
 from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
-from metadata_service.api.data_source import (DataProviderDetailAPI, FileDetailAPI, FileTagAPI)
+from metadata_service.api.data_source import (DataProviderDetailAPI, FileDetailAPI, FileTagAPI, FileDescriptionAPI)
 from metadata_service.deprecations import process_deprecations
 
 
@@ -199,6 +199,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/data_source/file/<path:file_uri>')
     api.add_resource(FileTagAPI,
                      '/data_source/file/<path:id>/tag/<tag>')
+    api.add_resource(FileDescriptionAPI,
+                     '/data_source/file/<path:id>/description')
     app.register_blueprint(api_bp)
 
     # cli registration

@@ -16,13 +16,13 @@ class FileESDocument(ElasticsearchDocument):
                  key: str,
                  description: str,
                  type: str,
+                 category: Optional[str],
                  path: str,
                  is_directory: bool,
-                 data_channel_name: str,
-                 data_location_name: str,
-                 data_provider_name: str,
+                 data_location_type: Optional[str],
+                 data_location_name: Optional[str],
                  last_updated_timestamp: Optional[int],
-                #  tags: List[str],
+                 tags: Optional[List[str]],
                 #  badges: Optional[List[str]] = None,
                  ) -> None:
         self.name = name

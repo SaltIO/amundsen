@@ -26,7 +26,7 @@ export interface FileMetadata {
   badges: Badge[];
   key: string;
   name: string;
-  description: string;
+  description?: string;
   type: string;
   category: string;
   path: string;

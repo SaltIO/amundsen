@@ -75,7 +75,8 @@ import {
 } from './providerMetadata/sagas';
 import {
   getFileDataWatcher,
-  getFileDescriptionWatcher
+  getFileDescriptionWatcher,
+  updateFileDescriptionWatcher
 } from './fileMetadata/sagas'
 
 export default function* rootSaga() {
@@ -139,5 +140,6 @@ export default function* rootSaga() {
     getProviderDescriptionWatcher(),
     getFileDataWatcher(),
     getFileDescriptionWatcher(),
+    updateFileDescriptionWatcher()
   ]);
 }

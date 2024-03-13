@@ -1,5 +1,5 @@
 from typing import (
-    Iterator, Optional, Dict
+    Iterator, Optional, Dict, Union, List
 )
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -8,10 +8,23 @@ import re
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.graph_serializable import GraphSerializable
+from databuilder.models.description_metadata import (  # noqa: F401
+    DESCRIPTION_NODE_LABEL, DESCRIPTION_NODE_LABEL_VAL, DescriptionMetadata,
+)
+from databuilder.models.table_metadata import TagMetadata
 
 
 def convert_to_uri_safe_str(input_string: str) -> str:
     return re.sub(r'\W+', '_', input_string).lower()
+
+def _format_as_list(tags: Union[List, str, None]) -> List:
+    if tags is None:
+        tags = []
+    if isinstance(tags, str):
+        tags = list(filter(None, tags.split(',')))
+    if isinstance(tags, list):
+        tags = [tag.lower().strip() for tag in tags]
+    return tags
 
 
 class DataProvider(GraphSerializable):
@@ -226,6 +239,9 @@ class DataLocation(GraphSerializable):
             name=convert_to_uri_safe_str(self.name),
             type=self.type)
 
+    def get_root(self) -> str:
+        return 'NA'
+
 
 class FilesystemDataLocation(DataLocation):
 
@@ -252,6 +268,9 @@ class FilesystemDataLocation(DataLocation):
             name=convert_to_uri_safe_str(self.name),
             type=self.type,
             drive=convert_to_uri_safe_str(self.drive))
+
+    def get_root(self) -> str:
+        return self.drive
 
 
 class AwsS3DataLocation(DataLocation):
@@ -280,6 +299,9 @@ class AwsS3DataLocation(DataLocation):
             type=self.type,
             bucket=convert_to_uri_safe_str(self.bucket))
 
+    def get_root(self) -> str:
+        return self.bucket
+
 class SharepointDataLocation(DataLocation):
 
     SHAREPOINT_DATA_LOCATION_ATTR_DOCUMENT_LIBRARY = "document_library"
@@ -306,13 +328,15 @@ class SharepointDataLocation(DataLocation):
             type=self.type,
             document_library=convert_to_uri_safe_str(self.bucket))
 
+    def get_root(self) -> str:
+        return self.document_library
+
 
 class File(GraphSerializable):
 
     FILE_NODE_LABEL = 'File'
     FILE_NODE_ATTR_NAME = 'name'
     FILE_NODE_ATTR_PATH = 'path'
-    FILE_NODE_ATTR_DESC = 'desc'
     FILE_NODE_ATTR_TYPE = 'type'
     FILE_NODE_ATTR_CATEGORY = 'category'
     FILE_NODE_ATTR_IS_DIRECTORY= 'is_directory'
@@ -320,18 +344,24 @@ class File(GraphSerializable):
     FILE_RELATION_TYPE = 'FILE'
     FILE_OF_RELATION_TYPE = 'FILE_OF'
 
+    FILE_DESCRIPTION_FORMAT = '{data_location_type}://{data_location_name}/{data_location_root}/{file_type}/{file_name}/_description'
+
 
     def __init__(self,
                  name: str,
-                 desc: str,
                  type: str,
                  category: str,
                  path: str,
                  is_directory: bool,
-                 data_location: DataLocation = None) -> None:
+                 description: Union[str, None] = None,
+                 data_location: DataLocation = None,
+                 tags: Union[List, str] = None) -> None:
 
         self.name = name
-        self.desc = desc
+        if description:
+            self.set_description(description=description)
+        else:
+            self.description = None
         self.type = type
         self.category = category
         self.path = path
@@ -339,11 +369,17 @@ class File(GraphSerializable):
 
         self.data_location = data_location
 
+        self.tags = _format_as_list(tags)
+
         self._node_iter = self._create_node_iterator()
         self._relation_iter = self._create_relation_iterator()
 
+
     def __repr__(self) -> str:
-        return f'File({self.name!r}, {self.desc!r}, {self.type!r}, {self.category!r}, {self.path!r}, {self.is_directory!r})'
+        return f'File({self.name!r}, {self.description!r}, {self.type!r}, {self.category!r}, {self.path!r}, {self.is_directory!r})'
+
+    def set_description(self, description: str):
+        self.description = DescriptionMetadata.create_description_metadata(text=description)
 
     def create_next_node(self) -> Optional[GraphNode]:
         try:
@@ -363,13 +399,22 @@ class File(GraphSerializable):
             label=self.FILE_NODE_LABEL,
             attributes={
                 self.FILE_NODE_ATTR_NAME: self.name,
-                self.FILE_NODE_ATTR_DESC: self.desc,
                 self.FILE_NODE_ATTR_TYPE: self.type,
                 self.FILE_NODE_ATTR_CATEGORY: self.category,
                 self.FILE_NODE_ATTR_PATH: self.path,
                 self.FILE_NODE_ATTR_IS_DIRECTORY: self.is_directory
             }
         )
+
+        if self.description:
+            node_key = self._get_file_description_key(self.description)
+            yield self.description.get_node(node_key)
+
+        # Create the table tag nodes
+        if self.tags:
+            for tag in self.tags:
+                tag_node = TagMetadata(tag).get_node()
+                yield tag_node
 
     def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
         if self.data_location:
@@ -382,6 +427,31 @@ class File(GraphSerializable):
                 reverse_type=self.FILE_OF_RELATION_TYPE,
                 attributes={}
             )
+
+        if self.description:
+            yield self.description.get_relation(File.FILE_NODE_LABEL,
+                                                self.get_key(),
+                                                self._get_file_description_key(self.description))
+
+        if self.tags:
+            for tag in self.tags:
+                tag_relationship = GraphRelationship(
+                    start_label=File.FILE_NODE_LABEL,
+                    start_key=self.get_key(),
+                    end_label=TagMetadata.TAG_NODE_LABEL,
+                    end_key=TagMetadata.get_tag_key(tag),
+                    type=TagMetadata.ENTITY_TAG_RELATION_TYPE,
+                    reverse_type=TagMetadata.TAG_ENTITY_RELATION_TYPE,
+                    attributes={}
+                )
+                yield tag_relationship
+
+    def _get_file_description_key(self, description: DescriptionMetadata) -> str:
+        return File.FILE_DESCRIPTION_FORMAT.format(data_location_type=self.data_location.type,
+                                                   data_location_name=convert_to_uri_safe_str(self.data_location.name),
+                                                   data_location_root=convert_to_uri_safe_str(self.data_location.get_root()),
+                                                   file_type=convert_to_uri_safe_str(self.type),
+                                                   file_name=convert_to_uri_safe_str(self.name))
 
     def get_key(self) -> str:
         return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"

@@ -3053,11 +3053,12 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
             OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_LOCATION]->(data_location)
             OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
+            OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
             OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
             OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
             OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
-            WITH file, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
-            RETURN file, data_location, data_channel, data_provider, tags, file_tables, prospectus_waterfall_schemes
+            WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+            RETURN file, file_desc, data_location, data_channel, data_provider, tags, file_tables, prospectus_waterfall_schemes
         """)
         return data_provider_query
 
@@ -3079,25 +3080,25 @@ class Neo4jProxy(BaseProxy):
         if data_location_rec:
             data_location = self._get_data_location(data_location_rec)
 
-        data_channel_rec = record.get("data_channel", None)
-        data_channel: DataChannel = None
-        if data_channel_rec:
-            data_channel = DataChannel(name=data_channel_rec["name"],
-                                        key=data_channel_rec["key"],
-                                        description=data_channel_rec.get("description", None),
-                                        license=data_channel_rec.get("license", None),
-                                        type=data_channel_rec["type"],
-                                        url=data_channel_rec.get("url", None),
-                                        data_locations=([data_location] if data_location else []))
+        # data_channel_rec = record.get("data_channel", None)
+        # data_channel: DataChannel = None
+        # if data_channel_rec:
+        #     data_channel = DataChannel(name=data_channel_rec["name"],
+        #                                 key=data_channel_rec["key"],
+        #                                 description=data_channel_rec.get("description", None),
+        #                                 license=data_channel_rec.get("license", None),
+        #                                 type=data_channel_rec["type"],
+        #                                 url=data_channel_rec.get("url", None),
+        #                                 data_locations=([data_location] if data_location else []))
 
-        data_provider_rec = record.get("data_provider", None)
-        data_provider: DataProvider = None
-        if data_provider_rec:
-            data_provider = DataProvider(name=data_provider_rec["name"],
-                                        key=data_provider_rec["key"],
-                                        description=data_provider_rec.get("desc", None),
-                                        website=data_provider_rec.get("website", None),
-                                        data_channels=([data_channel] if data_channel else []))
+        # data_provider_rec = record.get("data_provider", None)
+        # data_provider: DataProvider = None
+        # if data_provider_rec:
+        #     data_provider = DataProvider(name=data_provider_rec["name"],
+        #                                 key=data_provider_rec["key"],
+        #                                 description=data_provider_rec.get("desc", None),
+        #                                 website=data_provider_rec.get("website", None),
+        #                                 data_channels=([data_channel] if data_channel else []))
 
 
         tags = []
@@ -3142,7 +3143,7 @@ class Neo4jProxy(BaseProxy):
         file_rec = record["file"]
         file = File(name=file_rec["name"],
                     key=file_rec["key"],
-                    description=file_rec.get("desc", None),
+                    description=self._safe_get(record, "file_desc", "description"),
                     type=file_rec.get("type", None),
                     category=file_rec.get("category", None),
                     path=file_rec.get("path", None),
@@ -3155,3 +3156,29 @@ class Neo4jProxy(BaseProxy):
                     prospectusWaterfallSchemes=prospectus_waterfall_schemes)
 
         return file
+
+    @timer_with_counter
+    def get_file_description(self, *,
+                             id: str) -> Description:
+        """
+        Get the file description based on dashboard uri. Any exception will propagate back to api server.
+
+        :param id:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.File, uri=id)
+
+    @timer_with_counter
+    def put_file_description(self, *,
+                             id: str,
+                             description: str) -> None:
+        """
+        Update Dashboard description
+        :param id: Dashboard URI
+        :param description: new value for Dashboard description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.File,
+                                      uri=id,
+                                      description=description)

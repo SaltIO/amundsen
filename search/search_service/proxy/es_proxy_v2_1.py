@@ -100,6 +100,10 @@ class ElasticsearchProxyV2_1():
         # 'badges': 'badges.keyword',
         'tag': 'tags.keyword',
         'name': 'name.keyword',
+        'type': 'type.keyword',
+        'category': 'category.keyword',
+        'data_location_type': 'data_location_type.keyword',
+        'data_location_name': 'data_location_name.keyword',
     }
 
     FILE_MAPPING = {
@@ -112,8 +116,7 @@ class ElasticsearchProxyV2_1():
         'path': 'path.keyword',
         'is_directory': 'is_directory.keyword',
         'data_location_type': 'data_location_type.keyword',
-        'data_location_name': 'data_location_name.keyword',
-        'tag': 'tags.keyword',
+        'data_location_name': 'data_location_name.keyword'
     }
 
     RESOURCE_TO_MAPPING = {

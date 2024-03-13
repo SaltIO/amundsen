@@ -1371,6 +1371,64 @@ def get_file_metadata() -> Response:
         logging.exception(message)
         return make_response(jsonify({'tableData': {}, 'msg': message}), HTTPStatus.INTERNAL_SERVER_ERROR)
 
+@metadata_blueprint.route('/get_file_description', methods=['GET'])
+def get_file_description() -> Response:
+    try:
+        file_endpoint = _get_file_endpoint()
+        file_key = get_query_param(request.args, 'key')
+
+        url = '{0}/{1}/description'.format(file_endpoint, file_key)
+
+        response = request_metadata(url=url)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+            description = response.json().get('description')
+        else:
+            message = 'Get file description failed'
+            description = None
+
+        payload = jsonify({'description': description, 'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        payload = jsonify({'description': None, 'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+@metadata_blueprint.route('/put_file_description', methods=['PUT'])
+def put_file_description() -> Response:
+
+    @action_logging
+    def _log_put_file_description(*, file_key: str, description: str, source: str) -> None:
+        pass  # pragma: no cover
+
+    try:
+        args = request.get_json()
+
+        file_key = get_query_param(args, 'key')
+        description = get_query_param(args, 'description')
+        src = get_query_param(args, 'source')
+
+        file_endpoint = _get_file_endpoint()
+        url = '{0}/{1}/description'.format(file_endpoint, file_key)
+        response = request_metadata(url=url)
+
+        _log_put_file_description(file_key=file_key, description=description, source=src)
+
+        response = request_metadata(url=url, method='PUT', data=json.dumps({'description': description}))
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+        else:
+            message = 'Update file description failed'
+
+        payload = jsonify({'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
 @action_logging
 def _get_file_metadata(*, file_key: str, index: int, source: str) -> Dict[str, Any]:
 

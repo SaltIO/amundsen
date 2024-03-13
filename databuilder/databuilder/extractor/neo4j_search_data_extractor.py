@@ -166,23 +166,20 @@ class Neo4jSearchDataExtractor(Extractor):
         """
         MATCH (f:File)
         OPTIONAL MATCH (dl:Data_Location)-[:FILE]->(f)
-        //OPTIONAL MATCH (dc:Data_Channel)-[:DATA_LOCATION]->(dl)
-        //OPTIONAL MATCH (dp:Data_Provider)-[:DATA_CHANNEL]->(dc)
+        OPTIONAL MATCH (f)-[:DESCRIPTION]->(file_desc:Description)
         OPTIONAL MATCH (f)-[:TAGGED_BY]->(tags:Tag)
         {publish_tag_filter}
-        WITH f, COLLECT(DISTINCT tags.key) as tags, dl //, dp, dc,
+        WITH f, file_desc, COLLECT(DISTINCT tags.key) as tags, dl
         RETURN
         f.name as name,
         f.key as key,
-        f.desc as description,
+        file_desc as description,
         f.type as type,
         f.category as category,
         f.path as path,
         f.is_directory as is_directory,
         dl.name as data_location_name,
         dl.type as data_location_type,
-        //dc.name as data_channel_name,
-        //dp.name as data_provider_name
         tags
         """
     )
