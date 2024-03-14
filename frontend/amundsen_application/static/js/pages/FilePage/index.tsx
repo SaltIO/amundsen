@@ -426,12 +426,24 @@ export class FilePage extends React.Component<
                     </div>
                     {fileData.path}
                   </section>
-                  <section className="metadata-section">
+                  {fileData.dataChannel &&  (
+                    <section className="metadata-section">
                     <div className="section-title">
-                    </div>
-                  </section>
+                        License
+                      </div>
+                      {fileData.dataChannel.license}
+                    </section>
+                  )}
                 </section>
                 <section className="right-column">
+                  {/* <EditableSection
+                      title={Constants.OWNERS_TITLE}
+                      readOnly={!fileData.is_editable}
+                      editText={ownersEditText}
+                      editUrl={editUrl || undefined}
+                    >
+                    <TableOwnerEditor resourceType={ResourceType.table} />
+                  </EditableSection> */}
                 </section>
               </section>
               <EditableSection title={Constants.TAG_TITLE}>

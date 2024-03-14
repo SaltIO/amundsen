@@ -3,7 +3,9 @@
 
 import { Badge } from './Badges';
 import { Tag } from './Tags';
+import { User } from './User';
 import { DataLocation, FilesystemDataLocation, AwsS3DataLocation } from './DataLocation';
+import { DataChannel } from './DataChannel';
 
 
 
@@ -31,9 +33,15 @@ export interface FileMetadata {
   category: string;
   path: string;
   dataLocation?: FilesystemDataLocation | AwsS3DataLocation | DataLocation;
+  dataChannel?: DataChannel;
   tags?:  Tag[];
   fileTables?: FileTable[]
   prospectusWaterfallSchemes?: ProspectusWaterfallScheme[];
   is_editable: boolean;
+}
+
+export interface FileOwners {
+  isLoading: boolean;
+  owners: User[];
 }
 

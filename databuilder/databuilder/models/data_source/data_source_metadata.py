@@ -162,8 +162,8 @@ class DataChannel(GraphSerializable):
 
     def get_key(self) -> str:
         return self.DATA_CHANNEL_NODE_KEY.format(data_provider_name=self.data_provider.get_name_for_uri(),
-                                                    name=convert_to_uri_safe_str(self.name),
-                                                    type=self.type.value)
+                                                 name=convert_to_uri_safe_str(self.name),
+                                                 type=self.type.value)
 
 
 class DataLocation(GraphSerializable):
@@ -184,13 +184,10 @@ class DataLocation(GraphSerializable):
 
     def __init__(self,
                  name: str,
-                 type: str,
-                 data_channel: DataChannel = None
-                 ) -> None:
+                 type: str) -> None:
 
         self.name = name
         self.type = type
-        self.data_channel = data_channel
 
         self._node_iter = self._create_node_iterator()
         self._relation_iter = self._create_relation_iterator()
@@ -224,15 +221,16 @@ class DataLocation(GraphSerializable):
         }
 
     def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
-        yield GraphRelationship(
-            start_label=DataChannel.DATA_CHANNEL_NODE_LABEL,
-            start_key=self.data_channel.get_key(),
-            end_label=self.DATA_LOCATION_NODE_LABEL,
-            end_key=self.get_key(),
-            type=self.DATA_LOCATION_RELATION_TYPE,
-            reverse_type=self.DATA_LOCATION_OF_RELATION_TYPE,
-            attributes={}
-        )
+        # yield GraphRelationship(
+        #     start_label=DataChannel.DATA_CHANNEL_NODE_LABEL,
+        #     start_key=self.data_channel.get_key(),
+        #     end_label=self.DATA_LOCATION_NODE_LABEL,
+        #     end_key=self.get_key(),
+        #     type=self.DATA_LOCATION_RELATION_TYPE,
+        #     reverse_type=self.DATA_LOCATION_OF_RELATION_TYPE,
+        #     attributes={}
+        # )
+        pass
 
     def get_key(self) -> str:
         return DataLocation.DataLocationType.DATA_LOCATION_NODE_KEY.format(
@@ -250,11 +248,10 @@ class FilesystemDataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 drive: str,
-                 data_channel: DataChannel = None
+                 drive: str
                  ) -> None:
 
-        super().__init__(name=name, type='filesystem', data_channel=data_channel)
+        super().__init__(name=name, type='filesystem')
 
         self.drive = drive
 
@@ -280,11 +277,10 @@ class AwsS3DataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 bucket: str,
-                 data_channel: DataChannel = None
+                 bucket: str
                  ) -> None:
 
-        super().__init__(name=name, type='aws_s3', data_channel=data_channel)
+        super().__init__(name=name, type='aws_s3')
 
         self.bucket = bucket
 
@@ -309,11 +305,10 @@ class SharepointDataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 document_library: str,
-                 data_channel: DataChannel = None
+                 document_library: str
                  ) -> None:
 
-        super().__init__(name=name, type='sharepoint', data_channel=data_channel)
+        super().__init__(name=name, type='sharepoint')
 
         self.document_library = document_library
 
@@ -355,6 +350,7 @@ class File(GraphSerializable):
                  is_directory: bool,
                  description: Union[str, None] = None,
                  data_location: DataLocation = None,
+                 data_channel: DataChannel = None,
                  tags: Union[List, str] = None) -> None:
 
         self.name = name
@@ -368,6 +364,7 @@ class File(GraphSerializable):
         self.is_directory = is_directory
 
         self.data_location = data_location
+        self.data_channel = data_channel
 
         self.tags = _format_as_list(tags)
 
@@ -421,6 +418,17 @@ class File(GraphSerializable):
             yield GraphRelationship(
                 start_label=DataLocation.DATA_LOCATION_NODE_LABEL,
                 start_key=self.data_location.get_key(),
+                end_label=self.FILE_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.FILE_RELATION_TYPE,
+                reverse_type=self.FILE_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+        if self.data_channel:
+            yield GraphRelationship(
+                start_label=DataLocation.DATA_CHANNEL_NODE_LABEL,
+                start_key=self.data_channel.get_key(),
                 end_label=self.FILE_NODE_LABEL,
                 end_key=self.get_key(),
                 type=self.FILE_RELATION_TYPE,

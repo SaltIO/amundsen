@@ -567,14 +567,42 @@ const configDefault: AppConfig = {
         },
         {
           categoryId: 'data_location_type',
-          displayName: 'Data Location Type',
+          displayName: 'Location Type',
           helpText:
             'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
           type: FilterType.INPUT_SELECT,
         },
         {
           categoryId: 'data_location_name',
-          displayName: 'Data Location Name',
+          displayName: 'Location Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_type',
+          displayName: 'Channel Type',
+          helpText:
+            'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_name',
+          displayName: 'Channel Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_license',
+          displayName: 'License',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_provider_name',
+          displayName: 'Provider Name',
           helpText:
             'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
           type: FilterType.INPUT_SELECT,
