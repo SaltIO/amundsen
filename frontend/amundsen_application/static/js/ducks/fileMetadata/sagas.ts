@@ -23,14 +23,14 @@ export function* getFileDataWorker(action: GetFileDataRequest): SagaIterator {
   const { key, searchIndex, source } = action.payload;
 
   try {
-    const { data, statusCode, tags } = yield call(
+    const { data, owners, statusCode, tags } = yield call(
       API.getFileData,
       key,
       searchIndex,
       source
     );
 
-    yield put(getFileDataSuccess(data, statusCode, tags));
+    yield put(getFileDataSuccess(statusCode, data, owners, tags));
 
   } catch (e) {
     yield put(getFileDataFailure());

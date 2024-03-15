@@ -78,6 +78,7 @@ import {
   getFileDescriptionWatcher,
   updateFileDescriptionWatcher
 } from './fileMetadata/sagas'
+import { updateFileOwnerWatcher } from './fileMetadata/owners/sagas';
 
 export default function* rootSaga() {
   yield all([
@@ -140,6 +141,7 @@ export default function* rootSaga() {
     getProviderDescriptionWatcher(),
     getFileDataWatcher(),
     getFileDescriptionWatcher(),
-    updateFileDescriptionWatcher()
+    updateFileDescriptionWatcher(),
+    updateFileOwnerWatcher()
   ]);
 }

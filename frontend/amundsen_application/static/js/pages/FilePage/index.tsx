@@ -56,6 +56,7 @@ import FileHeaderBullets from './FileHeaderBullets';
 
 import FileDescEditableText from './FileDescEditableText';
 import RequestDescriptionText from '../TableDetailPage/RequestDescriptionText';
+import FileOwnerEditor from './FileOwnerEditor';
 
 import * as Constants from './constants';
 import { STATUS_CODES } from '../../constants';
@@ -351,6 +352,17 @@ export class FilePage extends React.Component<
       innerContent = <ErrorMessage />;
     } else {
 
+      // const ownersEditText = fileData.sources[0]
+      //   ? // TODO rename getDescriptionSourceDisplayName to more generic since
+      //     // owners also edited on the same file?
+      //     `${Constants.EDIT_OWNERS_TEXT} ${getDescriptionSourceDisplayName(
+      //       fileData.sources[0].source_type
+      //     )}`
+      //   : '';
+      // const editUrl = fileData.sources[0] ? fileData.sources[0].source : '';
+      const ownersEditText = '';
+      const editUrl = '';
+
       innerContent = (
         <div className="resource-detail-layout table-detail">
           <header className="resource-header">
@@ -436,14 +448,14 @@ export class FilePage extends React.Component<
                   )}
                 </section>
                 <section className="right-column">
-                  {/* <EditableSection
+                  <EditableSection
                       title={Constants.OWNERS_TITLE}
                       readOnly={!fileData.is_editable}
                       editText={ownersEditText}
                       editUrl={editUrl || undefined}
                     >
-                    <TableOwnerEditor resourceType={ResourceType.table} />
-                  </EditableSection> */}
+                    <FileOwnerEditor resourceType={ResourceType.file} />
+                  </EditableSection>
                 </section>
               </section>
               <EditableSection title={Constants.TAG_TITLE}>
@@ -477,6 +489,7 @@ export const mapStateToProps = (state: GlobalState) => ({
   isLoading: state.fileMetadata.isLoading,
   statusCode: state.fileMetadata.statusCode,
   fileData: state.fileMetadata.fileData,
+  fileOwners: state.fileMetadata.fileOwners,
 });
 
 export const mapDispatchToProps = (dispatch: any) =>

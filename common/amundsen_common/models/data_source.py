@@ -100,13 +100,20 @@ class DataChannelSchema(AttrsSchema):
             return None
         elif isinstance(obj.license, DataLicenseType):
             return obj.license.name
+        elif isinstance(obj.license, str):
+            return obj.license
         else:
             raise ValueError("Unsupported license type")
 
     def set_license(self, value):
         # Implement deserialization logic for dataLocation
         if isinstance(value, dict):
-            return DataLicenseType[value['license']]
+            return DataLicenseType[value['license']].value.name
+        elif isinstance(value, str):
+            for license_type in DataLicenseType:
+                # Check if the enum_value is the one you're looking for
+                if value == license_type.value.name or (license_type.value.alias and value == license_type.value.alias):
+                    return license_type.value.name
         else:
             raise ValueError("Invalid license format")
 

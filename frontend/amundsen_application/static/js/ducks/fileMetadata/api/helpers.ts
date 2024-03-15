@@ -7,6 +7,7 @@ import {
   PeopleUser,
   FileMetadata,
   UpdateMethod,
+  UpdateOwnerPayload,
 } from 'interfaces';
 import * as API from './v0';
 
@@ -33,6 +34,26 @@ export function getFileDataFromResponseData(
     'owners',
     'tags',
   ]) as FileMetadata;
+}
+
+/**
+ * Creates post data for sending a notification to owners when they are added/removed
+ */
+export function createOwnerNotificationData(
+  payload: UpdateOwnerPayload,
+  fileData: FileMetadata
+) {
+  return {
+    notificationType:
+      payload.method === UpdateMethod.PUT
+        ? NotificationType.OWNER_ADDED
+        : NotificationType.OWNER_REMOVED,
+    options: {
+      resource_name: `${fileData.type}.${fileData.name}`,
+      // resource_path: `/file_detail/${fileData.dataLocation?.type}/${fileData.database}/${fileData.schema}/${fileData.name}`,
+    },
+    recipients: [payload.id],
+  };
 }
 
 /**

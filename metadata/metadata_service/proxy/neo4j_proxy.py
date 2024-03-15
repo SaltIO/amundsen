@@ -3055,10 +3055,11 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
             OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
             OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+            OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
             OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
             OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
-            WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
-            RETURN file, file_desc, data_location, data_channel, data_provider, tags, file_tables, prospectus_waterfall_schemes
+            WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
         """)
         return data_provider_query
 
@@ -3138,6 +3139,8 @@ class Neo4jProxy(BaseProxy):
                                                                         scheme=prospectus_schemes)
                 prospectus_waterfall_schemes.append(prospectus_waterfall_scheme)
 
+        owners = self._create_owners(record['owners'])
+
         file_rec = record["file"]
         file = File(name=file_rec["name"],
                     key=file_rec["key"],
@@ -3149,6 +3152,7 @@ class Neo4jProxy(BaseProxy):
                     dataLocation=data_location,
                     dataChannel=data_channel,
                     tags=tags,
+                    owners=owners,
                     fileTables=file_tables,
                     prospectusWaterfallSchemes=prospectus_waterfall_schemes)
 

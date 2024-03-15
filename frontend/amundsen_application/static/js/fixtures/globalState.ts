@@ -266,7 +266,11 @@ const globalState: GlobalState = {
       category: '',
       description: '',
       is_editable: true
-    }
+    },
+    fileOwners: {
+      isLoading: true,
+      owners: {},
+    },
   },
   providerMetadata: {
     isLoading: true,

@@ -238,6 +238,37 @@ def update_table_owner() -> Response:
         payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+@metadata_blueprint.route('/update_file_owner', methods=['PUT', 'DELETE'])
+def update_file_owner() -> Response:
+
+    @action_logging
+    def _log_update_file_owner(*, file_key: str, method: str, owner: str) -> None:
+        pass  # pragma: no cover
+
+    try:
+        args = request.get_json()
+        file_key = get_query_param(args, 'key')
+        owner = get_query_param(args, 'owner')
+
+        file_endpoint = _get_file_endpoint()
+        url = '{0}/{1}/owner/{2}'.format(file_endpoint, file_key, owner)
+        method = request.method
+        _log_update_file_owner(file_key=file_key, method=method, owner=owner)
+
+        response = request_metadata(url=url, method=method)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Updated owner'
+        else:
+            message = 'There was a problem updating owner {0}'.format(owner)
+
+        payload = jsonify({'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
 @metadata_blueprint.route('/get_last_indexed')
 def get_last_indexed() -> Response:

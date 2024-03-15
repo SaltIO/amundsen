@@ -74,7 +74,7 @@ class FileTagAPI(Resource):
         """
         API to add a tag to existing File.
 
-        :param table_uri:
+        :param file_uri:
         :param tag:
         :return:
         """
@@ -91,7 +91,7 @@ class FileTagAPI(Resource):
         """
         API to remove a association between a given tag and a File.
 
-        :param table_uri:
+        :param file_uri:
         :param tag:
         :return:
         """
@@ -140,3 +140,35 @@ class FileDescriptionAPI(BaseAPI):
 
         except NotFoundException:
             return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+
+class FileOwnerAPI(Resource):
+    """
+    FileOwnerAPI API to add / delete owner info
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+
+    # @swag_from('swagger_doc/file/owner_put.yml')
+    def put(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            self.client.add_resource_owner(uri=file_uri, resource_type=ResourceType.File, owner=owner)
+            return {'message': 'The owner {} for file_uri {} '
+                               'is added successfully'.format(owner,
+                                                              file_uri)}, HTTPStatus.OK
+        except Exception:
+            return {'message': 'The owner {} for file_uri {} '
+                               'is not added successfully'.format(owner,
+                                                                  file_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+    # @swag_from('swagger_doc/file/owner_delete.yml')
+    def delete(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            self.client.delete_resource_owner(uri=file_uri, resource_type=ResourceType.File, owner=owner)
+            return {'message': 'The owner {} for file_uri {} '
+                               'is deleted successfully'.format(owner,
+                                                                file_uri)}, HTTPStatus.OK
+        except Exception:
+            return {'message': 'The owner {} for file_uri {} '
+                               'is not deleted successfully'.format(owner,
+                                                                    file_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR

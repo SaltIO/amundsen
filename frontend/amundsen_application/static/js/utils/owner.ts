@@ -54,6 +54,7 @@ export function createOwnerUpdatePayload(
 ) {
   const updateOwnerEndpointMap = {
     [ResourceType.table]: `${API.API_PATH}/update_table_owner`,
+    [ResourceType.file]: `${API.API_PATH}/update_file_owner`,
     [ResourceType.feature]: `${API.API_PATH}/update_feature_owner`,
   };
   const url = updateOwnerEndpointMap[resourceType];
