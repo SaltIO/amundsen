@@ -26,14 +26,14 @@ class SupersetPreviewClient(BaseSupersetPreviewClient):
                  database_map: Dict[str, int] = DEFAULT_DATABASE_MAP,
                  url: str = DEFAULT_URL) -> None:
         self.database_map = database_map
-        self.headers = {}        
+        self.headers = {}
         self.url = url
 
     def authenticate(self) -> None:
         try:
             logging.info('Authenticating with apache superset')
 
-            rsp = requests.post(AUTH_URL, json=dict(username='salt', password='salt', provider='db'))   
+            rsp = requests.post(AUTH_URL, json=dict(username='salt', password='salt', provider='db'))
 
             access_token = rsp.json()['access_token']
 
@@ -42,9 +42,9 @@ class SupersetPreviewClient(BaseSupersetPreviewClient):
                 'Accept': 'application/json',
                 'Content-Type': 'application/json; charset=utf-8',
                 'Referer': AUTH_URL
-            }        
+            }
         except Exception as e:
-            logging.error('Encountered error authenticating with apache superset: ' + str(e))            
+            logging.error('Encountered error authenticating with apache superset: ' + str(e))
 
     def post_to_sql_json(self, *, params: Dict, headers: Dict) -> Response:
         """

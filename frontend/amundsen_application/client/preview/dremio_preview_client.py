@@ -9,6 +9,7 @@ from marshmallow import ValidationError
 from pyarrow import flight
 
 from sqlalchemy import create_engine
+from urllib.parse import quote
 
 from amundsen_application.client.preview.sqlalchemy_base_preview_client import SqlAlchemyBasePreviewClient
 
@@ -61,7 +62,7 @@ class DremioPreviewClient(SqlAlchemyBasePreviewClient):
 
     def get_conn_str(self, params: Dict, optionalHeaders: Dict = None)  -> Tuple[str,Dict[str,Any]]:
         conn_str = DremioPreviewClient.CONN_STR.format(username=self.username,
-                                                       password=self.password,
+                                                       password=quote(self.password),
                                                        host=self.host,
                                                        port=self.port,
                                                        limit=self.limit)

@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Dict,Tuple,Any  # noqa: F401
 import json
+from urllib.parse import quote
 
 from amundsen_application.client.preview.sqlalchemy_base_preview_client import SqlAlchemyBasePreviewClient
 
@@ -62,7 +63,7 @@ class MySqlPreviewClient(SqlAlchemyBasePreviewClient):
 
         conn_str = MySqlPreviewClient.CONN_STR.format(
             user=self.username,
-            password=self.password,
+            password=quote(self.password),
             host=self.host,
             port=self.port
         )
