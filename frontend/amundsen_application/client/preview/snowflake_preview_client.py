@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Dict,Tuple,Any  # noqa: F401
 import json
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 
 from amundsen_application.client.preview.sqlalchemy_base_preview_client import SqlAlchemyBasePreviewClient
@@ -18,7 +18,7 @@ class SnowflakePreviewClient(SqlAlchemyBasePreviewClient):
         super().__init__()
         self.account_identifier = os.getenv("PREVIEW_CLIENT_SNOWFLAKE_ACCOUNT_IDENTIFIER")
         self.username = os.getenv("PREVIEW_CLIENT_SNOWFLAKE_USERNAME")
-        self.password = quote_plus(os.getenv("PREVIEW_CLIENT_SNOWFLAKE_PASSWORD"))
+        self.password = os.getenv("PREVIEW_CLIENT_SNOWFLAKE_PASSWORD")
         self.conn_args = os.getenv("PREVIEW_CLIENT_SNOWFLAKE_CONN_ARGS")
         if self.conn_args is None or self.conn_args == '':
             self.conn_args = {}
@@ -65,7 +65,7 @@ class SnowflakePreviewClient(SqlAlchemyBasePreviewClient):
 
         conn_str = SnowflakePreviewClient.CONN_STR.format(
             user=self.username,
-            password=self.password,
+            password=quote(self.password),
             account_identifier=self.account_identifier,
             database=database,
             schema=schema)

@@ -14,6 +14,7 @@ from amundsen_application.client.preview.snowflake_preview_client import Snowfla
 from amundsen_application.client.preview.mysql_preview_client import MySqlPreviewClient
 from amundsen_application.client.preview.postgres_preview_client import PostgresPreviewClient
 from amundsen_application.base.base_superset_preview_client import BasePreviewClient
+from amundsen_application.client.preview.postgres_factory_preview_client import PostgresFactoryPreviewClient
 
 
 class FactoryPreviewClient(BasePreviewClient):
@@ -25,6 +26,7 @@ class FactoryPreviewClient(BasePreviewClient):
         self.preview_clients.append(MsSqlPreviewClient())
         self.preview_clients.append(MySqlPreviewClient())
         self.preview_clients.append(PostgresPreviewClient())
+        self.preview_clients.append(PostgresFactoryPreviewClient())
 
     def get_feature_preview_data(self, params: Dict, optionalHeaders: Dict = None) -> Response:
         pass
