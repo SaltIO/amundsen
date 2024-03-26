@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from 'react';
-
+import { useEffect, useRef, useState } from 'react';
+import { withRouter, RouteComponentProps } from 'react-router-dom'; // Import withRouter
 import './styles.scss';
 import 'features/CodeBlock/styles.scss';
 
@@ -31,12 +32,46 @@ const FileMetadataBlockShimmer = () => (
   </div>
 );
 
-const FileMetadataListItem = ({ name, content }: FileMetadataListItemProps) => {
-  const [isExpanded, setExpanded] = React.useState(false);
-  const toggleExpand = () => {
-    setExpanded(!isExpanded);
-  };
+const FileMetadataListItem = withRouter(({ name, content, history, location }: FileMetadataListItemProps & RouteComponentProps) => {
+  const [isExpanded, setExpanded] = useState(false);
   const key = `key:${name}`;
+  const itemRef = useRef<HTMLLIElement>(null); // Create a ref for the item
+
+  function toUrlSafeString(str) {
+    // Replace any character that is not a letter, number, or underscore with an underscore
+    return str.replace(/[\W]+/g, '_');
+  }
+
+  const toggleExpand = (key) => {
+    let _isExpanded = !isExpanded;
+    setExpanded(_isExpanded);
+
+    if (_isExpanded === true) {
+      const safe_name = toUrlSafeString(name);
+
+      history.push(`${location.pathname}${location.search}#${safe_name}`);
+    }
+    else {
+      history.push(`${location.pathname}${location.search}`);
+    }
+  };
+
+  useEffect(() => {
+    if (isExpanded === true) {
+      // Scroll the item into view if it matches the URL hash
+      itemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isExpanded]);
+
+  useEffect(() => {
+    const currentName = location.hash.replace('#', '');
+    const safe_name = toUrlSafeString(name);
+    if (currentName === safe_name.toString()) {
+      setExpanded(true);
+      // Scroll the item into view if it matches the URL hash
+      // itemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [location, name]);
 
   const fileMetadataContentList = content.map(({ name, text, renderHTML }) => (
     <label className="filemetadata-list-filemetadata-label section-title">
@@ -55,13 +90,13 @@ const FileMetadataListItem = ({ name, content }: FileMetadataListItemProps) => {
   ));
 
   return (
-    <li className="list-group-item filemetadata-list-item" role="tab" id={key}>
+    <li className="list-group-item filemetadata-list-item" role="tab" id={key} ref={itemRef}>
       <button
         className="filemetadata-list-header"
         aria-expanded={isExpanded}
         aria-controls={key}
         type="button"
-        onClick={toggleExpand}
+        onClick={() => toggleExpand(key)}
       >
         <p className="filemetadata-list-item-name column-name">{name}</p>
       </button>
@@ -70,6 +105,6 @@ const FileMetadataListItem = ({ name, content }: FileMetadataListItemProps) => {
       }
     </li>
   );
-};
+});
 
 export default FileMetadataListItem;

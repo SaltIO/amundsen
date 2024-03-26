@@ -267,8 +267,6 @@ export class FilePage extends React.Component<
       key: fileData.key,
       name: fileData.name
     };
-    const defaultTab = getUrlParam(TAB_URL_PARAM) || Constants.PROSPECTUS_FILE_TABS.FILE_TABLES;
-
 
     if (fileData.fileTables && fileData.fileTables.length > 0) {
 
@@ -283,8 +281,6 @@ export class FilePage extends React.Component<
           }]
         })
       }
-
-      // let file_metadata: FileMetadataListProps = {file_metadata: file_metadata_list}
 
       tabInfo.push({
         content: (
@@ -326,7 +322,7 @@ export class FilePage extends React.Component<
     return (
       <TabsComponent
         tabs={tabInfo}
-        defaultTab={defaultTab}
+        defaultTab={currentTab}
         onSelect={(key) => {
           setUrlParam(TAB_URL_PARAM, key);
           logAction({
@@ -466,7 +462,7 @@ export class FilePage extends React.Component<
               </EditableSection>
             </aside>
             <main className="main-content-panel">
-              {fileData.type == "pdf" && fileData.category == 'prospectus' &&
+              {fileData.category == 'prospectus' &&
                 this.renderProspectusTabs()
               }
             </main>
