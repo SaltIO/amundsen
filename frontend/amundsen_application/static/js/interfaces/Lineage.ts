@@ -1,18 +1,29 @@
 import { Badge } from './Badges';
 
-export interface LineageItem {
-  badges: Badge[];
-  cluster: string;
-  database: string;
-  key: string;
-  level: number;
+export interface TableLineageItemDetail {
   name: string;
   schema: string;
+  cluster: string;
+  database: string;
+}
+
+export interface FileLineageItemDetail {
+  name: string;
+  type: string;
+  category: string;
+}
+
+export interface LineageItem {
+  key: string;
+  type: string;
+  badges: Badge[];
+  level: number;
   parent: string | null;
   usage: number | null;
   source?: string;
   link?: string;
   in_amundsen?: boolean;
+  lineage_item_detail: TableLineageItemDetail | FileLineageItemDetail;
 }
 
 export interface Lineage {

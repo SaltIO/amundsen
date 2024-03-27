@@ -5,7 +5,7 @@ import { drag } from 'd3-drag';
 import { zoom } from 'd3-zoom';
 import { SimulationNodeDatum } from 'd3-force';
 
-import { Lineage, LineageItem } from 'interfaces';
+import { Lineage, LineageItem, TableLineageItemDetail, FileLineageItemDetail } from 'interfaces';
 import {
   ANIMATION_DURATION,
   CHART_DEFAULT_DIMENSIONS,
@@ -48,10 +48,10 @@ export const hasLineageData = (lineage: Lineage) =>
  * Returns the link to the table
  */
 const getTableDetailLink = (d) =>
-  `/table_detail/${d.cluster}/${d.database}/${d.schema}/${d.name}`
+  `/table_detail/${(d.lineage_item_detail as TableLineageItemDetail).cluster}/${(d.lineage_item_detail as TableLineageItemDetail).database}/${(d.lineage_item_detail as TableLineageItemDetail).schema}/${(d.lineage_item_detail as TableLineageItemDetail).name}`
 
 const getSearchLink = (d) =>
-  `/search?resource=table&index=0&filters=${encodeURIComponent(`{"schema":{"value":"${d.schema}"},"cluster":{"value":"${d.cluster}"}}`)}`;
+  `/search?resource=table&index=0&filters=${encodeURIComponent(`{"schema":{"value":"${(d.lineage_item_detail as TableLineageItemDetail).schema}"},"cluster":{"value":"${(d.lineage_item_detail as TableLineageItemDetail).cluster}"}}`)}`;
   // https://wilcox.cmdrvl.com/search?resource=table&index=0&filters=%7B%22schema%22%3A%7B%22value%22%3A%22staging_wilcox%22%7D%2C%22database%22%3A%7B%22value%22%3A%22Snowflake%22%7D%7D
 
 function toD3LineageItem(item: LineageItem): D3LineageItem {
@@ -319,7 +319,7 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
             .attr("dy", "10")
             .style("fill", d => d.key === rootNode.key ? "#DEFF2D" : "black")
             .style("stroke", d => d.key === rootNode.key ? "#DEFF2D" : "black")
-            .text((d: D3LineageItem) => `${d.cluster}.${d.schema}`)
+            .text((d: D3LineageItem) => `${(d.lineage_item_detail as TableLineageItemDetail).cluster}.${(d.lineage_item_detail as TableLineageItemDetail).schema}`)
             .each(function() {
                 truncateText(select(this), nodeRectWidth - 2 * textMargin);
             });
@@ -332,7 +332,7 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
             .style("font-size", "18px") // Larger font size
             .style("fill", d => d.key === rootNode.key ? "#DEFF2D" : "black")
             .style("stroke", d => d.key === rootNode.key ? "#DEFF2D" : "black")
-            .text((d: D3LineageItem) => d.name)
+            .text((d: D3LineageItem) => (d.lineage_item_detail as TableLineageItemDetail).name)
             .each(function() {
                 truncateText(select(this), nodeRectWidth - 2 * textMargin);
             });
@@ -344,7 +344,7 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
             .attr("height", nodeRectHeight);  // Using full height to test
         nodeLabel.attr("clip-path", "url(#clip-rect)");
 
-        const nodeTitle = nodeGroup.append("title").text((d: D3LineageItem) => `${d.cluster}.${d.schema}.${d.name}`);
+        const nodeTitle = nodeGroup.append("title").text((d: D3LineageItem) => `${(d.lineage_item_detail as TableLineageItemDetail).cluster}.${(d.lineage_item_detail as TableLineageItemDetail).schema}.${(d.lineage_item_detail as TableLineageItemDetail).name}`);
 
         // simulation.on("tick", () => {
         //     link

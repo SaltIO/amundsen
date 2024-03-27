@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 
-import { ResourceType, Lineage, LineageItem } from 'interfaces';
+import { ResourceType, Lineage, LineageItem, TableLineageItemDetail, FileLineageItemDetail } from 'interfaces';
 import { getSourceIconClass } from 'config/config-utils';
 import { getLink } from 'components/ResourceListItem/TableListItem';
 import Graph from 'components/Lineage/Graph';
@@ -23,7 +23,7 @@ export const GraphContainer: React.FC<GraphContainerProps> = ({
   lineage,
   rootNode,
 }: GraphContainerProps) => {
-  const rootTitle = `${rootNode.schema}.${rootNode.name}`;
+  const rootTitle = `${(rootNode.lineage_item_detail as TableLineageItemDetail).schema}.${(rootNode.lineage_item_detail as TableLineageItemDetail).name}`;
 
   return (
     <div className="resource-detail-layout">
@@ -32,7 +32,7 @@ export const GraphContainer: React.FC<GraphContainerProps> = ({
           <span
             className={
               'icon icon-header ' +
-              getSourceIconClass(rootNode.database, ResourceType.table)
+              getSourceIconClass((rootNode.lineage_item_detail as TableLineageItemDetail).database, ResourceType.table)
             }
           />
         </div>

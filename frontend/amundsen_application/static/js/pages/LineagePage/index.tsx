@@ -75,10 +75,13 @@ export const LineagePage: React.FC<
 
   const rootNode: LineageItem = {
     badges: [],
-    cluster: params.cluster,
-    database: params.database,
-    name: params.table,
-    schema: params.schema,
+    type: 'Table',
+    lineage_item_detail: {
+      database: params.database,
+      cluster: params.cluster,
+      schema: params.schema,
+      name: params.table,
+    },
     key: tableKey,
     level: 0,
     parent: null,

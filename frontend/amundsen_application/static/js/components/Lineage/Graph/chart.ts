@@ -7,7 +7,7 @@ import {
 } from 'd3-hierarchy';
 import { zoom as d3Zoom, zoomIdentity } from 'd3-zoom';
 import { select, Selection } from 'd3-selection';
-import { Lineage, LineageItem } from 'interfaces';
+import { Lineage, LineageItem, TableLineageItemDetail, FileLineageItemDetail } from 'interfaces';
 import {
   ANIMATION_DURATION,
   CHART_DEFAULT_DIMENSIONS,
@@ -72,8 +72,8 @@ export const getChildren = ({
  * Returns the label of a node based on its data and index.
  */
 const getNodeLabel = (d, idx) =>
-  idx !== 0 && d.data.data.name
-    ? d.data.data.schema + '.' + d.data.data.name
+  idx !== 0 && (d.data.data.lineage_item_detail as TableLineageItemDetail).name
+    ? (d.data.data.lineage_item_detail as TableLineageItemDetail).schema + '.' + (d.data.data.lineage_item_detail as TableLineageItemDetail).name
     : '';
 
 /**

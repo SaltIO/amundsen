@@ -7,7 +7,7 @@ import {
   getTableLineageConfiguration,
 } from 'config/config-utils';
 import { ResourceType, TableResource } from 'interfaces/Resources';
-import { LineageItem } from 'interfaces/Lineage';
+import { LineageItem, TableLineageItemDetail } from 'interfaces/Lineage';
 import TableListItem from 'components/ResourceListItem/TableListItem';
 import { getHighlightedTableMetadata } from 'components/ResourceListItem/MetadataHighlightList/utils';
 
@@ -95,7 +95,12 @@ export const LineageList: React.FC<LineageListProps> = ({
             source: `table_lineage_list_${direction}`,
           };
           const tableResource: TableResource = {
-            ...table,
+            key: table.key,
+            badges: table.badges,
+            database: (table.lineage_item_detail as TableLineageItemDetail).database,
+            cluster: (table.lineage_item_detail as TableLineageItemDetail).cluster,
+            schema: (table.lineage_item_detail as TableLineageItemDetail).schema,
+            name: (table.lineage_item_detail as TableLineageItemDetail).name,
             type: ResourceType.table,
             description: '',
           };
