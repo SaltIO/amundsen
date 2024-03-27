@@ -207,6 +207,20 @@ def marshall_lineage_table(table_dict: Dict) -> Dict:
     table_dict['name'] = table_uri.table
     return table_dict
 
+def marshall_lineage_file(file_dict: Dict) -> Dict:
+    """
+    Decorate lineage entries with database, schema, cluster, and table
+    :param table_dict:
+    :return: table entry with additional fields
+    """
+    file_key = str(file_dict.get('key'))
+    file_uri = TableUri.from_uri(file_key)
+    # table_dict['database'] = table_uri.database
+    # table_dict['schema'] = table_uri.schema
+    # table_dict['cluster'] = table_uri.cluster
+    # table_dict['name'] = table_uri.table
+    return file_dict
+
 
 def _convert_prog_descriptions(prog_descriptions: List = None) -> Dict:
     """
