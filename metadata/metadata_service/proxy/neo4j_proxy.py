@@ -2607,11 +2607,11 @@ class Neo4jProxy(BaseProxy):
                                              param_dict={'query_key': id})
         result = get_single_record(records)
 
-        downstream_tables = []
-        upstream_tables = []
+        downstream_entities = []
+        upstream_entities = []
 
         for downstream in result.get("downstream_entities") or []:
-            downstream_tables.append(LineageItem(**{"key": downstream["key"],
+            downstream_entities.append(LineageItem(**{"key": downstream["key"],
                                                     "type": downstream["label"],
                                                     "source": downstream["source"],
                                                     "level": downstream["level"],
@@ -2621,7 +2621,7 @@ class Neo4jProxy(BaseProxy):
                                                     }))
 
         for upstream in result.get("upstream_entities") or []:
-            upstream_tables.append(LineageItem(**{"key": upstream["key"],
+            upstream_entities.append(LineageItem(**{"key": upstream["key"],
                                                   "type": downstream["label"],
                                                   "source": upstream["source"],
                                                   "level": upstream["level"],
@@ -2632,8 +2632,8 @@ class Neo4jProxy(BaseProxy):
 
         # ToDo: Add a root_entity as an item, which will make it easier for lineage graph
         return Lineage(**{"key": id,
-                          "upstream_entities": upstream_tables,
-                          "downstream_entities": downstream_tables,
+                          "upstream_entities": upstream_entities,
+                          "downstream_entities": downstream_entities,
                           "direction": direction, "depth": depth})
 
     def _create_watermarks(self, wmk_records: List) -> List[Watermark]:

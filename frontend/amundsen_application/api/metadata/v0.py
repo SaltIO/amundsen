@@ -20,7 +20,7 @@ from amundsen_application.models.user import load_user, dump_user
 
 from amundsen_application.api.utils.metadata_utils import is_table_editable, marshall_table_partial, \
     marshall_table_full, marshall_dashboard_partial, marshall_dashboard_full, marshall_feature_full, \
-    marshall_lineage_table, TableUri, marshall_data_provider_full, marshall_file_full
+    marshall_lineage_table, TableUri, marshall_data_provider_full, marshall_file_full, marshall_lineage_item
 from amundsen_application.api.utils.request_utils import get_query_param, request_metadata
 
 from amundsen_application.api.utils.search_utils import execute_search_document_request
@@ -960,8 +960,8 @@ def get_table_lineage() -> Response:
         url = f'{table_endpoint}/{table_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_table(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_table(table) for table in json.get('upstream_entities')]
+        downstream = [marshall_lineage_item(table) for table in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(table) for table in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 
@@ -990,8 +990,8 @@ def get_column_lineage() -> Response:
         url = f'{table_endpoint}/{table_key}/column/{column_name}/lineage'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_table(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_table(table) for table in json.get('upstream_entities')]
+        downstream = [marshall_lineage_item(table) for table in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(table) for table in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 
@@ -1006,6 +1006,35 @@ def get_column_lineage() -> Response:
         payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+@metadata_blueprint.route('/get_file_lineage', methods=['GET'])
+def get_file_lineage() -> Response:
+    """
+    Call metadata service to fetch table lineage for a given table
+    :return:
+    """
+    try:
+        file_endpoint = _get_file_endpoint
+        file_key = get_query_param(request.args, 'key')
+        depth = get_query_param(request.args, 'depth')
+        direction = get_query_param(request.args, 'direction')
+        url = f'{file_endpoint}/{file_key}/lineage?depth={depth}&direction={direction}'
+        response = request_metadata(url=url, method=request.method)
+        json = response.json()
+        downstream = [marshall_lineage_item(entity) for entity in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(entity) for entity in json.get('upstream_entities')]
+        downstream_count = json.get('downstream_count')
+        upstream_count = json.get('upstream_count')
+
+        payload = {
+            'downstream_entities': downstream,
+            'upstream_entities': upstream,
+            'downstream_count': downstream_count,
+            'upstream_count': upstream_count,
+        }
+        return make_response(jsonify(payload), 200)
+    except Exception as e:
+        payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
 @metadata_blueprint.route('/get_feature_description', methods=['GET'])
 def get_feature_description() -> Response:
@@ -1095,8 +1124,8 @@ def get_feature_lineage() -> Response:
         url = f'{endpoint}/{feature_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_table(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_table(table) for table in json.get('upstream_entities')]
+        downstream = [marshall_lineage_item(table) for table in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(table) for table in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 

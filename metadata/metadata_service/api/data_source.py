@@ -53,3 +53,26 @@ class FileDetailAPI(Resource):
 
         except NotFoundException:
             return {'message': 'data_prfile_uriovider_uri {} does not exist'.format(file_uri)}, HTTPStatus.NOT_FOUND
+
+class FileLineageAPI(Resource):
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        self.parser = reqparse.RequestParser()
+        self.parser.add_argument('direction', type=str, required=False, default="both")
+        self.parser.add_argument('depth', type=int, required=False, default=1)
+        super(FileLineageAPI, self).__init__()
+
+    # @swag_from('swagger_doc/table/lineage_get.yml')
+    def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
+        args = self.parser.parse_args()
+        direction = args.get('direction')
+        depth = args.get('depth')
+        try:
+            lineage = self.client.get_lineage(id=id,
+                                              resource_type=ResourceType.File,
+                                              direction=direction,
+                                              depth=depth)
+            schema = LineageSchema()
+            return schema.dump(lineage), HTTPStatus.OK
+        except Exception as e:
+            return {'message': f'Exception raised when getting lineage: {e}'}, HTTPStatus.NOT_FOUND

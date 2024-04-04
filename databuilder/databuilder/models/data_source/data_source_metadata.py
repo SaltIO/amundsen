@@ -380,4 +380,4 @@ class File(GraphSerializable):
             )
 
     def get_key(self) -> str:
-        return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.name)}"
+        return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"

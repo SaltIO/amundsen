@@ -10,7 +10,9 @@ export interface TableLineageItemDetail {
 export interface FileLineageItemDetail {
   name: string;
   type: string;
-  category: string;
+  data_location_type: string;
+  data_location_container: string;
+  data_location_name: string;
 }
 
 export interface LineageItem {

@@ -30,6 +30,27 @@ export function getTableLineage(
     });
 }
 
+export function getFileLineage(
+  key: string,
+  depth: number = 1,
+  direction: string = 'both'
+) {
+  const fileQueryParams = getQueryParams({ key, depth, direction });
+
+  return axios
+    .get(`${API_PATH}/get_file_lineage?${fileQueryParams}`)
+    .then((response: AxiosResponse<LineageAPI>) => ({
+      data: response.data,
+      statusCode: response.status,
+    }))
+    .catch((e: AxiosError<LineageAPI>) => {
+      const { response } = e;
+      const statusCode = response?.status;
+
+      return Promise.reject({ statusCode });
+    });
+}
+
 export function getFeatureLineage(
   key: string,
   depth: number = 1,

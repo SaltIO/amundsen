@@ -101,3 +101,24 @@ export interface GetTableColumnLineageResponse {
     statusCode: number;
   };
 }
+
+export enum GetFileLineage {
+  REQUEST = 'amundsen/lineage/GET_FILE_LINEAGE_REQUEST',
+  SUCCESS = 'amundsen/lineage/GET_FILE_LINEAGE_SUCCESS',
+  FAILURE = 'amundsen/lineage/GET_FILE_LINEAGE_FAILURE',
+}
+export interface GetFileLineageRequest {
+  type: GetFileLineage.REQUEST;
+  payload: {
+    key: string;
+    direction: string;
+    depth: number;
+  };
+}
+export interface GetFileLineageResponse {
+  type: GetFileLineage.SUCCESS | GetFileLineage.FAILURE;
+  payload: {
+    lineageTree: Lineage;
+    statusCode: number;
+  };
+}

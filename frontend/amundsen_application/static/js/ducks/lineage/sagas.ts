@@ -11,6 +11,8 @@ import {
   getTableLineageSuccess,
   getTableColumnLineageSuccess,
   getTableColumnLineageFailure,
+  getFileLineageFailure,
+  getFileLineageSuccess,
 } from './reducer';
 
 import {
@@ -20,6 +22,8 @@ import {
   GetTableLineageRequest,
   GetTableColumnLineage,
   GetTableColumnLineageRequest,
+  GetFileLineage,
+  GetFileLineageRequest,
 } from './types';
 
 export function* getTableLineageWorker(
@@ -94,4 +98,24 @@ export function* getTableColumnLineageWorker(
 // ToDo: Please remove once list based view is deprecated
 export function* getTableColumnLineageWatcher(): SagaIterator {
   yield takeEvery(GetTableColumnLineage.REQUEST, getTableColumnLineageWorker);
+}
+
+export function* getFileLineageWorker(
+  action: GetFileLineageRequest
+): SagaIterator {
+  const { key, depth, direction } = action.payload;
+
+  try {
+    const response = yield call(API.getFileLineage, key, depth, direction);
+    const { data, statusCode } = response;
+
+    yield put(getFileLineageSuccess(data, statusCode));
+  } catch (error) {
+    const { statusCode } = error;
+
+    yield put(getFileLineageFailure(statusCode));
+  }
+}
+export function* getFileLineageWatcher(): SagaIterator {
+  yield takeEvery(GetFileLineage.REQUEST, getFileLineageWorker);
 }
