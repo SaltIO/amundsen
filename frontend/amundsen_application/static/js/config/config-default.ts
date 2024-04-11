@@ -45,6 +45,7 @@ const configDefault: AppConfig = {
   },
   editableText: {
     tableDescLength: 750,
+    fileDescLength: 750,
     columnDescLength: 250,
   },
   analytics: {
@@ -548,6 +549,62 @@ const configDefault: AppConfig = {
           displayName: 'Name',
           helpText:
             'Enter one or more comma separated values with exact file names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'type',
+          displayName: 'Type',
+          helpText:
+            'Enter one or more comma separated values with exact file types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'category',
+          displayName: 'Category',
+          helpText:
+            'Enter one or more comma separated values with exact file categories or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_location_type',
+          displayName: 'Location Type',
+          helpText:
+            'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_location_name',
+          displayName: 'Location Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_type',
+          displayName: 'Channel Type',
+          helpText:
+            'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_name',
+          displayName: 'Channel Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_license',
+          displayName: 'License',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_provider_name',
+          displayName: 'Provider Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
           type: FilterType.INPUT_SELECT,
         },
         {

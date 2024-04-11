@@ -259,9 +259,16 @@ const globalState: GlobalState = {
       badges: [],
       key: '',
       name: '',
+      type: '',
+      path: '',
+      category: '',
       description: '',
       is_editable: true
-    }
+    },
+    fileOwners: {
+      isLoading: true,
+      owners: {},
+    },
   },
   providerMetadata: {
     isLoading: true,

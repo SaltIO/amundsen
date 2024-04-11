@@ -224,9 +224,9 @@ export function getIconNotRequiredStatTypes(): string[] | undefined {
  * use DefaultBadgeStyle.DEFAULT and badge name as display name.
  */
 export function getBadgeConfig(badgeName: string): BadgeStyleConfig {
-  console.log(`badgename=${badgeName}`);
-  console.log(`AppConfig.badges`);
-  console.log(AppConfig.badges);
+  // console.log(`badgename=${badgeName}`);
+  // console.log(`AppConfig.badges`);
+  // console.log(AppConfig.badges);
   const config: object = AppConfig.badges[badgeName] || {};
 
   return {

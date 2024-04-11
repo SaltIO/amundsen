@@ -1,11 +1,11 @@
 import {
   AnalyticsEvent,
   DashboardResource,
-  OwnerDict,
   PreviewData,
   TablePreviewQueryParams,
   TableMetadata,
   TableQualityChecks,
+  OwnerDict,
   UpdateOwnerPayload,
   Tag,
 } from 'interfaces';

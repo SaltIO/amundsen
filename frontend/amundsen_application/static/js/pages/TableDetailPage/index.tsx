@@ -77,7 +77,6 @@ import {
   Lineage,
   TableApp,
   DynamicResourceNotice,
-  SnowflakeTableShares,
   SnowflakeTableShare
 } from 'interfaces';
 import { FormattedDataType } from 'interfaces/ColumnList';
@@ -89,7 +88,6 @@ import FrequentUsers from './FrequentUsers';
 import LineageLink from './LineageLink';
 import LineageList from './LineageList';
 import TableOwnerEditor from './TableOwnerEditor';
-import SourceLink from './SourceLink';
 import SourceDropdown from './SourceDropdown';
 import TableDashboardResourceList from './TableDashboardResourceList';
 import TableDescEditableText from './TableDescEditableText';
@@ -843,7 +841,7 @@ export class TableDetail extends React.Component<
                       {Constants.LAST_UPDATED_TITLE}
                     </div>
                     <time className="time-body-text">
-                      {  
+                      {
                         data.last_updated_timestamp != null
                         ? formatDateTimeShort({
                             epochTimestamp: data.last_updated_timestamp,

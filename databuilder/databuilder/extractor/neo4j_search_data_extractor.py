@@ -165,22 +165,26 @@ class Neo4jSearchDataExtractor(Extractor):
     DEFAULT_NEO4J_FILE_CYPHER_QUERY = textwrap.dedent(
         """
         MATCH (f:File)
-        //OPTIONAL MATCH (dl:Data_Location)-[:FILE]->(f)
-        //OPTIONAL MATCH (dc:Data_Channel)-[:DATA_LOCATION]->(dl)
-        //OPTIONAL MATCH (dp:Data_Provider)-[:DATA_CHANNEL]->(dc)
+        OPTIONAL MATCH (f)-[:FILE_OF]->(dl:Data_Location)
+        OPTIONAL MATCH (f)-[:FILE_OF]->(dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp:Data_Provider)
+        OPTIONAL MATCH (f)-[:DESCRIPTION]->(file_desc:Description)
         OPTIONAL MATCH (f)-[:TAGGED_BY]->(tags:Tag)
         {publish_tag_filter}
-        WITH f, COLLECT(DISTINCT tags.key) as tags //,dp, dc, dl
+        WITH f, file_desc, COLLECT(DISTINCT tags.key) as tags, dl, dc, dp
         RETURN
         f.name as name,
         f.key as key,
-        f.desc as description,
+        file_desc.description as description,
         f.type as type,
+        f.category as category,
         f.path as path,
         f.is_directory as is_directory,
-        //dl.name as data_location_name,
-        //dc.name as data_channel_name,
-        //dp.name as data_provider_name
+        dl.name as data_location_name,
+        dl.type as data_location_type,
+        dc.name as data_channel_name,
+        dc.type as data_channel_type,
+        dc.license as data_channel_license,
+        dp.name as data_provider_name,
         tags
         """
     )

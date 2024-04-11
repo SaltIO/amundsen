@@ -1,6 +1,7 @@
 import {
   FileMetadata,
   Tag,
+  OwnerDict
 } from 'interfaces';
 
 import {
@@ -12,20 +13,24 @@ import {
   GetFileDescriptionResponse,
   UpdateFileDescription,
   UpdateFileDescriptionRequest,
+  UpdateFileOwner,
 } from './types';
 
-import { STATUS_CODES } from '../../constants';
+import fileOwnersReducer, {
+  initialOwnersState,
+  FileOwnerReducerState,
+} from './owners/reducer';
 
-export const initialPreviewState = {
-  data: {},
-  status: null,
-};
+import { STATUS_CODES } from '../../constants';
 
 export const initialFileDataState: FileMetadata = {
   badges: [],
   key: '',
   name: '',
   description: '',
+  path: '',
+  type: '',
+  category: '',
   is_editable: true
 };
 
@@ -33,6 +38,7 @@ export const initialState: FileMetadataReducerState = {
   isLoading: true,
   statusCode: null,
   fileData: initialFileDataState,
+  fileOwners: initialOwnersState,
 };
 
 /* ACTIONS */
@@ -54,22 +60,25 @@ export function getFileDataFailure(): GetFileDataResponse {
   return {
     type: GetFileData.FAILURE,
     payload: {
-      data: initialFileDataState,
       statusCode: STATUS_CODES.INTERNAL_SERVER_ERROR,
+      data: initialFileDataState,
+      owners: {},
       tags: [],
     },
   };
 }
 export function getFileDataSuccess(
-  data: FileMetadata,
   statusCode: number,
+  data: FileMetadata,
+  owners: OwnerDict,
   tags: Tag[]
 ): GetFileDataResponse {
   return {
     type: GetFileData.SUCCESS,
     payload: {
-      data,
       statusCode,
+      data,
+      owners,
       tags,
     },
   };
@@ -132,6 +141,7 @@ export interface FileMetadataReducerState {
   isLoading: boolean;
   statusCode: number | null;
   fileData: FileMetadata;
+  fileOwners: FileOwnerReducerState;
 }
 
 export default function reducer(
@@ -147,6 +157,7 @@ export default function reducer(
         isLoading: false,
         statusCode: (<GetFileDataResponse>action).payload.statusCode,
         fileData: initialFileDataState,
+        fileOwners: fileOwnersReducer(state.fileOwners, action),
       };
     case GetFileData.SUCCESS:
       return {
@@ -154,12 +165,20 @@ export default function reducer(
         isLoading: false,
         statusCode: (<GetFileDataResponse>action).payload.statusCode,
         fileData: (<GetFileDataResponse>action).payload.data,
+        fileOwners: fileOwnersReducer(state.fileOwners, action),
       };
     case GetFileDescription.FAILURE:
     case GetFileDescription.SUCCESS:
       return {
         ...state,
         fileData: (<GetFileDescriptionResponse>action).payload.fileMetadata,
+      };
+    case UpdateFileOwner.REQUEST:
+    case UpdateFileOwner.FAILURE:
+    case UpdateFileOwner.SUCCESS:
+      return {
+        ...state,
+        fileOwners: fileOwnersReducer(state.fileOwners, action),
       };
     default:
       return state;
