@@ -44,7 +44,7 @@ from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
                                        UserFollowsAPI, UserOwnAPI, UserOwnsAPI,
                                        UserReadsAPI)
 from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
-from metadata_service.api.data_source import (DataProviderDetailAPI, FileDetailAPI, FileTagAPI, FileDescriptionAPI, FileOwnerAPI)
+from metadata_service.api.data_source import (DataProviderDetailAPI, FileDetailAPI, FileTagAPI, FileDescriptionAPI, FileOwnerAPI, FileLineageAPI)
 from metadata_service.deprecations import process_deprecations
 
 
