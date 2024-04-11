@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import ast
 import re
 import textwrap
 import time
@@ -3183,15 +3184,15 @@ class Neo4jProxy(BaseProxy):
             for prospectus_waterfall_scheme_rec in prospectus_waterfall_schemes_rec:
 
                 schemes = prospectus_waterfall_scheme_rec["scheme"]
-                schemes = schemes.replace("'", '"')
-                schemes = json.loads(schemes)
+                schemes = ast.literal_eval(schemes)
 
                 prospectus_schemes: List[ProspectusScheme] = None
                 if schemes and len(schemes) > 0:
                     prospectus_schemes: List[ProspectusScheme] = []
                     for scheme in schemes:
-                        prospectus_scheme = ProspectusScheme(shortName=scheme["short name"],
-                                                             details=scheme["details"])
+                        short_name, details = next(iter(scheme.items()))
+                        prospectus_scheme = ProspectusScheme(shortName=short_name,
+                                                             details=details)
                         prospectus_schemes.append(prospectus_scheme)
 
                 prospectus_waterfall_scheme = ProspectusWaterfallScheme(name=prospectus_waterfall_scheme_rec["name"],

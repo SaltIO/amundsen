@@ -137,6 +137,7 @@ class ProspectusScheme:
     details: str
 
 class ProspectusSchemeSchema(AttrsSchema):
+
     class Meta:
         target = ProspectusScheme
         register_as_scheme = True
