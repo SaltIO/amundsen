@@ -2683,7 +2683,7 @@ class Neo4jProxy(BaseProxy):
 
         for upstream in result.get("upstream_entities") or []:
             upstream_entities.append(LineageItem(**{"key": upstream["key"],
-                                                  "type": downstream["label"],
+                                                  "type": upstream["label"],
                                                   "source": upstream["source"],
                                                   "level": upstream["level"],
                                                   "badges": self._make_badges(upstream["badges"]),
