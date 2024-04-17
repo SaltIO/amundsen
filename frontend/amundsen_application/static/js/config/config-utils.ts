@@ -13,6 +13,7 @@ import {
   TourConfig,
   HomePageWidgetsConfig,
   TableLineageConfig,
+  FileLineageConfig,
   DateFormatConfig,
 } from './config-types';
 
@@ -612,6 +613,13 @@ export function getTableLineageConfiguration(): TableLineageConfig {
 }
 
 /**
+ * Returns fileLineage configuration
+ */
+export function getFileLineageConfiguration(): FileLineageConfig {
+  return AppConfig.fileLineage;
+}
+
+/**
  * Returns whether the in-app table lineage list is enabled.
  */
 export function isTableListLineageEnabled() {
@@ -637,6 +645,34 @@ export function getTableLineageDisableAppListLinks() {
  */
 export function getTableLineageDefaultDepth() {
   return AppConfig.tableLineage.defaultLineageDepth;
+}
+
+/**
+ * Returns whether the in-app table lineage list is enabled.
+ */
+export function isFileListLineageEnabled() {
+  return AppConfig.fileLineage.inAppListEnabled;
+}
+
+/**
+ * Returns whether the in-app table lineage page is enabled.
+ */
+export function isFileLineagePageEnabled() {
+  return AppConfig.fileLineage.inAppPageEnabled;
+}
+
+/**
+ * Returns disableAppListLinks configuration for table lineage.
+ */
+export function getFileLineageDisableAppListLinks() {
+  return AppConfig.fileLineage.disableAppListLinks;
+}
+
+/**
+ * Returns the depth of lineage you should see in the lineage page
+ */
+export function getFileLineageDefaultDepth() {
+  return AppConfig.fileLineage.defaultLineageDepth;
 }
 
 /**

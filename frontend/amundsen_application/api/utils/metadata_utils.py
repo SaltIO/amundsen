@@ -228,10 +228,12 @@ def marshall_lineage_table(table_dict: Dict) -> Dict:
     """
     table_key = str(table_dict.get('key'))
     table_uri = TableUri.from_uri(table_key)
-    table_dict['database'] = table_uri.database
-    table_dict['schema'] = table_uri.schema
-    table_dict['cluster'] = table_uri.cluster
-    table_dict['name'] = table_uri.table
+
+    table_dict['lineage_item_detail'] = {}
+    table_dict['lineage_item_detail']['database'] = table_uri.database
+    table_dict['lineage_item_detail']['schema'] = table_uri.schema
+    table_dict['lineage_item_detail']['cluster'] = table_uri.cluster
+    table_dict['lineage_item_detail']['name'] = table_uri.table
     return table_dict
 
 def marshall_lineage_file(file_dict: Dict) -> Dict:
@@ -243,11 +245,12 @@ def marshall_lineage_file(file_dict: Dict) -> Dict:
     file_key = str(file_dict.get('key'))
     file_uri = FileUri.from_uri(file_key)
 
-    file_dict['type'] = file_uri.type
-    file_dict['name'] = file_uri.name
-    file_dict['data_location_type'] = file_uri.data_location_type
-    file_dict['data_location_container'] = file_uri.data_location_container
-    file_dict['data_location_name'] = file_uri.data_location_name
+    file_dict['lineage_item_detail'] = {}
+    file_dict['lineage_item_detail']['type'] = file_uri.type
+    file_dict['lineage_item_detail']['name'] = file_uri.name
+    file_dict['lineage_item_detail']['data_location_type'] = file_uri.data_location_type
+    file_dict['lineage_item_detail']['data_location_container'] = file_uri.data_location_container
+    file_dict['lineage_item_detail']['data_location_name'] = file_uri.data_location_name
 
     return file_dict
 

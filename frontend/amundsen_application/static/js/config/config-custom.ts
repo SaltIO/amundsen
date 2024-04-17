@@ -107,6 +107,22 @@ const configCustom: AppConfigCustom = {
     ) =>
       `https://DEFAULT_LINEAGE_URL?schema=${schema}&cluster=${cluster}&db=${database}&table=${table}`,
   },
+  fileLineage: {
+    defaultLineageDepth: 25,
+    inAppListEnabled: true,
+    inAppPageEnabled: true,
+    externalEnabled: false,
+    iconPath: 'PATH_TO_ICON',
+    isBeta: false,
+    urlGenerator: (
+      data_location_type: string,
+      data_location_name: string,
+      data_location_container: string,
+      type: string,
+      name: string
+    ) =>
+      `https://DEFAULT_LINEAGE_URL?data_location_type=${data_location_type}&data_location_name=${data_location_name}&data_location_container=${data_location_container}&type=${type}&name=${name}`,
+  },
   columnLineage: {
     inAppListEnabled: true,
     inAppPageEnabled: true,

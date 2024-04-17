@@ -50,6 +50,7 @@ export interface AppConfig {
   searchPagination: SearchPagination;
   snowflake: SnowflakeConfig;
   tableLineage: TableLineageConfig;
+  fileLineage: FileLineageConfig;
   tableProfile: TableProfileConfig;
   tableQualityChecks: TableQualityChecksConfig;
   userIdLabel: string /* Temporary configuration due to lacking string customization/translation support */;
@@ -91,6 +92,7 @@ export interface AppConfigCustom {
   resourceConfig?: ResourceConfig;
   featureLineage?: FeatureLineageConfig;
   tableLineage?: TableLineageConfig;
+  fileLineage?: FileLineageConfig;
   columnLineage?: ColumnLineageConfig;
   tableProfile?: TableProfileConfig;
   tableQualityChecks?: TableQualityChecksConfig;
@@ -430,6 +432,18 @@ interface TableLineageDisableAppListLinksConfig {
 }
 
 /**
+ * FileeLineageDisableAppListLinksConfig - maps file fields to regular expressions or string lists
+ * for matching and disabling list links if they don't match
+ */
+interface FileLineageDisableAppListLinksConfig {
+  data_location_type?: RegExp;
+  data_location_name?: RegExp;
+  data_location_container?: RegExp;
+  type?: RegExp;
+  name?: RegExp;
+}
+
+/**
  * TableLineageConfig - Customize the "Table Lineage" links of the "Table Details" page.
  * This feature is intended to link to an external lineage provider.
  *
@@ -461,6 +475,42 @@ export interface TableLineageConfig {
   ) => string;
   inAppPageEnabled: boolean;
   disableAppListLinks?: TableLineageDisableAppListLinksConfig;
+  defaultLineageDepth: number;
+}
+
+/**
+ * FileLineageConfig - Customize the "File Lineage" links of the "File Details" page.
+ * This feature is intended to link to an external lineage provider.
+ *
+ * iconPath - Path to an icon image to display next to the lineage URL.
+ * isBeta - Adds a "beta" tag to the section header.
+ * isEnabled - Whether to show or hide this section
+ * urlGenerator - Generate a URL to the third party lineage website
+ * inAppListEnabled - Enable the in app Upstream/Downstream tabs for table lineage. Requires backend support.
+ * inAppListMessages - when an in app list is enabled this will add a custom message at the end of the lineage tabs content.
+ * disableAppListLinks - Set up table field based regular expression rules to disable lineage list view links.
+ */
+export interface FileLineageConfig {
+  iconPath: string;
+  isBeta: boolean;
+  urlGenerator: (
+    data_location_type: string,
+    data_location_name: string,
+    data_location_container: string,
+    type: string,
+    name: string
+  ) => string;
+  externalEnabled: boolean;
+  inAppListEnabled: boolean;
+  inAppListMessageGenerator?: (
+    direction: string,
+    database: string,
+    cluster: string,
+    schema: string,
+    table: string
+  ) => string;
+  inAppPageEnabled: boolean;
+  disableAppListLinks?: FileLineageDisableAppListLinksConfig;
   defaultLineageDepth: number;
 }
 

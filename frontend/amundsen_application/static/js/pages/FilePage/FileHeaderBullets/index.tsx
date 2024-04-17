@@ -46,11 +46,13 @@ export class FileHeaderBullets extends React.Component<FileHeaderBulletsProps> {
   handleFileCategoryClick = (e) => {
     const { fileData, searchFileCategory } = this.props;
 
-    logClick(e, {
-      target_type: 'file',
-      label: fileData.category,
-    });
-    searchFileCategory(fileData.category);
+    if (fileData.category) {
+      logClick(e, {
+        target_type: 'file',
+        label: fileData.category,
+      });
+      searchFileCategory(fileData.category);
+    }
   };
 
   handleDataLocationTypeClick = (e) => {

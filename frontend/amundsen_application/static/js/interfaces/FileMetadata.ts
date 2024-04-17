@@ -30,7 +30,7 @@ export interface FileMetadata {
   name: string;
   description?: string;
   type: string;
-  category: string;
+  category?: string;
   path: string;
   dataLocation?: FilesystemDataLocation | AwsS3DataLocation | DataLocation;
   dataChannel?: DataChannel;

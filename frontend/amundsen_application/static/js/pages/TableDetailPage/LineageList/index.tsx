@@ -6,16 +6,18 @@ import {
   getTableLineageDisableAppListLinks,
   getTableLineageConfiguration,
 } from 'config/config-utils';
-import { ResourceType, TableResource } from 'interfaces/Resources';
-import { LineageItem, TableLineageItemDetail } from 'interfaces/Lineage';
+import { ResourceType, TableResource, FileResource } from 'interfaces/Resources';
+import { LineageItem, TableLineageItemDetail, FileLineageItemDetail } from 'interfaces/Lineage';
 import TableListItem from 'components/ResourceListItem/TableListItem';
-import { getHighlightedTableMetadata } from 'components/ResourceListItem/MetadataHighlightList/utils';
+import FileListItem from 'components/ResourceListItem/FileListItem';
+import { getHighlightedTableMetadata, getHighlightedFileMetadata } from 'components/ResourceListItem/MetadataHighlightList/utils';
 
 import { TableMetadata } from 'interfaces/TableMetadata';
 import ReactMarkdown from 'react-markdown';
 import { NO_LINEAGE_INFO } from '../constants';
 
 import './styles.scss';
+import { getOwnerItemPropsFromUsers } from 'utils/owner';
 
 export interface LineageListProps {
   items: LineageItem[];
@@ -89,31 +91,60 @@ export const LineageList: React.FC<LineageListProps> = ({
   return (
     <>
       <div className="list-group">
-        {items.map((table, index) => {
-          const logging = {
-            index,
-            source: `table_lineage_list_${direction}`,
-          };
-          const tableResource: TableResource = {
-            key: table.key,
-            badges: table.badges,
-            database: (table.lineage_item_detail as TableLineageItemDetail).database,
-            cluster: (table.lineage_item_detail as TableLineageItemDetail).cluster,
-            schema: (table.lineage_item_detail as TableLineageItemDetail).schema,
-            name: (table.lineage_item_detail as TableLineageItemDetail).name,
-            type: ResourceType.table,
-            description: '',
-          };
+        {items.map((item, index) => {
 
-          return (
-            <TableListItem
-              table={tableResource}
-              logging={logging}
-              key={`lineage-item::${index}`}
-              tableHighlights={getHighlightedTableMetadata(tableResource)}
-              disabled={isTableLinkDisabled(table)}
-            />
-          );
+          if (item.type == 'Table') {
+            const logging = {
+              index,
+              source: `table_lineage_list_${direction}`,
+            };
+
+            const table = item.lineage_item_detail as unknown as TableLineageItemDetail;
+            const tableResource: TableResource = {
+              key: item.key,
+              badges: item.badges,
+              database: table.database,
+              cluster: table.cluster,
+              schema: table.schema,
+              name: table.name,
+              type: ResourceType.table,
+              description: '',
+            };
+
+            return (
+              <TableListItem
+                table={tableResource}
+                logging={logging}
+                key={`lineage-item::${index}`}
+                tableHighlights={getHighlightedTableMetadata(tableResource)}
+                disabled={isTableLinkDisabled(item)}
+              />
+            );
+          }
+          else if (item.type == 'File') {
+            const logging = {
+              index,
+              source: `file_lineage_list_${direction}`,
+            };
+            const file = item.lineage_item_detail as unknown as FileLineageItemDetail;
+            const fileResource: FileResource = {
+              key: item.key,
+              badges: item.badges,
+              name: file.name,
+              type: ResourceType.file,
+              description: '',
+            };
+
+            return (
+              <FileListItem
+                file={fileResource}
+                logging={logging}
+                key={`lineage-item::${index}`}
+                fileHighlights={getHighlightedFileMetadata(fileResource)}
+                disabled={false}
+              />
+            );
+          }
         })}
       </div>
       {message && <LineageListMessage message={message} />}
