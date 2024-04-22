@@ -54,6 +54,7 @@ export interface AppConfig {
   tableProfile: TableProfileConfig;
   tableQualityChecks: TableQualityChecksConfig;
   userIdLabel: string /* Temporary configuration due to lacking string customization/translation support */;
+  eagleye: EagleyeConfig;
 }
 
 /**
@@ -103,6 +104,11 @@ export interface AppConfigCustom {
   preview?: PreviewConfig;
   ai?: AIConfig;
   snowflake?: SnowflakeConfig;
+  eagleye?: EagleyeConfig;
+}
+
+export interface EagleyeConfig {
+  isEnabled: boolean;
 }
 
 /**
@@ -441,6 +447,7 @@ interface FileLineageDisableAppListLinksConfig {
   data_location_container?: RegExp;
   type?: RegExp;
   name?: RegExp;
+  badges?: string[];
 }
 
 /**
@@ -503,11 +510,11 @@ export interface FileLineageConfig {
   externalEnabled: boolean;
   inAppListEnabled: boolean;
   inAppListMessageGenerator?: (
-    direction: string,
-    database: string,
-    cluster: string,
-    schema: string,
-    table: string
+    data_location_type: string,
+    data_location_name: string,
+    data_location_container: string,
+    type: string,
+    name: string
   ) => string;
   inAppPageEnabled: boolean;
   disableAppListLinks?: FileLineageDisableAppListLinksConfig;

@@ -7,12 +7,31 @@ export interface TableLineageItemDetail {
   database: string;
 }
 
+export function isTableLineageItemDetail(detail: any): detail is TableLineageItemDetail {
+  return detail !== null &&
+         typeof detail === 'object' &&
+         'name' in detail &&
+         'schema' in detail &&
+         'cluster' in detail &&
+         'database' in detail;
+}
+
 export interface FileLineageItemDetail {
   name: string;
   type: string;
   data_location_type: string;
   data_location_container: string;
   data_location_name: string;
+}
+
+export function isFileLineageItemDetail(detail: any): detail is FileLineageItemDetail {
+  return detail !== null &&
+         typeof detail === 'object' &&
+         'name' in detail &&
+         'type' in detail &&
+         'data_location_type' in detail &&
+         'data_location_container' in detail &&
+         'data_location_name' in detail;
 }
 
 export interface LineageItem {

@@ -92,6 +92,9 @@ const configCustom: AppConfigCustom = {
       use_router: true,
     },
   ],
+  eagleye: {
+    isEnabled: false
+  },
   tableLineage: {
     defaultLineageDepth: 25,
     inAppListEnabled: true,

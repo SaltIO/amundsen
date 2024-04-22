@@ -44,4 +44,3 @@ export interface FileOwners {
   isLoading: boolean;
   owners: User[];
 }
-

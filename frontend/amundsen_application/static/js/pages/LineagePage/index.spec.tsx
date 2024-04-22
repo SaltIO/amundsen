@@ -16,6 +16,8 @@ import {
   LineagePageProps,
   mapDispatchToProps,
   mapStateToProps,
+  MatchTableProps,
+  MatchFileProps
 } from './index';
 
 import { STATUS_CODES } from '../../constants';
@@ -38,10 +40,11 @@ describe('LineagePage', () => {
       table: 'table',
     });
 
-    const props: LineagePageProps & RouteComponentProps<any> = {
+    const props: LineagePageProps & RouteComponentProps<MatchTableProps|MatchFileProps> = {
       isLoading: false,
       statusCode: STATUS_CODES.OK,
       tableLineageGet: jest.fn(),
+      fileLineageGet: jest.fn(),
       lineageTree: {
         downstream_entities: [
           {

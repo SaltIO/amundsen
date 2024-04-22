@@ -7,9 +7,11 @@ from typing import Any, Iterable, Mapping, Optional, Union
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.data_source import DataProviderSchema, FileSchema
+from amundsen_common.models.lineage import LineageSchema
 from flasgger import swag_from
 from flask import request
 from flask_restful import Resource, reqparse
+
 
 from metadata_service.api import BaseAPI
 from metadata_service.api.badge import BadgeCommon

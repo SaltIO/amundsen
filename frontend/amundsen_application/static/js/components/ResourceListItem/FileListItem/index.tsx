@@ -28,8 +28,7 @@ export const getLink = (file, logging) => {
   if (file.link) return file.link;
 
   return (
-    `/file_detail/${encodeURIComponent(file.key)}` +
-    `?index=${logging.index}&source=${logging.source}`
+    `/file_detail/${encodeURIComponent(file.key)}?index=${logging.index}&source=${logging.source}`
   );
 };
 

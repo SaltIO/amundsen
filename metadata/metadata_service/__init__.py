@@ -204,7 +204,7 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(FileOwnerAPI,
                      '/data_source/file/<path:file_uri>/owner/<owner>')
     api.add_resource(FileLineageAPI,
-                     '/data_source/file/<path:file_uri>/lineage')
+                     '/data_source/file/<path:id>/lineage')
     app.register_blueprint(api_bp)
 
     # cli registration

@@ -13,6 +13,10 @@ import { getFileData } from 'ducks/fileMetadata/reducer';
 import { openRequestDescriptionDialog } from 'ducks/notification/reducer';
 import { GetFileDataRequest } from 'ducks/fileMetadata/types';
 import { updateSearchState } from 'ducks/search/reducer';
+import { getFileLineage } from 'ducks/lineage/reducer';
+import {
+  GetFileLineageRequest,
+} from 'ducks/lineage/types';
 
 import {
   getDescriptionSourceDisplayName,
@@ -20,7 +24,9 @@ import {
   getSourceIconClass,
   issueTrackingEnabled,
   notificationsEnabled,
-  getTableLineageDefaultDepth,
+  getFileLineageDefaultDepth,
+  isFileListLineageEnabled,
+  isEagleyeEnabled
 } from 'config/config-utils';
 
 import BadgeList from 'features/BadgeList';
@@ -49,14 +55,16 @@ import {
   ResourceType,
   RequestMetadataType,
   FileMetadata,
+  Lineage
 } from 'interfaces';
 import { FormattedDataType } from 'interfaces/ColumnList';
-
 import FileHeaderBullets from './FileHeaderBullets';
-
 import FileDescEditableText from './FileDescEditableText';
 import RequestDescriptionText from '../TableDetailPage/RequestDescriptionText';
 import FileOwnerEditor from './FileOwnerEditor';
+import LineageButton from './LineageButton';
+// import LineageLink from './LineageLink';
+import LineageList from './LineageList';
 
 import * as Constants from './constants';
 import { STATUS_CODES } from '../../constants';
@@ -71,6 +79,8 @@ export interface PropsFromState {
   isLoading: boolean;
   statusCode: number | null;
   fileData: FileMetadata;
+  fileLineage: Lineage;
+  isLoadingLineage: boolean;
 }
 export interface DispatchFromProps {
   getFileData: (
@@ -79,6 +89,10 @@ export interface DispatchFromProps {
     source?: string
   ) => GetFileDataRequest;
   searchDataLocation: (dataLocationType: string, dataLocationName: string) => UpdateSearchStateRequest;
+  getFileLineageDispatch: (
+    key: string,
+    depth: number
+  ) => GetFileLineageRequest;
 }
 
 export interface MatchProps {
@@ -115,14 +129,15 @@ export class FilePage extends React.Component<
     currentTab: this.getDefaultTab(),
     isRightPanelOpen: false,
     isRightPanelPreExpanded: false,
-    isExpandCollapseAllBtnVisible: true,
+    isExpandCollapseAllBtnVisible: true
   };
 
   componentDidMount() {
-    const defaultDepth = getTableLineageDefaultDepth();
+    const defaultDepth = getFileLineageDefaultDepth();
     const {
       location,
       getFileData,
+      getFileLineageDispatch
     } = this.props;
     const { index, source } = getLoggingParams(location.search);
     const {
@@ -131,6 +146,10 @@ export class FilePage extends React.Component<
 
     this.key = params.uri;
     getFileData(this.key, index, source);
+
+    if (isFileListLineageEnabled()) {
+      getFileLineageDispatch(this.key, defaultDepth);
+    }
 
     document.addEventListener('keydown', this.handleEscKey);
     window.addEventListener(
@@ -141,9 +160,11 @@ export class FilePage extends React.Component<
   }
 
   componentDidUpdate() {
+    const defaultDepth = getFileLineageDefaultDepth();
     const {
       location,
       getFileData,
+      getFileLineageDispatch,
       match: { params },
     } = this.props;
     const newKey = params.uri
@@ -153,6 +174,10 @@ export class FilePage extends React.Component<
 
       this.key = newKey;
       getFileData(this.key, index, source);
+
+      if (isFileListLineageEnabled()) {
+        getFileLineageDispatch(this.key, defaultDepth);
+      }
 
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({ currentTab: this.getDefaultTab() });
@@ -254,69 +279,126 @@ export class FilePage extends React.Component<
     });
   };
 
-  renderProspectusTabs() {
+  renderTabs() {
     const tabInfo: TabInfo[] = [];
     const {
       fileData,
+      isLoadingLineage,
+      fileLineage,
     } = this.props;
     const {
       currentTab,
-      isRightPanelOpen,
+      isRightPanelOpen
     } = this.state;
     const fileParams: FilePageParams = {
       key: fileData.key,
       name: fileData.name
     };
 
-    if (fileData.fileTables && fileData.fileTables.length > 0) {
-
-      let file_metadata_list: FileMetadataListItemProps[] = []
-      for (const file_table of fileData.fileTables) {
-        file_metadata_list.push({
-          name: file_table.name,
-          content: [{
-            name: '',
-            text: file_table.content,
-            renderHTML: true
-          }]
-        })
-      }
+    if (isFileListLineageEnabled()) {
+      const upstreamLoadingTitle = isLoadingLineage ? (
+        <div className="tab-title is-loading">
+          Upstream <LoadingSpinner />
+        </div>
+      ) : (
+        `Upstream (${
+          fileLineage.upstream_count || fileLineage.upstream_entities.length
+        })`
+      );
+      const upstreamLineage = isLoadingLineage
+        ? []
+        : fileLineage.upstream_entities;
 
       tabInfo.push({
         content: (
-          <FileMetadataList file_metadata={file_metadata_list} />
+          <LineageList
+            items={upstreamLineage}
+            direction="upstream"
+            fileDetails={fileData}
+          />
         ),
-        key: Constants.PROSPECTUS_FILE_TABS.FILE_TABLES,
-        title: `File Tables (${fileData.fileTables.length})`,
+        key: 'upstream',
+        title: upstreamLoadingTitle,
+      });
+
+      const downstreamLoadingTitle = isLoadingLineage ? (
+        <div className="tab-title is-loading">
+          Downstream <LoadingSpinner />
+        </div>
+      ) : (
+        `Downstream (${
+          fileLineage.downstream_count ||
+          fileLineage.downstream_entities.length
+        })`
+      );
+      const downstreamLineage = isLoadingLineage
+        ? []
+        : fileLineage.downstream_entities;
+
+      tabInfo.push({
+        content: (
+          <LineageList
+            items={downstreamLineage}
+            direction="downstream"
+            fileDetails={fileData}
+          />
+        ),
+        key: 'downstream',
+        title: downstreamLoadingTitle,
       });
     }
 
-    if (fileData.prospectusWaterfallSchemes && fileData.prospectusWaterfallSchemes.length > 0) {
+    if (isEagleyeEnabled()) {
+      if (fileData.fileTables && fileData.fileTables.length > 0) {
 
-      let file_metadata_list: FileMetadataListItemProps[] = [];
-      for (const prospectus_waterfall_scheme of fileData.prospectusWaterfallSchemes) {
-        let content: FileMetadataListItemContentProps[] = [];
-        for (const scheme of prospectus_waterfall_scheme.scheme) {
-          content.push({
-            name: scheme.shortName,
-            text: scheme.details,
-            renderHTML: false
-          });
+        let file_metadata_list: FileMetadataListItemProps[] = []
+        for (const file_table of fileData.fileTables) {
+          file_metadata_list.push({
+            name: file_table.name,
+            content: [{
+              name: '',
+              text: file_table.content,
+              renderHTML: true
+            }]
+          })
         }
 
-        file_metadata_list.push({
-          name: prospectus_waterfall_scheme.name,
-          content: content
-        })
+        tabInfo.push({
+          content: (
+            <FileMetadataList file_metadata={file_metadata_list} />
+          ),
+          key: Constants.PROSPECTUS_FILE_TABS.FILE_TABLES,
+          title: `File Tables (${fileData.fileTables.length})`,
+        });
       }
 
-      tabInfo.push({
-        content: (
-          <FileMetadataList file_metadata={file_metadata_list} />
-        ),
-        key: Constants.PROSPECTUS_FILE_TABS.PROSPECTUS_WATERFALL_SCHEMES,
-        title: `Waterfall Schemes (${fileData.prospectusWaterfallSchemes.length})`,
-      });
+      if (fileData.prospectusWaterfallSchemes && fileData.prospectusWaterfallSchemes.length > 0) {
+
+        let file_metadata_list: FileMetadataListItemProps[] = [];
+        for (const prospectus_waterfall_scheme of fileData.prospectusWaterfallSchemes) {
+          let content: FileMetadataListItemContentProps[] = [];
+          for (const scheme of prospectus_waterfall_scheme.scheme) {
+            content.push({
+              name: scheme.shortName,
+              text: scheme.details,
+              renderHTML: false
+            });
+          }
+
+          file_metadata_list.push({
+            name: prospectus_waterfall_scheme.name,
+            content: content
+          })
+        }
+
+        tabInfo.push({
+          content: (
+            <FileMetadataList file_metadata={file_metadata_list} />
+          ),
+          key: Constants.PROSPECTUS_FILE_TABS.PROSPECTUS_WATERFALL_SCHEMES,
+          title: `Waterfall Schemes (${fileData.prospectusWaterfallSchemes.length})`,
+        });
+      }
     }
 
     return (
@@ -390,6 +472,12 @@ export class FilePage extends React.Component<
               <div className="header-details">
               </div>
             </div>
+            <div className="header-section header-links header-external-links">
+              {/* <LineageLink tableData={fileData} /> */}
+            </div>
+            <div className="header-section header-buttons">
+              <LineageButton fileData={fileData} />
+            </div>
           </header>
           <div className="single-column-layout">
             <aside className="left-panel">
@@ -462,9 +550,7 @@ export class FilePage extends React.Component<
               </EditableSection>
             </aside>
             <main className="main-content-panel">
-              {fileData.category == 'prospectus' &&
-                this.renderProspectusTabs()
-              }
+              {this.renderTabs()}
             </main>
           </div>
         </div>
@@ -486,6 +572,8 @@ export const mapStateToProps = (state: GlobalState) => ({
   statusCode: state.fileMetadata.statusCode,
   fileData: state.fileMetadata.fileData,
   fileOwners: state.fileMetadata.fileOwners,
+  fileLineage: state.lineage.lineageTree,
+  isLoadingLineage: state.lineage ? state.lineage.isLoading : true,
 });
 
 export const mapDispatchToProps = (dispatch: any) =>
@@ -493,6 +581,7 @@ export const mapDispatchToProps = (dispatch: any) =>
     {
       getFileData,
       openRequestDescriptionDialog,
+      getFileLineageDispatch: getFileLineage,
       searchDataLocation: (dataLocationType: string, dataLocationName: string) =>
         updateSearchState({
           filters: {

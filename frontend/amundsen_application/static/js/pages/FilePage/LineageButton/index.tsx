@@ -4,13 +4,13 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 
-import { TableMetadata } from 'interfaces';
-import { isTableLineagePageEnabled } from 'config/config-utils';
-import { buildTableLineageURL } from 'utils/navigation';
+import { FileMetadata } from 'interfaces';
+import { isFileLineagePageEnabled } from 'config/config-utils';
+import { buildFileLineageURL } from 'utils/navigation';
 import AvatarLabel from 'components/AvatarLabel';
 
 export interface LineageButtonProps {
-  tableData: TableMetadata;
+  fileData: FileMetadata;
 }
 
 const BUTTON_LABEL = 'Lineage';
@@ -18,19 +18,12 @@ const BUTTON_LABEL = 'Lineage';
 const BUTTON_IMAGE = '/static/images/lineage.png';
 
 const LineageButton: React.FC<LineageButtonProps> = ({
-  tableData,
+  fileData,
 }: LineageButtonProps) => {
-  if (!isTableLineagePageEnabled()) return null;
-  const path = buildTableLineageURL(tableData);
+  if (!isFileLineagePageEnabled()) return null;
+  const path = buildFileLineageURL(fileData);
 
   return (
-    // <Link to={path} className="btn btn-default btn-lg">
-    //   {BUTTON_LABEL}
-    //   <span className="static-badge flag label label-warning">
-    //     <div className="badge-overlay-primary">{BUTTON_BADGE}</div>
-    //   </span>
-    // </Link>
-
     <Link to={path} className="btn btn-default btn-lg">
       <AvatarLabel
         label={BUTTON_LABEL}

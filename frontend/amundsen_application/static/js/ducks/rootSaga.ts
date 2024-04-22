@@ -62,6 +62,7 @@ import {
   getColumnLineageWatcher,
   getTableColumnLineageWatcher,
   getTableLineageWatcher,
+  getFileLineageWatcher
 } from './lineage/sagas';
 import {
   getSnowflakeTableSharesWatcher,
@@ -108,6 +109,7 @@ export default function* rootSaga() {
     getTableDataWatcher(),
     getTableDescriptionWatcher(),
     getTableLineageWatcher(),
+    getFileLineageWatcher(),
     getTableQualityChecksWatcher(),
     getTypeMetadataDescriptionWatcher(),
     getUserOwnWatcher(),

@@ -83,7 +83,11 @@ const Routes: React.FC = () => {
           component={TableDetail}
         />
         <Route
-          path="/lineage/:resource/:cluster/:database/:schema/:table"
+          path="/lineage/table/:cluster/:database/:schema/:table"
+          component={LineagePage}
+        />
+        <Route
+          path="/lineage/file/:data_location_type/:data_location_name/:data_location_container/:type/:name"
           component={LineagePage}
         />
         <Route path="/user/:userId" component={ProfilePage} />

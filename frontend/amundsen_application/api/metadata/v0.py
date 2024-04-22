@@ -1080,7 +1080,7 @@ def get_file_lineage() -> Response:
     :return:
     """
     try:
-        file_endpoint = _get_file_endpoint
+        file_endpoint = _get_file_endpoint()
         file_key = get_query_param(request.args, 'key')
         depth = get_query_param(request.args, 'depth')
         direction = get_query_param(request.args, 'direction')
