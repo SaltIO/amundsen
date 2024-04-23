@@ -12,6 +12,7 @@ from marshmallow3_annotations.ext.attrs import AttrsSchema
 @attr.s(auto_attribs=True, kw_only=True)
 class LineageItem:
     key: str  # down/upstream table/col/task key
+    type: str
     level: int  # upstream/downstream distance from current resource
     source: str  # database this resource is from
     badges: Optional[List[Badge]] = None

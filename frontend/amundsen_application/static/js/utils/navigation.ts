@@ -1,9 +1,11 @@
 import * as qs from 'simple-query-string';
 import { createBrowserHistory } from 'history';
 
-import { ResourceType, TableMetadata } from 'interfaces';
+import { ResourceType, TableMetadata, FileMetadata } from 'interfaces';
+import { isFilesystemDataLocation, isAwsS3DataLocation } from 'interfaces/DataLocation';
 import { TAB_URL_PARAM } from 'components/TabsComponent/constants';
 import { TABLE_TAB } from 'pages/TableDetailPage/constants';
+import { AwsS3DataLocation, FilesystemDataLocation } from 'interfaces/DataLocation';
 
 // https://github.com/ReactTraining/react-router/issues/3972#issuecomment-264805667
 export const BrowserHistory = createBrowserHistory();
@@ -30,6 +32,14 @@ export interface FilePageParams {
 export interface ProviderPageParams {
   key: string;
   name: string;
+}
+
+export interface FileParams {
+  type: string;
+  name: string;
+  data_location_type: string;
+  data_location_name: string;
+  data_location_container: string;
 }
 
 export const DEFAULT_SEARCH_ROUTE = '/search';
@@ -85,13 +95,17 @@ export const updateSearchUrl = (
 export const buildTableKey = (params: TablePageParams) =>
   `${params.database}://${params.cluster}.${params.schema}/${params.table}`;
 
+export const buildFileKey = (params: FileParams) =>
+  `${params.data_location_type}://${params.data_location_name}/${params.data_location_container}/${params.type}/${params.name}`;
+
 /**
  * Creates a provider key for endpoints from url params.
  * @param TablePageParams Route params with expectations of matching a Table resource
  * @return String Params formatted as a table key.
  */
 export const buildProviderKey = (params: ProviderPageParams) =>
-  `data_provider://${params.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  // `data_provider://${params.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  `data_provider://${params.name}`;
 
 
 /**
@@ -99,13 +113,20 @@ export const buildProviderKey = (params: ProviderPageParams) =>
  * @param TableMetadata - information on table properties.
  * @return String Params formatted a path to a lineage table.
  */
-export const buildLineageURL = ({
+export const buildTableLineageURL = ({
   cluster,
   database,
   schema,
-  name,
+  name
 }: Partial<TableMetadata>) =>
   `/lineage/table/${cluster}/${database}/${schema}/${name}`;
+
+export const buildFileLineageURL = ({
+  type,
+  name,
+  dataLocation
+}: Partial<FileMetadata>) =>
+  `/lineage/file/${encodeURIComponent(dataLocation ? dataLocation.type : '')}/${encodeURIComponent(dataLocation ? dataLocation.name : '')}/${isFilesystemDataLocation(dataLocation) ? encodeURIComponent((dataLocation as FilesystemDataLocation).drive) : isAwsS3DataLocation(dataLocation) ? encodeURIComponent((dataLocation as AwsS3DataLocation).bucket) : 'unknown'}/${encodeURIComponent(type ? type : '')}/${encodeURIComponent(name ? name : '')}`;
 
 /**
  * Creates the dashboard detail URL from the URI

@@ -41,6 +41,27 @@ class TableUri:
 
         return TableUri(**spec)
 
+@dataclass
+class FileUri:
+    name: str
+    type: str
+    data_location_type: str
+    data_location_container: str
+    data_location_name: str
+
+    def __str__(self) -> str:
+        return f"{self.data_location_type}://{self.data_location_name}/{self.data_location_container}/{self.type}/{self.name}"
+
+    @classmethod
+    def from_uri(cls, uri: str) -> 'FileUri':
+        pattern = re.compile(r'^(?P<data_location_type>.*?)://(?P<data_location_name>.*)/(?P<data_location_container>.*?)/(?P<type>.*?)/(?P<name>.*?)$', re.X)
+
+        groups = pattern.match(uri)
+
+        spec = groups.groupdict() if groups else {}
+
+        return FileUri(**spec)
+
 
 def marshall_table_partial(table_dict: Dict) -> Dict:
     """
@@ -192,6 +213,12 @@ def marshall_dashboard_full(dashboard_dict: Dict) -> Dict:
     dashboard_dict['tables'] = [marshall_table_partial(table) for table in dashboard_dict['tables']]
     return dashboard_dict
 
+def marshall_lineage_item(entity: Dict) -> Dict:
+    type = entity.get('type')
+    if type == "Table":
+        return marshall_lineage_table(entity)
+    elif type == "File":
+        return marshall_lineage_file(entity)
 
 def marshall_lineage_table(table_dict: Dict) -> Dict:
     """
@@ -201,11 +228,31 @@ def marshall_lineage_table(table_dict: Dict) -> Dict:
     """
     table_key = str(table_dict.get('key'))
     table_uri = TableUri.from_uri(table_key)
-    table_dict['database'] = table_uri.database
-    table_dict['schema'] = table_uri.schema
-    table_dict['cluster'] = table_uri.cluster
-    table_dict['name'] = table_uri.table
+
+    table_dict['lineage_item_detail'] = {}
+    table_dict['lineage_item_detail']['database'] = table_uri.database
+    table_dict['lineage_item_detail']['schema'] = table_uri.schema
+    table_dict['lineage_item_detail']['cluster'] = table_uri.cluster
+    table_dict['lineage_item_detail']['name'] = table_uri.table
     return table_dict
+
+def marshall_lineage_file(file_dict: Dict) -> Dict:
+    """
+    Decorate lineage entries with database, schema, cluster, and table
+    :param table_dict:
+    :return: table entry with additional fields
+    """
+    file_key = str(file_dict.get('key'))
+    file_uri = FileUri.from_uri(file_key)
+
+    file_dict['lineage_item_detail'] = {}
+    file_dict['lineage_item_detail']['type'] = file_uri.type
+    file_dict['lineage_item_detail']['name'] = file_uri.name
+    file_dict['lineage_item_detail']['data_location_type'] = file_uri.data_location_type
+    file_dict['lineage_item_detail']['data_location_container'] = file_uri.data_location_container
+    file_dict['lineage_item_detail']['data_location_name'] = file_uri.data_location_name
+
+    return file_dict
 
 
 def _convert_prog_descriptions(prog_descriptions: List = None) -> Dict:

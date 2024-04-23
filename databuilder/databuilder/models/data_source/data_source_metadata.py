@@ -1,5 +1,5 @@
 from typing import (
-    Iterator, Optional, Dict
+    Iterator, Optional, Dict, Union, List
 )
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -8,10 +8,23 @@ import re
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.graph_serializable import GraphSerializable
+from databuilder.models.description_metadata import (  # noqa: F401
+    DESCRIPTION_NODE_LABEL, DESCRIPTION_NODE_LABEL_VAL, DescriptionMetadata,
+)
+from databuilder.models.table_metadata import TagMetadata
 
 
-def convert_to_uri_safe_str(input_string: str) -> str:
-    return re.sub(r'\W+', '_', input_string).lower()
+# def convert_to_uri_safe_str(input_string: str) -> str:
+#     return re.sub(r'\W+', '_', input_string).lower()
+
+def _format_as_list(tags: Union[List, str, None]) -> List:
+    if tags is None:
+        tags = []
+    if isinstance(tags, str):
+        tags = list(filter(None, tags.split(',')))
+    if isinstance(tags, list):
+        tags = [tag.lower().strip() for tag in tags]
+    return tags
 
 
 class DataProvider(GraphSerializable):
@@ -60,7 +73,8 @@ class DataProvider(GraphSerializable):
         )
 
     def get_name_for_uri(self) -> str:
-        return convert_to_uri_safe_str(self.name)
+        # return convert_to_uri_safe_str(self.name)
+        return self.name
 
     def get_key(self) -> str:
         return self.DATA_PROVIDER_NODE_KEY.format(name=self.get_name_for_uri())
@@ -149,8 +163,9 @@ class DataChannel(GraphSerializable):
 
     def get_key(self) -> str:
         return self.DATA_CHANNEL_NODE_KEY.format(data_provider_name=self.data_provider.get_name_for_uri(),
-                                                    name=convert_to_uri_safe_str(self.name),
-                                                    type=self.type.value)
+                                                #  name=convert_to_uri_safe_str(self.name),
+                                                 name=self.name,
+                                                 type=self.type.value)
 
 
 class DataLocation(GraphSerializable):
@@ -171,13 +186,10 @@ class DataLocation(GraphSerializable):
 
     def __init__(self,
                  name: str,
-                 type: str,
-                 data_channel: DataChannel
-                 ) -> None:
+                 type: str) -> None:
 
         self.name = name
         self.type = type
-        self.data_channel = data_channel
 
         self._node_iter = self._create_node_iterator()
         self._relation_iter = self._create_relation_iterator()
@@ -211,20 +223,25 @@ class DataLocation(GraphSerializable):
         }
 
     def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
-        yield GraphRelationship(
-            start_label=DataChannel.DATA_CHANNEL_NODE_LABEL,
-            start_key=self.data_channel.get_key(),
-            end_label=self.DATA_LOCATION_NODE_LABEL,
-            end_key=self.get_key(),
-            type=self.DATA_LOCATION_RELATION_TYPE,
-            reverse_type=self.DATA_LOCATION_OF_RELATION_TYPE,
-            attributes={}
-        )
+        # yield GraphRelationship(
+        #     start_label=DataChannel.DATA_CHANNEL_NODE_LABEL,
+        #     start_key=self.data_channel.get_key(),
+        #     end_label=self.DATA_LOCATION_NODE_LABEL,
+        #     end_key=self.get_key(),
+        #     type=self.DATA_LOCATION_RELATION_TYPE,
+        #     reverse_type=self.DATA_LOCATION_OF_RELATION_TYPE,
+        #     attributes={}
+        # )
+        pass
 
     def get_key(self) -> str:
-        return DataLocationType.DATA_LOCATION_NODE_KEY.format(
-            name=convert_to_uri_safe_str(self.name),
+        return DataLocation.DataLocationType.DATA_LOCATION_NODE_KEY.format(
+            # name=convert_to_uri_safe_str(self.name),
+            name=self.name,
             type=self.type)
+
+    def get_root(self) -> str:
+        return 'NA'
 
 
 class FilesystemDataLocation(DataLocation):
@@ -234,11 +251,10 @@ class FilesystemDataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 data_channel: DataChannel,
                  drive: str
                  ) -> None:
 
-        super().__init__(name=name, type='filesystem', data_channel=data_channel)
+        super().__init__(name=name, type='filesystem')
 
         self.drive = drive
 
@@ -249,9 +265,14 @@ class FilesystemDataLocation(DataLocation):
 
     def get_key(self) -> str:
         return FilesystemDataLocation.DATA_LOCATION_NODE_KEY.format(
-            name=convert_to_uri_safe_str(self.name),
+            # name=convert_to_uri_safe_str(self.name),
+            name=self.name,
             type=self.type,
-            drive=convert_to_uri_safe_str(self.drive))
+            drive=self.drive)
+            # drive=convert_to_uri_safe_str(self.drive))
+
+    def get_root(self) -> str:
+        return self.drive
 
 
 class AwsS3DataLocation(DataLocation):
@@ -261,11 +282,10 @@ class AwsS3DataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 data_channel: DataChannel,
                  bucket: str
                  ) -> None:
 
-        super().__init__(name=name, type='aws_s3', data_channel=data_channel)
+        super().__init__(name=name, type='aws_s3')
 
         self.bucket = bucket
 
@@ -276,9 +296,14 @@ class AwsS3DataLocation(DataLocation):
 
     def get_key(self) -> str:
         return AwsS3DataLocation.DATA_LOCATION_NODE_KEY.format(
-            name=convert_to_uri_safe_str(self.name),
+            # name=convert_to_uri_safe_str(self.name),
+            name=self.name,
             type=self.type,
-            bucket=convert_to_uri_safe_str(self.bucket))
+            # bucket=convert_to_uri_safe_str(self.bucket))
+            bucket=self.bucket)
+
+    def get_root(self) -> str:
+        return self.bucket
 
 class SharepointDataLocation(DataLocation):
 
@@ -287,11 +312,10 @@ class SharepointDataLocation(DataLocation):
 
     def __init__(self,
                  name: str,
-                 data_channel: DataChannel,
                  document_library: str
                  ) -> None:
 
-        super().__init__(name=name, type='sharepoint', data_channel=data_channel)
+        super().__init__(name=name, type='sharepoint')
 
         self.document_library = document_library
 
@@ -302,9 +326,14 @@ class SharepointDataLocation(DataLocation):
 
     def get_key(self) -> str:
         return SharepointDataLocation.DATA_LOCATION_NODE_KEY.format(
-            name=convert_to_uri_safe_str(self.name),
+            # name=convert_to_uri_safe_str(self.name),
+            name=self.name,
             type=self.type,
-            document_library=convert_to_uri_safe_str(self.bucket))
+            # document_library=convert_to_uri_safe_str(self.bucket))
+            document_library=self.bucket)
+
+    def get_root(self) -> str:
+        return self.document_library
 
 
 class File(GraphSerializable):
@@ -312,35 +341,51 @@ class File(GraphSerializable):
     FILE_NODE_LABEL = 'File'
     FILE_NODE_ATTR_NAME = 'name'
     FILE_NODE_ATTR_PATH = 'path'
-    FILE_NODE_ATTR_DESC = 'desc'
     FILE_NODE_ATTR_TYPE = 'type'
+    FILE_NODE_ATTR_CATEGORY = 'category'
     FILE_NODE_ATTR_IS_DIRECTORY= 'is_directory'
 
     FILE_RELATION_TYPE = 'FILE'
     FILE_OF_RELATION_TYPE = 'FILE_OF'
 
+    FILE_DESCRIPTION_FORMAT = '{data_location_type}://{data_location_name}/{data_location_root}/{file_type}/{file_name}/_description'
+
+
     def __init__(self,
                  name: str,
-                 desc: str,
                  type: str,
+                 category: str,
                  path: str,
                  is_directory: bool,
-                 data_location: DataLocation,
-                 ) -> None:
+                 description: Union[str, None] = None,
+                 data_location: DataLocation = None,
+                 data_channel: DataChannel = None,
+                 tags: Union[List, str] = None) -> None:
 
         self.name = name
-        self.desc = desc
+        if description:
+            self.set_description(description=description)
+        else:
+            self.description = None
         self.type = type
+        self.category = category
         self.path = path
         self.is_directory = is_directory
 
         self.data_location = data_location
+        self.data_channel = data_channel
+
+        self.tags = _format_as_list(tags)
 
         self._node_iter = self._create_node_iterator()
         self._relation_iter = self._create_relation_iterator()
 
+
     def __repr__(self) -> str:
-        return f'File({self.name!r}, {self.desc!r}, {self.type!r}, {self.path!r}, {self.is_directory!r})'
+        return f'File({self.name!r}, {self.description!r}, {self.type!r}, {self.category!r}, {self.path!r}, {self.is_directory!r})'
+
+    def set_description(self, description: str):
+        self.description = DescriptionMetadata.create_description_metadata(text=description)
 
     def create_next_node(self) -> Optional[GraphNode]:
         try:
@@ -360,15 +405,25 @@ class File(GraphSerializable):
             label=self.FILE_NODE_LABEL,
             attributes={
                 self.FILE_NODE_ATTR_NAME: self.name,
-                self.FILE_NODE_ATTR_DESC: self.desc,
                 self.FILE_NODE_ATTR_TYPE: self.type,
+                self.FILE_NODE_ATTR_CATEGORY: self.category,
                 self.FILE_NODE_ATTR_PATH: self.path,
                 self.FILE_NODE_ATTR_IS_DIRECTORY: self.is_directory
             }
         )
 
+        if self.description:
+            node_key = self._get_file_description_key(self.description)
+            yield self.description.get_node(node_key)
+
+        # Create the table tag nodes
+        if self.tags:
+            for tag in self.tags:
+                tag_node = TagMetadata(tag).get_node()
+                yield tag_node
+
     def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
-        if self.start_key and self.start_label:
+        if self.data_location:
             yield GraphRelationship(
                 start_label=DataLocation.DATA_LOCATION_NODE_LABEL,
                 start_key=self.data_location.get_key(),
@@ -379,5 +434,170 @@ class File(GraphSerializable):
                 attributes={}
             )
 
+        if self.data_channel:
+            yield GraphRelationship(
+                start_label=DataLocation.DATA_CHANNEL_NODE_LABEL,
+                start_key=self.data_channel.get_key(),
+                end_label=self.FILE_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.FILE_RELATION_TYPE,
+                reverse_type=self.FILE_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+        if self.description:
+            yield self.description.get_relation(File.FILE_NODE_LABEL,
+                                                self.get_key(),
+                                                self._get_file_description_key(self.description))
+
+        if self.tags:
+            for tag in self.tags:
+                tag_relationship = GraphRelationship(
+                    start_label=File.FILE_NODE_LABEL,
+                    start_key=self.get_key(),
+                    end_label=TagMetadata.TAG_NODE_LABEL,
+                    end_key=TagMetadata.get_tag_key(tag),
+                    type=TagMetadata.ENTITY_TAG_RELATION_TYPE,
+                    reverse_type=TagMetadata.TAG_ENTITY_RELATION_TYPE,
+                    attributes={}
+                )
+                yield tag_relationship
+
+    def _get_file_description_key(self, description: DescriptionMetadata) -> str:
+        return File.FILE_DESCRIPTION_FORMAT.format(data_location_type=self.data_location.type,
+                                                   data_location_name=self.data_location.name,
+                                                   data_location_root=self.data_location.get_root(),
+                                                   file_type=self.type,
+                                                   file_name=self.name)
+                                                #    data_location_name=convert_to_uri_safe_str(self.data_location.name),
+                                                #    data_location_root=convert_to_uri_safe_str(self.data_location.get_root()),
+                                                #    file_type=convert_to_uri_safe_str(self.type),
+                                                #    file_name=convert_to_uri_safe_str(self.name))
+
     def get_key(self) -> str:
-        return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.name)}"
+        # return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"
+        return f"{self.data_location.get_key()}/{self.type}/{self.name}"
+
+class FileTable(GraphSerializable):
+
+    FILE_TABLE_NODE_LABEL = 'File_Table'
+    FILE_TABLE_NODE_ATTR_NAME = 'name'
+    FILE_TABLE_NODE_ATTR_CONTENT = 'content'
+
+    FILE_TABLE_RELATION_TYPE = 'FILE_TABLE'
+    FILE_TABLE_OF_RELATION_TYPE = 'FILE_TABLE_OF'
+
+    def __init__(self,
+                 name: str,
+                 content: str,
+                 file: File,
+                 ) -> None:
+
+        self.name = name
+        self.content = content
+        self.file = file
+
+        self._node_iter = self._create_node_iterator()
+        self._relation_iter = self._create_relation_iterator()
+
+    def __repr__(self) -> str:
+        return f'FileTable({self.name!r}, {self.content!r})'
+
+    def create_next_node(self) -> Optional[GraphNode]:
+        try:
+            return next(self._node_iter)
+        except StopIteration:
+            return None
+
+    def create_next_relation(self) -> Optional[GraphRelationship]:
+        try:
+            return next(self._relation_iter)
+        except StopIteration:
+            return None
+
+    def _create_node_iterator(self) -> Iterator[GraphNode]:
+        yield GraphNode(
+            key=self.get_key(),
+            label=self.FILE_TABLE_NODE_LABEL,
+            attributes={
+                self.FILE_TABLE_NODE_ATTR_NAME: self.name,
+                self.FILE_TABLE_NODE_ATTR_CONTENT: self.content,
+            }
+        )
+
+    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
+        if self.file:
+            yield GraphRelationship(
+                start_label=File.FILE_NODE_LABEL,
+                start_key=self.file.get_key(),
+                end_label=self.FILE_TABLE_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.FILE_TABLE_RELATION_TYPE,
+                reverse_type=self.FILE_TABLE_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+    def get_key(self) -> str:
+        return f"{self.file.get_key()}/_filetable/{self.name}"
+
+class ProspectusWaterfallScheme(GraphSerializable):
+
+    PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL = 'Prospectus_Waterfall_Scheme'
+    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME = 'name'
+    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME = 'scheme'
+
+    PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME'
+    PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME_OF'
+
+    def __init__(self,
+                 name: str,
+                 scheme: str,
+                 file: File,
+                 ) -> None:
+
+        self.name = name
+        self.scheme = scheme
+        self.file = file
+
+        self._node_iter = self._create_node_iterator()
+        self._relation_iter = self._create_relation_iterator()
+
+    def __repr__(self) -> str:
+        return f'ProspectusWaterfallScheme({self.name!r}, {self.content!r})'
+
+    def create_next_node(self) -> Optional[GraphNode]:
+        try:
+            return next(self._node_iter)
+        except StopIteration:
+            return None
+
+    def create_next_relation(self) -> Optional[GraphRelationship]:
+        try:
+            return next(self._relation_iter)
+        except StopIteration:
+            return None
+
+    def _create_node_iterator(self) -> Iterator[GraphNode]:
+        yield GraphNode(
+            key=self.get_key(),
+            label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
+            attributes={
+                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME: self.name,
+                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME: self.scheme,
+            }
+        )
+
+    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
+        if self.file:
+            yield GraphRelationship(
+                start_label=File.FILE_NODE_LABEL,
+                start_key=self.file.get_key(),
+                end_label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE,
+                reverse_type=self.PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+    def get_key(self) -> str:
+        return f"{self.file.get_key()}/_prospectuswaterfallscheme/{self.name}"

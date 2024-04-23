@@ -62,6 +62,7 @@ import {
   getColumnLineageWatcher,
   getTableColumnLineageWatcher,
   getTableLineageWatcher,
+  getFileLineageWatcher
 } from './lineage/sagas';
 import {
   getSnowflakeTableSharesWatcher,
@@ -75,8 +76,10 @@ import {
 } from './providerMetadata/sagas';
 import {
   getFileDataWatcher,
-  getFileDescriptionWatcher
+  getFileDescriptionWatcher,
+  updateFileDescriptionWatcher
 } from './fileMetadata/sagas'
+import { updateFileOwnerWatcher } from './fileMetadata/owners/sagas';
 
 export default function* rootSaga() {
   yield all([
@@ -106,6 +109,7 @@ export default function* rootSaga() {
     getTableDataWatcher(),
     getTableDescriptionWatcher(),
     getTableLineageWatcher(),
+    getFileLineageWatcher(),
     getTableQualityChecksWatcher(),
     getTypeMetadataDescriptionWatcher(),
     getUserOwnWatcher(),
@@ -139,5 +143,7 @@ export default function* rootSaga() {
     getProviderDescriptionWatcher(),
     getFileDataWatcher(),
     getFileDescriptionWatcher(),
+    updateFileDescriptionWatcher(),
+    updateFileOwnerWatcher()
   ]);
 }

@@ -20,7 +20,7 @@ from amundsen_application.models.user import load_user, dump_user
 
 from amundsen_application.api.utils.metadata_utils import is_table_editable, marshall_table_partial, \
     marshall_table_full, marshall_dashboard_partial, marshall_dashboard_full, marshall_feature_full, \
-    marshall_lineage_table, TableUri, marshall_data_provider_full, marshall_file_full
+    marshall_lineage_table, TableUri, marshall_data_provider_full, marshall_file_full, marshall_lineage_item
 from amundsen_application.api.utils.request_utils import get_query_param, request_metadata
 
 from amundsen_application.api.utils.search_utils import execute_search_document_request
@@ -223,6 +223,37 @@ def update_table_owner() -> Response:
         url = '{0}/{1}/owner/{2}'.format(table_endpoint, table_key, owner)
         method = request.method
         _log_update_table_owner(table_key=table_key, method=method, owner=owner)
+
+        response = request_metadata(url=url, method=method)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Updated owner'
+        else:
+            message = 'There was a problem updating owner {0}'.format(owner)
+
+        payload = jsonify({'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+@metadata_blueprint.route('/update_file_owner', methods=['PUT', 'DELETE'])
+def update_file_owner() -> Response:
+
+    @action_logging
+    def _log_update_file_owner(*, file_key: str, method: str, owner: str) -> None:
+        pass  # pragma: no cover
+
+    try:
+        args = request.get_json()
+        file_key = get_query_param(args, 'key')
+        owner = get_query_param(args, 'owner')
+
+        file_endpoint = _get_file_endpoint()
+        url = '{0}/{1}/owner/{2}'.format(file_endpoint, file_key, owner)
+        method = request.method
+        _log_update_file_owner(file_key=file_key, method=method, owner=owner)
 
         response = request_metadata(url=url, method=method)
         status_code = response.status_code
@@ -683,6 +714,41 @@ def update_dashboard_tags() -> Response:
         payload = jsonify({'msg': message})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+@metadata_blueprint.route('/update_file_tags', methods=['PUT', 'DELETE'])
+def update_file_tags() -> Response:
+
+    @action_logging
+    def _log_update_file_tags(*, uri_key: str, method: str, tag: str) -> None:
+        pass  # pragma: no cover
+
+    try:
+        args = request.get_json()
+        method = request.method
+
+        file_endpoint = _get_file_endpoint()
+        uri_key = get_query_param(args, 'key')
+        tag = get_query_param(args, 'tag')
+        url = f'{file_endpoint}/{uri_key}/tag/{tag}'
+
+        _log_update_file_tags(uri_key=uri_key, method=method, tag=tag)
+
+        response = request_metadata(url=url, method=method)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+        else:
+            message = f'Encountered error: {method} file tag failed'
+            logging.error(message)
+
+        payload = jsonify({'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        message = 'Encountered exception: ' + str(e)
+        logging.exception(message)
+        payload = jsonify({'msg': message})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
 @metadata_blueprint.route('/user', methods=['GET'])
 def get_user() -> Response:
@@ -960,8 +1026,8 @@ def get_table_lineage() -> Response:
         url = f'{table_endpoint}/{table_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_table(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_table(table) for table in json.get('upstream_entities')]
+        downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 
@@ -973,6 +1039,7 @@ def get_table_lineage() -> Response:
         }
         return make_response(jsonify(payload), 200)
     except Exception as e:
+        LOGGER.exception(e)
         payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -990,8 +1057,8 @@ def get_column_lineage() -> Response:
         url = f'{table_endpoint}/{table_key}/column/{column_name}/lineage'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_table(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_table(table) for table in json.get('upstream_entities')]
+        downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 
@@ -1006,6 +1073,44 @@ def get_column_lineage() -> Response:
         payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
+@metadata_blueprint.route('/get_file_lineage', methods=['GET'])
+def get_file_lineage() -> Response:
+    """
+    Call metadata service to fetch table lineage for a given table
+    :return:
+    """
+    try:
+        file_endpoint = _get_file_endpoint()
+        file_key = get_query_param(request.args, 'key')
+        depth = get_query_param(request.args, 'depth')
+        direction = get_query_param(request.args, 'direction')
+        url = f'{file_endpoint}/{file_key}/lineage?depth={depth}&direction={direction}'
+        response = request_metadata(url=url, method=request.method)
+        json = response.json()
+
+        downstream = []
+        upstream = []
+        downstream_count = 0
+        upstream_count = 0
+        if json is not None:
+            if 'downstream_entities' in json:
+                downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
+                downstream_count = json.get('downstream_count')
+            if 'upstream_entities' in json:
+                upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
+                upstream_count = json.get('upstream_count')
+
+        payload = {
+            'downstream_entities': downstream,
+            'upstream_entities': upstream,
+            'downstream_count': downstream_count,
+            'upstream_count': upstream_count,
+        }
+        return make_response(jsonify(payload), 200)
+    except Exception as e:
+        LOGGER.exception(e)
+        payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
 @metadata_blueprint.route('/get_feature_description', methods=['GET'])
 def get_feature_description() -> Response:
@@ -1095,8 +1200,8 @@ def get_feature_lineage() -> Response:
         url = f'{endpoint}/{feature_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_table(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_table(table) for table in json.get('upstream_entities')]
+        downstream = [marshall_lineage_item(table) for table in json.get('downstream_entities')]
+        upstream = [marshall_lineage_item(table) for table in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 
@@ -1335,6 +1440,64 @@ def get_file_metadata() -> Response:
         message = 'Encountered exception: ' + str(e)
         logging.exception(message)
         return make_response(jsonify({'tableData': {}, 'msg': message}), HTTPStatus.INTERNAL_SERVER_ERROR)
+
+@metadata_blueprint.route('/get_file_description', methods=['GET'])
+def get_file_description() -> Response:
+    try:
+        file_endpoint = _get_file_endpoint()
+        file_key = get_query_param(request.args, 'key')
+
+        url = '{0}/{1}/description'.format(file_endpoint, file_key)
+
+        response = request_metadata(url=url)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+            description = response.json().get('description')
+        else:
+            message = 'Get file description failed'
+            description = None
+
+        payload = jsonify({'description': description, 'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        payload = jsonify({'description': None, 'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+@metadata_blueprint.route('/put_file_description', methods=['PUT'])
+def put_file_description() -> Response:
+
+    @action_logging
+    def _log_put_file_description(*, file_key: str, description: str, source: str) -> None:
+        pass  # pragma: no cover
+
+    try:
+        args = request.get_json()
+
+        file_key = get_query_param(args, 'key')
+        description = get_query_param(args, 'description')
+        src = get_query_param(args, 'source')
+
+        file_endpoint = _get_file_endpoint()
+        url = '{0}/{1}/description'.format(file_endpoint, file_key)
+        response = request_metadata(url=url)
+
+        _log_put_file_description(file_key=file_key, description=description, source=src)
+
+        response = request_metadata(url=url, method='PUT', data=json.dumps({'description': description}))
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+        else:
+            message = 'Update file description failed'
+
+        payload = jsonify({'msg': message})
+        return make_response(payload, status_code)
+    except Exception as e:
+        payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
+        return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
 @action_logging
 def _get_file_metadata(*, file_key: str, index: int, source: str) -> Dict[str, Any]:

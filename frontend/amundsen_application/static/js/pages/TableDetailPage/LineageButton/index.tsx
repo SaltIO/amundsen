@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 
 import { TableMetadata } from 'interfaces';
 import { isTableLineagePageEnabled } from 'config/config-utils';
-import { buildLineageURL } from 'utils/navigation';
+import { buildTableLineageURL } from 'utils/navigation';
 import AvatarLabel from 'components/AvatarLabel';
 
 export interface LineageButtonProps {
@@ -21,7 +21,7 @@ const LineageButton: React.FC<LineageButtonProps> = ({
   tableData,
 }: LineageButtonProps) => {
   if (!isTableLineagePageEnabled()) return null;
-  const path = buildLineageURL(tableData);
+  const path = buildTableLineageURL(tableData);
 
   return (
     // <Link to={path} className="btn btn-default btn-lg">
@@ -36,7 +36,7 @@ const LineageButton: React.FC<LineageButtonProps> = ({
         label={BUTTON_LABEL}
         src={BUTTON_IMAGE}
         round={true}
-      />      
+      />
     </Link>
   );
 };

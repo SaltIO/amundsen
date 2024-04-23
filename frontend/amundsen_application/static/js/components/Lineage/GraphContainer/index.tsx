@@ -4,9 +4,10 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 
-import { ResourceType, Lineage, LineageItem } from 'interfaces';
+import { ResourceType, Lineage, LineageItem, TableLineageItemDetail, FileLineageItemDetail, isTableLineageItemDetail, isFileLineageItemDetail  } from 'interfaces';
 import { getSourceIconClass } from 'config/config-utils';
-import { getLink } from 'components/ResourceListItem/TableListItem';
+import { getLink as getTableLink } from 'components/ResourceListItem/TableListItem';
+import { getLink as getFileLink } from 'components/ResourceListItem/FileListItem';
 import Graph from 'components/Lineage/Graph';
 
 import './styles.scss';
@@ -23,7 +24,13 @@ export const GraphContainer: React.FC<GraphContainerProps> = ({
   lineage,
   rootNode,
 }: GraphContainerProps) => {
-  const rootTitle = `${rootNode.schema}.${rootNode.name}`;
+  let rootTitle = 'UNKNOWN RESOURCE';
+  if (isTableLineageItemDetail(rootNode.lineage_item_detail)) {
+    rootTitle = `${(rootNode.lineage_item_detail as TableLineageItemDetail).schema}.${(rootNode.lineage_item_detail as TableLineageItemDetail).name}`;
+  }
+  else if (isFileLineageItemDetail(rootNode.lineage_item_detail)) {
+    rootTitle = `${(rootNode.lineage_item_detail as FileLineageItemDetail).type}.${(rootNode.lineage_item_detail as FileLineageItemDetail).name}`;
+  }
 
   return (
     <div className="resource-detail-layout">
@@ -32,7 +39,14 @@ export const GraphContainer: React.FC<GraphContainerProps> = ({
           <span
             className={
               'icon icon-header ' +
-              getSourceIconClass(rootNode.database, ResourceType.table)
+              (isTableLineageItemDetail(rootNode.lineage_item_detail) ?
+                  getSourceIconClass((rootNode.lineage_item_detail as TableLineageItemDetail).database, ResourceType.table)
+                  :
+                  isFileLineageItemDetail(rootNode.lineage_item_detail) ?
+                    getSourceIconClass((rootNode.lineage_item_detail as FileLineageItemDetail).type, ResourceType.file)
+                    :
+                    ''
+              )
             }
           />
         </div>
@@ -44,15 +58,33 @@ export const GraphContainer: React.FC<GraphContainerProps> = ({
           <div className="lineage-graph-backlink">
             <Link
               className="resource-list-item table-list-item"
-              to={getLink(rootNode, 'table-lineage-page')}
+              to={
+                (isTableLineageItemDetail(rootNode.lineage_item_detail) ?
+                    getTableLink({ key: rootNode.key, ...rootNode.lineage_item_detail}, 'table-lineage-page')
+                    :
+                    isFileLineageItemDetail(rootNode.lineage_item_detail) ?
+                      getFileLink({ key: rootNode.key, ...rootNode.lineage_item_detail}, 'table-lineage-page')
+                      :
+                      ''
+                )
+              }
             >
-              {BACK_TABLE_LINK}
+              {"Back to Details..."}
             </Link>
           </div>
         </div>
         <div className="header-section header-links">
           <Link
-            to={getLink(rootNode, 'table-lineage-page')}
+            to={
+              (isTableLineageItemDetail(rootNode.lineage_item_detail) ?
+                  getTableLink(rootNode, 'table-lineage-page')
+                  :
+                  isFileLineageItemDetail(rootNode.lineage_item_detail) ?
+                    getFileLink(rootNode, 'table-lineage-page')
+                    :
+                    ''
+              )
+            }
             className="btn btn-close clear-button icon-header"
           />
         </div>

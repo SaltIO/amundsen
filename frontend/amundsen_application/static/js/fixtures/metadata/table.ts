@@ -198,12 +198,15 @@ export const tableLineage: Lineage = {
   downstream_entities: [
     {
       badges: [],
-      cluster: 'cluster',
-      database: 'database',
+      type: 'Table',
+      lineage_item_detail: {
+        cluster: 'cluster',
+        database: 'database',
+        name: 'table_name',
+        schema: 'schema',
+      },
       key: 'database://cluster.schema/table_name',
       level: 1,
-      name: 'table_name',
-      schema: 'schema',
       usage: 1398,
       parent: 'database://cluster.schema/parent_table_name',
     },
@@ -211,12 +214,15 @@ export const tableLineage: Lineage = {
   upstream_entities: [
     {
       badges: [],
-      cluster: 'cluster',
-      database: 'database',
+      type: 'Table',
+      lineage_item_detail: {
+        cluster: 'cluster',
+        database: 'database',
+        name: 'table_name',
+        schema: 'schema',
+      },
       key: 'database://cluster.schema/table_name',
       level: 1,
-      name: 'table_name',
-      schema: 'schema',
       usage: 1398,
       parent: 'database://cluster.schema/parent_table_name',
     },

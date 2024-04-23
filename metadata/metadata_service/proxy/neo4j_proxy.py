@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import ast
 import re
 import textwrap
 import time
+import json
 from random import randint
 from typing import (Any, Dict, Iterable, List, Optional, Tuple,  # noqa: F401
                     Union, no_type_check)
@@ -25,7 +27,7 @@ from amundsen_common.models.table import (Application, Badge, Column,
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.user import UserSchema
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare, SnowflakeListing
-from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File)
+from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable, ProspectusWaterfallScheme, ProspectusScheme)
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
@@ -2516,8 +2518,8 @@ class Neo4jProxy(BaseProxy):
     def _get_both_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
         get_both_lineage_query = textwrap.dedent(u"""
             MATCH (source:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity:{resource_label})
-            OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity:{resource_label})
+            OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+            OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
             WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
             OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
             OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
@@ -2526,59 +2528,118 @@ class Neo4jProxy(BaseProxy):
             END AS downstream_badges, CASE WHEN upstream_badge IS NULL THEN []
             ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
             END AS upstream_badges, upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath
-            OPTIONAL MATCH (downstream_entity:{resource_label})-[downstream_read:READ_BY]->(:User)
+            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
             WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
             downstream_badges, upstream_badges, sum(downstream_read.read_count) as downstream_read_count
-            OPTIONAL MATCH (upstream_entity:{resource_label})-[upstream_read:READ_BY]->(:User)
+            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
             WITH upstream_entity, downstream_entity, upstream_len, downstream_len,
             downstream_badges, upstream_badges, downstream_read_count,
             sum(upstream_read.read_count) as upstream_read_count, upath, dpath
             WITH CASE WHEN upstream_len IS NULL THEN []
             ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
-            key:upstream_entity.key, badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
+            key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
             END AS upstream_entities, CASE WHEN downstream_len IS NULL THEN []
             ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-            key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
+            key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
             END AS downstream_entities RETURN downstream_entities, upstream_entities
         """).format(depth=depth, resource_label=resource_type.name)
+        # get_both_lineage_query = textwrap.dedent(u"""
+        #     MATCH (source:{resource_label} {{key: $query_key}})
+        #     OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+        #     OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+        #     WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
+        #     OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+        #     OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+        #     WITH CASE WHEN downstream_badge IS NULL THEN []
+        #     ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
+        #     END AS downstream_badges, CASE WHEN upstream_badge IS NULL THEN []
+        #     ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
+        #     END AS upstream_badges, upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath
+        #     OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+        #     WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
+        #     downstream_badges, upstream_badges, sum(downstream_read.read_count) as downstream_read_count
+        #     OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+        #     WITH upstream_entity, downstream_entity, upstream_len, downstream_len,
+        #     downstream_badges, upstream_badges, downstream_read_count,
+        #     sum(upstream_read.read_count) as upstream_read_count, upath, dpath
+        #     WITH CASE WHEN upstream_len IS NULL THEN []
+        #     ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
+        #     key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
+        #     END AS upstream_entities, CASE WHEN downstream_len IS NULL THEN []
+        #     ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
+        #     key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
+        #     END AS downstream_entities RETURN downstream_entities, upstream_entities
+        # """).format(depth=depth, resource_label=resource_type.name)
         return get_both_lineage_query
 
     def _get_upstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
         get_upstream_lineage_query = textwrap.dedent(u"""
             MATCH (source:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity:{resource_label})
+            OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
             WITH upstream_entity, upstream_len, path
             OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
             WITH CASE WHEN upstream_badge IS NULL THEN []
             ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
             END AS upstream_badges, upstream_entity, upstream_len, path
-            OPTIONAL MATCH (upstream_entity:{resource_label})-[upstream_read:READ_BY]->(:User)
+            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
             WITH upstream_entity, upstream_len, upstream_badges,
             sum(upstream_read.read_count) as upstream_read_count, path
             WITH CASE WHEN upstream_len IS NULL THEN []
             ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
-            key:upstream_entity.key, badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
+            key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
             END AS upstream_entities RETURN upstream_entities
         """).format(depth=depth, resource_label=resource_type.name)
+        # get_upstream_lineage_query = textwrap.dedent(u"""
+        #     MATCH (source:{resource_label} {{key: $query_key}})
+        #     OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+        #     WITH upstream_entity, upstream_len, path
+        #     OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+        #     WITH CASE WHEN upstream_badge IS NULL THEN []
+        #     ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
+        #     END AS upstream_badges, upstream_entity, upstream_len, path
+        #     OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+        #     WITH upstream_entity, upstream_len, upstream_badges,
+        #     sum(upstream_read.read_count) as upstream_read_count, path
+        #     WITH CASE WHEN upstream_len IS NULL THEN []
+        #     ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
+        #     key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
+        #     END AS upstream_entities RETURN upstream_entities
+        # """).format(depth=depth, resource_label=resource_type.name)
         return get_upstream_lineage_query
 
     def _get_downstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
         get_downstream_lineage_query = textwrap.dedent(u"""
             MATCH (source:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity:{resource_label})
+            OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
             WITH downstream_entity, downstream_len, path
             OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
             WITH CASE WHEN downstream_badge IS NULL THEN []
             ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
             END AS downstream_badges, downstream_entity, downstream_len, path
-            OPTIONAL MATCH (downstream_entity:{resource_label})-[downstream_read:READ_BY]->(:User)
+            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
             WITH downstream_entity, downstream_len, downstream_badges,
             sum(downstream_read.read_count) as downstream_read_count, path
             WITH CASE WHEN downstream_len IS NULL THEN []
             ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-            key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
+            key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
             END AS downstream_entities RETURN downstream_entities
         """).format(depth=depth, resource_label=resource_type.name)
+        # get_downstream_lineage_query = textwrap.dedent(u"""
+        #     MATCH (source:{resource_label} {{key: $query_key}})
+        #     OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+        #     WITH downstream_entity, downstream_len, path
+        #     OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+        #     WITH CASE WHEN downstream_badge IS NULL THEN []
+        #     ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
+        #     END AS downstream_badges, downstream_entity, downstream_len, path
+        #     OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+        #     WITH downstream_entity, downstream_len, downstream_badges,
+        #     sum(downstream_read.read_count) as downstream_read_count, path
+        #     WITH CASE WHEN downstream_len IS NULL THEN []
+        #     ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
+        #     key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
+        #     END AS downstream_entities RETURN downstream_entities
+        # """).format(depth=depth, resource_label=resource_type.name)
         return get_downstream_lineage_query
 
     @timer_with_counter
@@ -2594,71 +2655,6 @@ class Neo4jProxy(BaseProxy):
         :return: The Lineage object with upstream & downstream lineage items
         """
 
-        # get_both_lineage_query = textwrap.dedent(u"""
-        # MATCH (source:{resource} {{key: $query_key}})
-        # OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity:{resource})
-        # OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity:{resource})
-        # WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
-        # OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
-        # OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
-        # WITH CASE WHEN downstream_badge IS NULL THEN []
-        # ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
-        # END AS downstream_badges, CASE WHEN upstream_badge IS NULL THEN []
-        # ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
-        # END AS upstream_badges, upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath
-        # OPTIONAL MATCH (downstream_entity:{resource})-[downstream_read:READ_BY]->(:User)
-        # WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
-        # downstream_badges, upstream_badges, sum(downstream_read.read_count) as downstream_read_count
-        # OPTIONAL MATCH (upstream_entity:{resource})-[upstream_read:READ_BY]->(:User)
-        # WITH upstream_entity, downstream_entity, upstream_len, downstream_len,
-        # downstream_badges, upstream_badges, downstream_read_count,
-        # sum(upstream_read.read_count) as upstream_read_count, upath, dpath
-        # WITH CASE WHEN upstream_len IS NULL THEN []
-        # ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
-        # key:upstream_entity.key, badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
-        # END AS upstream_entities, CASE WHEN downstream_len IS NULL THEN []
-        # ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-        # key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
-        # END AS downstream_entities RETURN downstream_entities, upstream_entities
-        # """).format(depth=depth, resource=resource_type.name)
-        # get_both_lineage_query = self._get_both_lineage_query_statement(resource_type, depth)
-
-        # get_upstream_lineage_query = textwrap.dedent(u"""
-        # MATCH (source:{resource} {{key: $query_key}})
-        # OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity:{resource})
-        # WITH upstream_entity, upstream_len, path
-        # OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
-        # WITH CASE WHEN upstream_badge IS NULL THEN []
-        # ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
-        # END AS upstream_badges, upstream_entity, upstream_len, path
-        # OPTIONAL MATCH (upstream_entity:{resource})-[upstream_read:READ_BY]->(:User)
-        # WITH upstream_entity, upstream_len, upstream_badges,
-        # sum(upstream_read.read_count) as upstream_read_count, path
-        # WITH CASE WHEN upstream_len IS NULL THEN []
-        # ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
-        # key:upstream_entity.key, badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
-        # END AS upstream_entities RETURN upstream_entities
-        # """).format(depth=depth, resource=resource_type.name)
-        # get_upstream_lineage_query = self._get_upstream_lineage_query_statement(resource_type, depth)
-
-        # get_downstream_lineage_query = textwrap.dedent(u"""
-        # MATCH (source:{resource} {{key: $query_key}})
-        # OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity:{resource})
-        # WITH downstream_entity, downstream_len, path
-        # OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
-        # WITH CASE WHEN downstream_badge IS NULL THEN []
-        # ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
-        # END AS downstream_badges, downstream_entity, downstream_len, path
-        # OPTIONAL MATCH (downstream_entity:{resource})-[downstream_read:READ_BY]->(:User)
-        # WITH downstream_entity, downstream_len, downstream_badges,
-        # sum(downstream_read.read_count) as downstream_read_count, path
-        # WITH CASE WHEN downstream_len IS NULL THEN []
-        # ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-        # key:downstream_entity.key, badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
-        # END AS downstream_entities RETURN downstream_entities
-        # """).format(depth=depth, resource=resource_type.name)
-        # get_downstream_lineage_query = self._get_downstream_lineage_query_statement(resource_type, depth)
-
         if direction == 'upstream':
             lineage_query = self._get_upstream_lineage_query_statement(resource_type, depth)
 
@@ -2672,11 +2668,12 @@ class Neo4jProxy(BaseProxy):
                                              param_dict={'query_key': id})
         result = get_single_record(records)
 
-        downstream_tables = []
-        upstream_tables = []
+        downstream_entities = []
+        upstream_entities = []
 
         for downstream in result.get("downstream_entities") or []:
-            downstream_tables.append(LineageItem(**{"key": downstream["key"],
+            downstream_entities.append(LineageItem(**{"key": downstream["key"],
+                                                    "type": downstream["label"],
                                                     "source": downstream["source"],
                                                     "level": downstream["level"],
                                                     "badges": self._make_badges(downstream["badges"]),
@@ -2685,7 +2682,8 @@ class Neo4jProxy(BaseProxy):
                                                     }))
 
         for upstream in result.get("upstream_entities") or []:
-            upstream_tables.append(LineageItem(**{"key": upstream["key"],
+            upstream_entities.append(LineageItem(**{"key": upstream["key"],
+                                                  "type": upstream["label"],
                                                   "source": upstream["source"],
                                                   "level": upstream["level"],
                                                   "badges": self._make_badges(upstream["badges"]),
@@ -2695,8 +2693,8 @@ class Neo4jProxy(BaseProxy):
 
         # ToDo: Add a root_entity as an item, which will make it easier for lineage graph
         return Lineage(**{"key": id,
-                          "upstream_entities": upstream_tables,
-                          "downstream_entities": downstream_tables,
+                          "upstream_entities": upstream_entities,
+                          "downstream_entities": downstream_entities,
                           "direction": direction, "depth": depth})
 
     def _create_watermarks(self, wmk_records: List) -> List[Watermark]:
@@ -3050,10 +3048,15 @@ class Neo4jProxy(BaseProxy):
         data_provider_query = textwrap.dedent("""
             MATCH (file:File {key: $file_key})
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
-            OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_LOCATION]->(data_location)
+            OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
             OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
-            WITH file, data_provider, data_channel, data_location
-            RETURN file, data_location, data_channel, data_provider
+            OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
+            OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+            OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
+            OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
+            OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
+            WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
         """)
         return data_provider_query
 
@@ -3068,47 +3071,20 @@ class Neo4jProxy(BaseProxy):
 
         record = get_single_record(records)
 
-        LOGGER.info(f"record={record}")
-
-        # data_channels = []
-        # for rec in record.get("data_channels", None):
-        #     LOGGER.info(f"rec={rec}")
-        #     data_channel_rec = rec["data_channel"]
-        #     LOGGER.info(f"data_channel_rec={data_channel_rec}")
-        #     data_locations = []
-        #     for data_location_rec in rec.get("data_locations", None):
-        #         LOGGER.info(f"data_location_rec={data_location_rec}")
-        #         type = data_location_rec.get("type", None)
-        #         if "aws_s3" == type:
-        #             data_location = AwsS3DataLocation(name=data_location_rec["name"],
-        #                                                 key=data_location_rec["key"],
-        #                                                 type=type,
-        #                                                 bucket=data_location_rec["bucket"])
-        #         elif "filesystem" == type:
-        #             data_location = FilesystemDataLocation(name=data_location_rec["name"],
-        #                                                     key=data_location_rec["key"],
-        #                                                     type=type,
-        #                                                     drive=data_location_rec["drive"])
-        #         else:
-        #             data_location = DataLocation(name=data_location_rec["name"],
-        #                                             key=data_location_rec["key"],
-        #                                             type=type)
-
-        #         data_locations.append(data_location)
-
-        #     data_channel = DataChannel(name=data_channel_rec["name"],
-        #                                 key=data_channel_rec["key"],
-        #                                 description=data_channel_rec.get("description", None),
-        #                                 license=data_channel_rec.get("license", None),
-        #                                 type=data_channel_rec["type"],
-        #                                 url=data_channel_rec.get("url", None),
-        #                                 data_locations=data_locations)
-        #     data_channels.append(data_channel)
+        # LOGGER.info(f"record={record}")
 
         data_location_rec = record.get("data_location", None)
         data_location: DataLocation = None
         if data_location_rec:
             data_location = self._get_data_location(data_location_rec)
+
+        data_provider_rec = record.get("data_provider", None)
+        data_provider: DataProvider = None
+        if data_provider_rec:
+            data_provider = DataProvider(name=data_provider_rec["name"],
+                                        key=data_provider_rec["key"],
+                                        description=data_provider_rec.get("desc", None),
+                                        website=data_provider_rec.get("website", None))
 
         data_channel_rec = record.get("data_channel", None)
         data_channel: DataChannel = None
@@ -3119,26 +3095,88 @@ class Neo4jProxy(BaseProxy):
                                         license=data_channel_rec.get("license", None),
                                         type=data_channel_rec["type"],
                                         url=data_channel_rec.get("url", None),
-                                        data_locations=([data_location] if data_location else []))
+                                        dataProvider=data_provider)
 
-        data_provider_rec = record.get("data_provider", None)
-        data_provider: DataProvider = None
-        if data_provider_rec:
-            data_provider = DataProvider(name=data_provider_rec["name"],
-                                        key=data_provider_rec["key"],
-                                        description=data_provider_rec.get("desc", None),
-                                        website=data_provider_rec.get("website", None),
-                                        data_channels=([data_channel] if data_channel else []))
+        tags = []
+        tag_records = record['tags']
+        if tag_records:
+            for tag_record in tag_records:
+                tag = Tag(tag_name=tag_record['key'],
+                          tag_type=tag_record['tag_type'])
+                tags.append(tag)
+
+        file_tables_rec = record.get("file_tables", None)
+        file_tables: List[FileTable] = None
+        if file_tables_rec and len(file_tables_rec) > 0:
+            file_tables: List[FileTable] = []
+            for file_table_rec in file_tables_rec:
+                file_table = FileTable(name=file_table_rec["name"],
+                                       content=file_table_rec["content"])
+                file_tables.append(file_table)
+
+        prospectus_waterfall_schemes_rec = record.get("prospectus_waterfall_schemes", None)
+        prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = None
+        if prospectus_waterfall_schemes_rec and len(prospectus_waterfall_schemes_rec) > 0:
+            prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = []
+            for prospectus_waterfall_scheme_rec in prospectus_waterfall_schemes_rec:
+
+                schemes = prospectus_waterfall_scheme_rec["scheme"]
+                schemes = ast.literal_eval(schemes)
+
+                prospectus_schemes: List[ProspectusScheme] = None
+                if schemes and len(schemes) > 0:
+                    prospectus_schemes: List[ProspectusScheme] = []
+                    for scheme in schemes:
+                        short_name, details = next(iter(scheme.items()))
+                        prospectus_scheme = ProspectusScheme(shortName=short_name,
+                                                             details=details)
+                        prospectus_schemes.append(prospectus_scheme)
+
+                prospectus_waterfall_scheme = ProspectusWaterfallScheme(name=prospectus_waterfall_scheme_rec["name"],
+                                                                        scheme=prospectus_schemes)
+                prospectus_waterfall_schemes.append(prospectus_waterfall_scheme)
+
+        owners = self._create_owners(record['owners'])
 
         file_rec = record["file"]
         file = File(name=file_rec["name"],
                     key=file_rec["key"],
-                    description=file_rec.get("desc", None),
+                    description=self._safe_get(record, "file_desc", "description"),
                     type=file_rec.get("type", None),
+                    category=file_rec.get("category", None),
                     path=file_rec.get("path", None),
                     is_directory=file_rec.get("is_directory", None),
-                    data_location=data_location,
-                    data_channel=data_channel,
-                    data_provider=data_provider)
+                    dataLocation=data_location,
+                    dataChannel=data_channel,
+                    tags=tags,
+                    owners=owners,
+                    fileTables=file_tables,
+                    prospectusWaterfallSchemes=prospectus_waterfall_schemes)
 
         return file
+
+    @timer_with_counter
+    def get_file_description(self, *,
+                             id: str) -> Description:
+        """
+        Get the file description based on dashboard uri. Any exception will propagate back to api server.
+
+        :param id:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.File, uri=id)
+
+    @timer_with_counter
+    def put_file_description(self, *,
+                             id: str,
+                             description: str) -> None:
+        """
+        Update Dashboard description
+        :param id: Dashboard URI
+        :param description: new value for Dashboard description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.File,
+                                      uri=id,
+                                      description=description)

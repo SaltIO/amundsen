@@ -80,7 +80,7 @@ describe('LineageButton', () => {
     });
 
     it('renders correctly', () => {
-      const builderSpy = jest.spyOn(NavigationUtils, 'buildLineageURL');
+      const builderSpy = jest.spyOn(NavigationUtils, 'buildTableLineageURL');
       const { props, wrapper } = setup();
 
       expect(builderSpy).toHaveBeenCalledWith(props.tableData);

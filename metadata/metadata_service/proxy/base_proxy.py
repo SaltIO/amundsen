@@ -285,3 +285,15 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def get_file(self, *, file_uri: str) -> File:
         pass
+
+    @abstractmethod
+    def get_file_description(self, *,
+                             id: str) -> Union[str, None]:
+        pass
+
+    @abstractmethod
+    def put_file_description(self, *,
+                             id: str,
+                             description: str) -> None:
+        pass
+

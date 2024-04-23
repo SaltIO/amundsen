@@ -12,9 +12,7 @@ import { STATUS_CODES } from '../constants';
 
 const sharedLineageItemCore = {
   badges: [],
-  cluster: 'cluster',
-  database: 'h',
-  schema: 'schema',
+  type: 'Table',
   source: 'source',
   usage: 0,
 };
@@ -261,9 +259,16 @@ const globalState: GlobalState = {
       badges: [],
       key: '',
       name: '',
+      type: '',
+      path: '',
+      category: '',
       description: '',
       is_editable: true
-    }
+    },
+    fileOwners: {
+      isLoading: true,
+      owners: {},
+    },
   },
   providerMetadata: {
     isLoading: true,
@@ -411,21 +416,36 @@ const globalState: GlobalState = {
           ...sharedLineageItemCore,
           key: 'h/parent-3',
           level: 3,
-          name: 'parent-3',
+          lineage_item_detail: {
+            name: 'parent-3',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: '',
         },
         {
           ...sharedLineageItemCore,
           key: 'h/parent-1',
           level: 1,
-          name: 'parent-1',
+          lineage_item_detail: {
+            name: 'parent-1',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: 'h/parent-2-solo',
         },
         {
           ...sharedLineageItemCore,
           key: 'h/parent-1',
           level: 1,
-          name: 'parent-1',
+          lineage_item_detail: {
+            name: 'parent-1',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: 'h/parent-2',
         },
 
@@ -433,14 +453,24 @@ const globalState: GlobalState = {
           ...sharedLineageItemCore,
           key: 'h/parent-2',
           level: 2,
-          name: 'parent-2',
+          lineage_item_detail: {
+            name: 'parent-2',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: 'h/parent-3',
         },
         {
           ...sharedLineageItemCore,
           key: 'h/parent-2-solo',
           level: 2,
-          name: 'parent-2-solo',
+          lineage_item_detail: {
+            name: 'parent-2-solo',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: '',
         },
       ] as LineageItem[],

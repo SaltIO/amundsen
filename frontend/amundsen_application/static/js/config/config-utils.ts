@@ -13,6 +13,7 @@ import {
   TourConfig,
   HomePageWidgetsConfig,
   TableLineageConfig,
+  FileLineageConfig,
   DateFormatConfig,
 } from './config-types';
 
@@ -224,9 +225,9 @@ export function getIconNotRequiredStatTypes(): string[] | undefined {
  * use DefaultBadgeStyle.DEFAULT and badge name as display name.
  */
 export function getBadgeConfig(badgeName: string): BadgeStyleConfig {
-  console.log(`badgename=${badgeName}`);
-  console.log(`AppConfig.badges`);
-  console.log(AppConfig.badges);
+  // console.log(`badgename=${badgeName}`);
+  // console.log(`AppConfig.badges`);
+  // console.log(AppConfig.badges);
   const config: object = AppConfig.badges[badgeName] || {};
 
   return {
@@ -598,6 +599,13 @@ export function isColumnListLineageEnabled() {
 }
 
 /**
+ * Returns whether the eagleye ui are enabled
+ */
+export function isEagleyeEnabled() {
+  return AppConfig.eagleye.isEnabled;
+}
+
+/**
  * Returns whether the in-app column lineage page is enabled.
  */
 export function isColumnLineagePageEnabled() {
@@ -609,6 +617,13 @@ export function isColumnLineagePageEnabled() {
  */
 export function getTableLineageConfiguration(): TableLineageConfig {
   return AppConfig.tableLineage;
+}
+
+/**
+ * Returns fileLineage configuration
+ */
+export function getFileLineageConfiguration(): FileLineageConfig {
+  return AppConfig.fileLineage;
 }
 
 /**
@@ -637,6 +652,34 @@ export function getTableLineageDisableAppListLinks() {
  */
 export function getTableLineageDefaultDepth() {
   return AppConfig.tableLineage.defaultLineageDepth;
+}
+
+/**
+ * Returns whether the in-app table lineage list is enabled.
+ */
+export function isFileListLineageEnabled() {
+  return AppConfig.fileLineage.inAppListEnabled;
+}
+
+/**
+ * Returns whether the in-app table lineage page is enabled.
+ */
+export function isFileLineagePageEnabled() {
+  return AppConfig.fileLineage.inAppPageEnabled;
+}
+
+/**
+ * Returns disableAppListLinks configuration for table lineage.
+ */
+export function getFileLineageDisableAppListLinks() {
+  return AppConfig.fileLineage.disableAppListLinks;
+}
+
+/**
+ * Returns the depth of lineage you should see in the lineage page
+ */
+export function getFileLineageDefaultDepth() {
+  return AppConfig.fileLineage.defaultLineageDepth;
 }
 
 /**

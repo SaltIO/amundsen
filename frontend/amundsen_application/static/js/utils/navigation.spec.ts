@@ -145,7 +145,7 @@ describe('navigation', () => {
     });
   });
 
-  describe('buildLineageURL', () => {
+  describe('buildTableLineageURL', () => {
     it('builds a path to the lineage page from table metadata', () => {
       const mockMetadata = {
         cluster: 'cluster',
@@ -154,7 +154,7 @@ describe('navigation', () => {
         name: 'name',
       };
       const expected = `/lineage/table/cluster/database/schema/name`;
-      const actual = NavigationUtils.buildLineageURL(mockMetadata);
+      const actual = NavigationUtils.buildTableLineageURL(mockMetadata);
 
       expect(actual).toEqual(expected);
     });

@@ -45,6 +45,7 @@ const configDefault: AppConfig = {
   },
   editableText: {
     tableDescLength: 750,
+    fileDescLength: 750,
     columnDescLength: 250,
   },
   analytics: {
@@ -551,6 +552,62 @@ const configDefault: AppConfig = {
           type: FilterType.INPUT_SELECT,
         },
         {
+          categoryId: 'type',
+          displayName: 'Type',
+          helpText:
+            'Enter one or more comma separated values with exact file types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'category',
+          displayName: 'Category',
+          helpText:
+            'Enter one or more comma separated values with exact file categories or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_location_type',
+          displayName: 'Location Type',
+          helpText:
+            'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_location_name',
+          displayName: 'Location Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_type',
+          displayName: 'Channel Type',
+          helpText:
+            'Enter one or more comma separated values with exact data location types or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_name',
+          displayName: 'Channel Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_channel_license',
+          displayName: 'License',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'data_provider_name',
+          displayName: 'Provider Name',
+          helpText:
+            'Enter one or more comma separated values with exact data location names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
           categoryId: 'tag',
           displayName: 'Tag',
           helpText:
@@ -566,6 +623,9 @@ const configDefault: AppConfig = {
   searchPagination: {
     resultsPerPage: 10,
   },
+  eagleye: {
+    isEnabled: false
+  },
   tableLineage: {
     defaultLineageDepth: 5,
     externalEnabled: false,
@@ -580,6 +640,22 @@ const configDefault: AppConfig = {
       table: string
     ) =>
       `https://DEFAULT_LINEAGE_URL?schema=${schema}&cluster=${cluster}&db=${database}&table=${table}`,
+  },
+  fileLineage: {
+    defaultLineageDepth: 5,
+    inAppListEnabled: true,
+    inAppPageEnabled: true,
+    externalEnabled: false,
+    iconPath: 'PATH_TO_ICON',
+    isBeta: false,
+    urlGenerator: (
+      data_location_type: string,
+      data_location_name: string,
+      data_location_container: string,
+      type: string,
+      name: string
+    ) =>
+      `https://DEFAULT_LINEAGE_URL?data_location_type=${data_location_type}&data_location_name=${data_location_name}&data_location_container=${data_location_container}&type=${type}&name=${name}`,
   },
   tableProfile: {
     exploreUrlGenerator: (

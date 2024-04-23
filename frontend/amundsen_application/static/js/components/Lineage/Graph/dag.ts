@@ -5,7 +5,7 @@ import { drag } from 'd3-drag';
 import { zoom } from 'd3-zoom';
 import { SimulationNodeDatum } from 'd3-force';
 
-import { Lineage, LineageItem } from 'interfaces';
+import { Lineage, LineageItem, TableLineageItemDetail, FileLineageItemDetail } from 'interfaces';
 import {
   ANIMATION_DURATION,
   CHART_DEFAULT_DIMENSIONS,
@@ -17,7 +17,7 @@ import {
   UPSTREAM_LABEL_OFFSET,
 } from './constants';
 import { Coordinates, Dimensions, Labels, TreeLineageNode } from './types';
-import { getLink } from 'components/ResourceListItem/TableListItem';
+
 
 interface D3LineageItem extends LineageItem {
   direction?: string | 'upstream' | 'downstream' | 'root';
@@ -47,18 +47,60 @@ export const hasLineageData = (lineage: Lineage) =>
 /**
  * Returns the link to the table
  */
-const getTableDetailLink = (d) =>
-  `/table_detail/${d.cluster}/${d.database}/${d.schema}/${d.name}`
+function getResourceDetailLink(d: LineageItem): string {
+    if (d.type == 'Table') {
+        return getTableDetailLink(d);
+    }
+    else if (d.type == 'File') {
+        return getFileDetailLink(d);
+    }
+    else {
+        return '#';
+    }
+}
 
-const getSearchLink = (d) =>
-  `/search?resource=table&index=0&filters=${encodeURIComponent(`{"schema":{"value":"${d.schema}"},"cluster":{"value":"${d.cluster}"}}`)}`;
-  // https://wilcox.cmdrvl.com/search?resource=table&index=0&filters=%7B%22schema%22%3A%7B%22value%22%3A%22staging_wilcox%22%7D%2C%22database%22%3A%7B%22value%22%3A%22Snowflake%22%7D%7D
+const getTableDetailLink = (d) =>
+    `/table_detail/${(d.lineage_item_detail as TableLineageItemDetail).cluster}/${(d.lineage_item_detail as TableLineageItemDetail).database}/${(d.lineage_item_detail as TableLineageItemDetail).schema}/${(d.lineage_item_detail as TableLineageItemDetail).name}`
+
+const getFileDetailLink = (d) =>
+    // `/file_detail/${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_container}/${(d.lineage_item_detail as FileLineageItemDetail).type}/${(d.lineage_item_detail as FileLineageItemDetail).name}`
+    `/file_detail/${encodeURIComponent((d.lineage_item_detail as FileLineageItemDetail).data_location_type+'://'+(d.lineage_item_detail as FileLineageItemDetail).data_location_name+'/'+(d.lineage_item_detail as FileLineageItemDetail).data_location_container+'/'+(d.lineage_item_detail as FileLineageItemDetail).type+'/'+(d.lineage_item_detail as FileLineageItemDetail).name)}`
+
+function getSearchLink(d: LineageItem) {
+    if (d.type == 'Table') {
+        return `/search?resource=${d.type.toLowerCase()}&index=0&filters=${encodeURIComponent(`{"schema":{"value":"${(d.lineage_item_detail as TableLineageItemDetail).schema}"},"cluster":{"value":"${(d.lineage_item_detail as TableLineageItemDetail).cluster}"}}`)}`;
+    }
+    else if (d.type == 'File') {
+        return `/search?resource=${d.type.toLowerCase()}&index=0&filters=${encodeURIComponent(`{"data_location_name":{"value":"${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}"},"data_location_type":{"value":"${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}"}}`)}`;
+    }
+}
+
+function getSearchLinkText(d: LineageItem) {
+    if (d.type == 'Table') {
+        return `${(d.lineage_item_detail as TableLineageItemDetail).cluster}.${(d.lineage_item_detail as TableLineageItemDetail).schema}`;
+    }
+    else if (d.type == 'File') {
+        return `${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}.${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}`;
+    }
+    else {
+        return '#'
+    }
+}
 
 function toD3LineageItem(item: LineageItem): D3LineageItem {
   return {
     ...item
     // You can add any default fx, fy values if needed here.
   };
+}
+
+function getTitle(d: LineageItem) {
+    if (d.type == 'Table') {
+        return `${(d.lineage_item_detail as TableLineageItemDetail).cluster}.${(d.lineage_item_detail as TableLineageItemDetail).schema}.${(d.lineage_item_detail as TableLineageItemDetail).name}`;
+    }
+    else if (d.type == 'File') {
+        return `${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}.${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}..${(d.lineage_item_detail as FileLineageItemDetail).name}`;
+    }
 }
 
 const renderLabels = (
@@ -154,30 +196,6 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
 
         rootNode.fx = rootX;
         rootNode.fy = rootY;
-
-        // nodes.forEach(node => {
-        //     const yPosition = rootY + (node.level * levelGap);
-        //     const xPosition = rootX + (node.level * nodeGap);
-        //     node.x = xPosition;
-        //     node.y = yPosition;
-        //     node.fy = node.y;  // Fixing the y-coordinate for each node
-        // });
-
-        // Upstream/Downstream Top/Bottom
-        // nodes.forEach(node => {
-        //     let yPosition;
-        //     if (node.direction === 'upstream') {
-        //         yPosition = rootY - (node.level * levelGap);
-        //     } else if (node.direction === 'downstream') {
-        //         yPosition = rootY + (node.level * levelGap);
-        //     } else {
-        //         yPosition = rootY;  // For the rootNode itself
-        //     }
-        //     const xPosition = rootX + (node.level * nodeGap);
-        //     node.x = xPosition;
-        //     node.y = yPosition;
-        //     node.fy = node.y;  // Fixing the y-coordinate for each node
-        // });
 
         // Upstream/Downstream Left/Right
         nodes.forEach(node => {
@@ -287,16 +305,6 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
                 .on("drag", dragged)
                 .on("end", dragended));
 
-        // Adding the anchor element
-        // const nodeTableDetailsAnchor = nodeGroup.append("a")
-        //     .attr("xlink:href", function(d){ return getTableDetailLink(d) })
-            // .attr("target", "_blank"); // Opens link in new tab
-
-        // const nodeSearchAnchor = nodeGroup.append("a")
-        //     .attr("xlink:href", function(d){ return getSearchLink(d) })
-            // .attr("target", "_blank"); // Opens link in new tab
-
-        // const nodeRect = nodeTableDetailsAnchor.append("rect")
         const nodeRect = nodeGroup.append("rect")
             .attr("rx", 5) // rounded corners
             .attr("ry", 5)
@@ -313,26 +321,35 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
             .style("stroke", d => d.key === rootNode.key ? "#DEFF2D" : "black");
 
         nodeLabel.append("a")
-            .attr("xlink:href", function(d){ return getSearchLink(d) })
-            .append("tspan")
+            .attr("xlink:href", function(d){ return getSearchLink(d) ?? '#' }).append("tspan")
             .attr("x", textMargin)
             .attr("dy", "10")
             .style("fill", d => d.key === rootNode.key ? "#DEFF2D" : "black")
             .style("stroke", d => d.key === rootNode.key ? "#DEFF2D" : "black")
-            .text((d: D3LineageItem) => `${d.cluster}.${d.schema}`)
+            .text(function(d){ return getSearchLinkText(d) ?? '' })
             .each(function() {
                 truncateText(select(this), nodeRectWidth - 2 * textMargin);
             });
 
         nodeLabel.append("a")
-            .attr("xlink:href", function(d){ return getTableDetailLink(d) }).append("tspan")
+            .attr("xlink:href", function(d ){ return getResourceDetailLink(d) ?? '#' }).append("tspan")
             .attr("x", textMargin)
             .attr("dy", "20")
             .style("font-weight", "bold") // Making the name bold
             .style("font-size", "18px") // Larger font size
             .style("fill", d => d.key === rootNode.key ? "#DEFF2D" : "black")
             .style("stroke", d => d.key === rootNode.key ? "#DEFF2D" : "black")
-            .text((d: D3LineageItem) => d.name)
+            .text(function(d) {
+                if (d.type == 'Table') {
+                    return (d.lineage_item_detail as TableLineageItemDetail).name;
+                }
+                else if (d.type == 'File') {
+                    return (d.lineage_item_detail as FileLineageItemDetail).name;
+                }
+                else {
+                    return '#';
+                }
+            })
             .each(function() {
                 truncateText(select(this), nodeRectWidth - 2 * textMargin);
             });
@@ -344,17 +361,17 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
             .attr("height", nodeRectHeight);  // Using full height to test
         nodeLabel.attr("clip-path", "url(#clip-rect)");
 
-        const nodeTitle = nodeGroup.append("title").text((d: D3LineageItem) => `${d.cluster}.${d.schema}.${d.name}`);
-
-        // simulation.on("tick", () => {
-        //     link
-        //         .attr("x1", (d: any) => d.source.x)
-        //         .attr("y1", (d: any) => d.source.y)
-        //         .attr("x2", (d: any) => d.target.x)
-        //         .attr("y2", (d: any) => d.target.y);
-
-        //     nodeGroup.attr("transform", d => `translate(${d.x}, ${d.y})`);
-        // });
+        const nodeTitle = nodeGroup.append("title").text(function(d) {
+            if (d.type == 'Table') {
+                return `${(d.lineage_item_detail as TableLineageItemDetail).cluster}.${(d.lineage_item_detail as TableLineageItemDetail).schema}.${(d.lineage_item_detail as TableLineageItemDetail).name}`;
+            }
+            else if (d.type == 'File') {
+                return `${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}.${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}.${(d.lineage_item_detail as FileLineageItemDetail).name}`;
+            }
+            else {
+                return '';
+            }
+        });
 
         simulation.on("tick", () => {
             link.attr("d", (d: any) => {

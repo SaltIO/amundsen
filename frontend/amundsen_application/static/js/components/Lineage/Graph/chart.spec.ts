@@ -25,13 +25,16 @@ import { TreeLineageItem } from './types';
 
 const item: LineageItem = {
   badges: [],
-  cluster: 'cluster',
-  database: 'database',
+  type: 'Table',
+  lineage_item_detail: {
+    cluster: 'cluster',
+    database: 'database',
+    schema: 'schema',
+    name: 'table',
+  },
   key: 'h/root',
   level: 0,
-  name: 'table',
   parent: null,
-  schema: 'schema',
   usage: null,
 };
 

@@ -3,6 +3,7 @@ import axios, { AxiosResponse } from 'axios';
 import { ResourceType, Tag } from 'interfaces';
 import { GetDashboardAPI } from 'ducks/dashboard/api/v0';
 import { GetFeatureAPI } from 'ducks/feature/api/v0';
+import { FileDataAPI } from 'ducks/fileMetadata/api/v0';
 import { API_PATH, TableDataAPI } from 'ducks/tableMetadata/api/v0';
 import { sortTagsAlphabetical } from 'ducks/utilMethods';
 
@@ -34,6 +35,13 @@ export function getResourceTags(resourceType, uriKey: string) {
         (response.data.featureData.tags || []).sort(sortTagsAlphabetical)
       );
   }
+  if (resourceType === ResourceType.file) {
+    return axios
+      .get(`${API_PATH}/file?key=${uriKey}`)
+      .then((response: AxiosResponse<FileDataAPI>) =>
+        (response.data.fileData.tags || []).sort(sortTagsAlphabetical)
+      );
+  }
 
   return axios
     .get(`${API_PATH}/table?key=${uriKey}`)
@@ -53,6 +61,7 @@ export function updateResourceTag(
     [ResourceType.table]: `${API_PATH}/update_table_tags`,
     [ResourceType.dashboard]: `${API_PATH}/update_dashboard_tags`,
     [ResourceType.feature]: `${API_PATH}/update_feature_tags`,
+    [ResourceType.file]: `${API_PATH}/update_file_tags`,
   };
   const url = updateTagEndpointMap[resourceType];
 

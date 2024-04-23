@@ -16,6 +16,8 @@ import {
   LineagePageProps,
   mapDispatchToProps,
   mapStateToProps,
+  MatchTableProps,
+  MatchFileProps
 } from './index';
 
 import { STATUS_CODES } from '../../constants';
@@ -38,33 +40,40 @@ describe('LineagePage', () => {
       table: 'table',
     });
 
-    const props: LineagePageProps & RouteComponentProps<any> = {
+    const props: LineagePageProps & RouteComponentProps<MatchTableProps|MatchFileProps> = {
       isLoading: false,
       statusCode: STATUS_CODES.OK,
       tableLineageGet: jest.fn(),
+      fileLineageGet: jest.fn(),
       lineageTree: {
         downstream_entities: [
           {
             badges: [],
-            cluster: 'gold',
-            database: 'hive',
+            type: 'Table',
+            lineage_item_detail: {
+              cluster: 'gold',
+              database: 'hive',
+              name: 'test_table3',
+              schema: 'test_schema',
+            },
             key: 'hive://gold.test_schema/test_table3',
             level: 1,
-            name: 'test_table3',
             parent: 'dynamo://gold.test_schema/test_table2',
-            schema: 'test_schema',
             source: 'hive',
             usage: 0,
           },
           {
             badges: [],
-            cluster: 'gold',
-            database: 'hive',
+            type: 'Table',
+            lineage_item_detail: {
+              cluster: 'gold',
+              database: 'hive',
+              name: "test's_table4",
+              schema: 'test_schema',
+            },
             key: "hive://gold.test_schema/test's_table4",
             level: 1,
-            name: "test's_table4",
             parent: 'dynamo://gold.test_schema/test_table2',
-            schema: 'test_schema',
             source: 'hive',
             usage: 0,
           },
@@ -77,13 +86,16 @@ describe('LineagePage', () => {
                 category: 'table_status',
               },
             ],
-            cluster: 'gold',
-            database: 'hive',
+            type: 'Table',
+            lineage_item_detail: {
+              cluster: 'gold',
+              database: 'hive',
+              name: 'test_table1',
+              schema: 'test_schema',
+            },
             key: 'hive://gold.test_schema/test_table1',
             level: 1,
-            name: 'test_table1',
             parent: 'dynamo://gold.test_schema/test_table2',
-            schema: 'test_schema',
             source: 'hive',
             usage: 1330,
           },

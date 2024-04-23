@@ -3,6 +3,7 @@ import { UpdateTagData, Tag, ResourceType } from 'interfaces';
 import { GetDashboard, GetDashboardResponse } from 'ducks/dashboard/types';
 import { GetFeature, GetFeatureResponse } from 'ducks/feature/types';
 import { GetTableData, GetTableDataResponse } from 'ducks/tableMetadata/types';
+import { GetFileData, GetFileDataResponse } from 'ducks/fileMetadata/types';
 
 import {
   GetAllTags,
@@ -106,6 +107,7 @@ export default function reducer(
       };
 
     case GetTableData.REQUEST:
+    case GetFileData.REQUEST:
     case GetDashboard.REQUEST:
     case GetFeature.REQUEST:
       return {
@@ -123,6 +125,15 @@ export default function reducer(
           ...state.resourceTags,
           isLoading: false,
           tags: (<GetTableDataResponse>action).payload.tags,
+        },
+      };
+    case GetFileData.SUCCESS:
+      return {
+        ...state,
+        resourceTags: {
+          ...state.resourceTags,
+          isLoading: false,
+          tags: (<GetFileDataResponse>action).payload.tags,
         },
       };
     case GetDashboard.SUCCESS:
@@ -144,6 +155,7 @@ export default function reducer(
         },
       };
     case GetTableData.FAILURE:
+    case GetFileData.FAILURE:
     case GetDashboard.FAILURE:
     case GetFeature.FAILURE:
       return {

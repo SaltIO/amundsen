@@ -42,6 +42,7 @@ import {
 
 describe('fileMetadata ducks', () => {
   let expectedData: FileMetadata;
+  let expectedOwners: { [id: string]: User };
   let expectedTags: Tag[];
   let expectedStatus: number;
   let mockSuccess;
@@ -49,11 +50,18 @@ describe('fileMetadata ducks', () => {
   let testKey: string;
   let testIndex: string;
   let testSource: string;
-  let columnKey: string;
   let newDescription: string;
 
   beforeAll(() => {
     expectedData = globalState.fileMetadata.fileData;
+    expectedOwners = {
+      testId: {
+        display_name: 'test',
+        profile_url: 'test.io',
+        email: 'test@test.com',
+        user_id: 'testId',
+      },
+    };
     expectedTags = [
       { tag_count: 2, tag_name: 'test' },
       { tag_count: 1, tag_name: 'test2' },
@@ -87,20 +95,23 @@ describe('fileMetadata ducks', () => {
 
       expect(action.type).toBe(GetFileData.FAILURE);
       expect(payload.data).toBe(initialFileDataState);
+      expect(payload.owners).toEqual({});
       expect(payload.statusCode).toBe(STATUS_CODES.INTERNAL_SERVER_ERROR);
       expect(payload.tags).toEqual([]);
     });
 
     it('getFileDataSuccess - returns the action to process success', () => {
       const action = getFileDataSuccess(
-        expectedData,
         expectedStatus,
-        expectedTags
+        expectedData,
+        expectedOwners,
+        expectedTags,
       );
       const { payload } = action;
 
       expect(action.type).toBe(GetFileData.SUCCESS);
       expect(payload.data).toBe(expectedData);
+      expect(payload.owners).toEqual(expectedOwners);
       expect(payload.statusCode).toBe(expectedStatus);
       expect(payload.tags).toEqual(expectedTags);
     });
@@ -191,6 +202,7 @@ describe('fileMetadata ducks', () => {
       it('executes flow for getting file data', () => {
         const mockResult = {
           data: expectedData,
+          owners: expectedOwners,
           statusCode: expectedStatus,
           tags: expectedTags,
         };
@@ -204,8 +216,9 @@ describe('fileMetadata ducks', () => {
           .next(mockResult)
           .put(
             getFileDataSuccess(
-              expectedData,
               expectedStatus,
+              expectedData,
+              expectedOwners,
               expectedTags
             )
           )
