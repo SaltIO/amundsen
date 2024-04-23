@@ -64,7 +64,7 @@ const getTableDetailLink = (d) =>
 
 const getFileDetailLink = (d) =>
     // `/file_detail/${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_container}/${(d.lineage_item_detail as FileLineageItemDetail).type}/${(d.lineage_item_detail as FileLineageItemDetail).name}`
-    `/file_detail/${encodeURIComponent((d.lineage_item_detail as FileLineageItemDetail).data_location_type+'/'+(d.lineage_item_detail as FileLineageItemDetail).data_location_name+'/'+(d.lineage_item_detail as FileLineageItemDetail).data_location_container+'/'+(d.lineage_item_detail as FileLineageItemDetail).type+'/'+(d.lineage_item_detail as FileLineageItemDetail).name)}`
+    `/file_detail/${encodeURIComponent((d.lineage_item_detail as FileLineageItemDetail).data_location_type+'://'+(d.lineage_item_detail as FileLineageItemDetail).data_location_name+'/'+(d.lineage_item_detail as FileLineageItemDetail).data_location_container+'/'+(d.lineage_item_detail as FileLineageItemDetail).type+'/'+(d.lineage_item_detail as FileLineageItemDetail).name)}`
 
 function getSearchLink(d: LineageItem) {
     if (d.type == 'Table') {

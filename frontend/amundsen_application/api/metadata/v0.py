@@ -1087,10 +1087,18 @@ def get_file_lineage() -> Response:
         url = f'{file_endpoint}/{file_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
-        upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
-        downstream_count = json.get('downstream_count')
-        upstream_count = json.get('upstream_count')
+
+        downstream = []
+        upstream = []
+        downstream_count = 0
+        upstream_count = 0
+        if json is not None:
+            if 'downstream_entities' in json:
+                downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
+                downstream_count = json.get('downstream_count')
+            if 'upstream_entities' in json:
+                upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
+                upstream_count = json.get('upstream_count')
 
         payload = {
             'downstream_entities': downstream,
@@ -1100,6 +1108,7 @@ def get_file_lineage() -> Response:
         }
         return make_response(jsonify(payload), 200)
     except Exception as e:
+        LOGGER.exception(e)
         payload = jsonify({'msg': 'Encountered exception: ' + str(e)})
         return make_response(payload, HTTPStatus.INTERNAL_SERVER_ERROR)
 
