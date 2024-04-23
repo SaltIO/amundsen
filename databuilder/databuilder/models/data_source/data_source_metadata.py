@@ -14,8 +14,8 @@ from databuilder.models.description_metadata import (  # noqa: F401
 from databuilder.models.table_metadata import TagMetadata
 
 
-def convert_to_uri_safe_str(input_string: str) -> str:
-    return re.sub(r'\W+', '_', input_string).lower()
+# def convert_to_uri_safe_str(input_string: str) -> str:
+#     return re.sub(r'\W+', '_', input_string).lower()
 
 def _format_as_list(tags: Union[List, str, None]) -> List:
     if tags is None:
@@ -477,3 +477,127 @@ class File(GraphSerializable):
     def get_key(self) -> str:
         # return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"
         return f"{self.data_location.get_key()}/{self.type}/{self.name}"
+
+class FileTable(GraphSerializable):
+
+    FILE_TABLE_NODE_LABEL = 'File_Table'
+    FILE_TABLE_NODE_ATTR_NAME = 'name'
+    FILE_TABLE_NODE_ATTR_CONTENT = 'content'
+
+    FILE_TABLE_RELATION_TYPE = 'FILE_TABLE'
+    FILE_TABLE_OF_RELATION_TYPE = 'FILE_TABLE_OF'
+
+    def __init__(self,
+                 name: str,
+                 content: str,
+                 file: File,
+                 ) -> None:
+
+        self.name = name
+        self.content = content
+        self.file = file
+
+        self._node_iter = self._create_node_iterator()
+        self._relation_iter = self._create_relation_iterator()
+
+    def __repr__(self) -> str:
+        return f'FileTable({self.name!r}, {self.content!r})'
+
+    def create_next_node(self) -> Optional[GraphNode]:
+        try:
+            return next(self._node_iter)
+        except StopIteration:
+            return None
+
+    def create_next_relation(self) -> Optional[GraphRelationship]:
+        try:
+            return next(self._relation_iter)
+        except StopIteration:
+            return None
+
+    def _create_node_iterator(self) -> Iterator[GraphNode]:
+        yield GraphNode(
+            key=self.get_key(),
+            label=self.FILE_TABLE_NODE_LABEL,
+            attributes={
+                self.FILE_TABLE_NODE_ATTR_NAME: self.name,
+                self.FILE_TABLE_NODE_ATTR_CONTENT: self.content,
+            }
+        )
+
+    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
+        if self.file:
+            yield GraphRelationship(
+                start_label=File.FILE_NODE_LABEL,
+                start_key=self.file.get_key(),
+                end_label=self.FILE_TABLE_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.FILE_TABLE_RELATION_TYPE,
+                reverse_type=self.FILE_TABLE_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+    def get_key(self) -> str:
+        return f"{self.file.get_key()}/_filetable/{self.name}"
+
+class ProspectusWaterfallScheme(GraphSerializable):
+
+    PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL = 'Prospectus_Waterfall_Scheme'
+    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME = 'name'
+    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME = 'scheme'
+
+    PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME'
+    PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME_OF'
+
+    def __init__(self,
+                 name: str,
+                 scheme: str,
+                 file: File,
+                 ) -> None:
+
+        self.name = name
+        self.scheme = scheme
+        self.file = file
+
+        self._node_iter = self._create_node_iterator()
+        self._relation_iter = self._create_relation_iterator()
+
+    def __repr__(self) -> str:
+        return f'ProspectusWaterfallScheme({self.name!r}, {self.content!r})'
+
+    def create_next_node(self) -> Optional[GraphNode]:
+        try:
+            return next(self._node_iter)
+        except StopIteration:
+            return None
+
+    def create_next_relation(self) -> Optional[GraphRelationship]:
+        try:
+            return next(self._relation_iter)
+        except StopIteration:
+            return None
+
+    def _create_node_iterator(self) -> Iterator[GraphNode]:
+        yield GraphNode(
+            key=self.get_key(),
+            label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
+            attributes={
+                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME: self.name,
+                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME: self.scheme,
+            }
+        )
+
+    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
+        if self.file:
+            yield GraphRelationship(
+                start_label=File.FILE_NODE_LABEL,
+                start_key=self.file.get_key(),
+                end_label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
+                end_key=self.get_key(),
+                type=self.PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE,
+                reverse_type=self.PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE,
+                attributes={}
+            )
+
+    def get_key(self) -> str:
+        return f"{self.file.get_key()}/_prospectuswaterfallscheme/{self.name}"

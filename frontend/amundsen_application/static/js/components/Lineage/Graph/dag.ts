@@ -63,14 +63,15 @@ const getTableDetailLink = (d) =>
     `/table_detail/${(d.lineage_item_detail as TableLineageItemDetail).cluster}/${(d.lineage_item_detail as TableLineageItemDetail).database}/${(d.lineage_item_detail as TableLineageItemDetail).schema}/${(d.lineage_item_detail as TableLineageItemDetail).name}`
 
 const getFileDetailLink = (d) =>
-    `/file_detail/${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_container}/${(d.lineage_item_detail as FileLineageItemDetail).type}/${(d.lineage_item_detail as FileLineageItemDetail).name}`
+    // `/file_detail/${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}/${(d.lineage_item_detail as FileLineageItemDetail).data_location_container}/${(d.lineage_item_detail as FileLineageItemDetail).type}/${(d.lineage_item_detail as FileLineageItemDetail).name}`
+    `/file_detail/${encodeURIComponent((d.lineage_item_detail as FileLineageItemDetail).data_location_type+'/'+(d.lineage_item_detail as FileLineageItemDetail).data_location_name+'/'+(d.lineage_item_detail as FileLineageItemDetail).data_location_container+'/'+(d.lineage_item_detail as FileLineageItemDetail).type+'/'+(d.lineage_item_detail as FileLineageItemDetail).name)}`
 
 function getSearchLink(d: LineageItem) {
     if (d.type == 'Table') {
         return `/search?resource=${d.type.toLowerCase()}&index=0&filters=${encodeURIComponent(`{"schema":{"value":"${(d.lineage_item_detail as TableLineageItemDetail).schema}"},"cluster":{"value":"${(d.lineage_item_detail as TableLineageItemDetail).cluster}"}}`)}`;
     }
     else if (d.type == 'File') {
-        return `/search?resource=${d.type.toLowerCase()}&index=0&filters=${encodeURIComponent(`{"data_location_name":{"value":"${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}"}},"data_location_type":{"value":"${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}"}}`)}`;
+        return `/search?resource=${d.type.toLowerCase()}&index=0&filters=${encodeURIComponent(`{"data_location_name":{"value":"${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}"},"data_location_type":{"value":"${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}"}}`)}`;
     }
 }
 

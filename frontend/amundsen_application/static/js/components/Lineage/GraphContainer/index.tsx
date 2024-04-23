@@ -25,10 +25,10 @@ export const GraphContainer: React.FC<GraphContainerProps> = ({
   rootNode,
 }: GraphContainerProps) => {
   let rootTitle = 'UNKNOWN RESOURCE';
-  if (isTableLineageItemDetail(rootNode.lineage_item_detail) {
+  if (isTableLineageItemDetail(rootNode.lineage_item_detail)) {
     rootTitle = `${(rootNode.lineage_item_detail as TableLineageItemDetail).schema}.${(rootNode.lineage_item_detail as TableLineageItemDetail).name}`;
   }
-  else if (isFileLineageItemDetail(rootNode.lineage_item_detail) {
+  else if (isFileLineageItemDetail(rootNode.lineage_item_detail)) {
     rootTitle = `${(rootNode.lineage_item_detail as FileLineageItemDetail).type}.${(rootNode.lineage_item_detail as FileLineageItemDetail).name}`;
   }
 
