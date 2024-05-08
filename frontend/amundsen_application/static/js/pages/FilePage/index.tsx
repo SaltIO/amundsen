@@ -522,12 +522,12 @@ export class FilePage extends React.Component<
                     </div>
                     {fileData.path}
                   </section>
-                  {fileData.dataChannel &&  (
+                  {fileData.dataProvider && fileData.dataProvider.dataChannels && fileData.dataProvider.dataChannels.length === 1 &&  (
                     <section className="metadata-section">
                     <div className="section-title">
                         License
                       </div>
-                      {fileData.dataChannel.license}
+                      {fileData.dataProvider.dataChannels[0].license}
                     </section>
                   )}
                 </section>

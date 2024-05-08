@@ -3078,14 +3078,6 @@ class Neo4jProxy(BaseProxy):
         if data_location_rec:
             data_location = self._get_data_location(data_location_rec)
 
-        data_provider_rec = record.get("data_provider", None)
-        data_provider: DataProvider = None
-        if data_provider_rec:
-            data_provider = DataProvider(name=data_provider_rec["name"],
-                                        key=data_provider_rec["key"],
-                                        description=data_provider_rec.get("desc", None),
-                                        website=data_provider_rec.get("website", None))
-
         data_channel_rec = record.get("data_channel", None)
         data_channel: DataChannel = None
         if data_channel_rec:
@@ -3094,8 +3086,16 @@ class Neo4jProxy(BaseProxy):
                                         description=data_channel_rec.get("description", None),
                                         license=data_channel_rec.get("license", None),
                                         type=data_channel_rec["type"],
-                                        url=data_channel_rec.get("url", None),
-                                        dataProvider=data_provider)
+                                        url=data_channel_rec.get("url", None))
+
+        data_provider_rec = record.get("data_provider", None)
+        data_provider: DataProvider = None
+        if data_provider_rec:
+            data_provider = DataProvider(name=data_provider_rec["name"],
+                                        key=data_provider_rec["key"],
+                                        description=data_provider_rec.get("desc", None),
+                                        website=data_provider_rec.get("website", None),
+                                        data_channels=[data_channel])
 
         tags = []
         tag_records = record['tags']
@@ -3147,7 +3147,7 @@ class Neo4jProxy(BaseProxy):
                     path=file_rec.get("path", None),
                     is_directory=file_rec.get("is_directory", None),
                     dataLocation=data_location,
-                    dataChannel=data_channel,
+                    dataProvider=data_provider,
                     tags=tags,
                     owners=owners,
                     fileTables=file_tables,

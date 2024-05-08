@@ -14,9 +14,6 @@ from databuilder.models.description_metadata import (  # noqa: F401
 from databuilder.models.table_metadata import TagMetadata
 
 
-# def convert_to_uri_safe_str(input_string: str) -> str:
-#     return re.sub(r'\W+', '_', input_string).lower()
-
 def _format_as_list(tags: Union[List, str, None]) -> List:
     if tags is None:
         tags = []
@@ -73,7 +70,6 @@ class DataProvider(GraphSerializable):
         )
 
     def get_name_for_uri(self) -> str:
-        # return convert_to_uri_safe_str(self.name)
         return self.name
 
     def get_key(self) -> str:
@@ -163,7 +159,6 @@ class DataChannel(GraphSerializable):
 
     def get_key(self) -> str:
         return self.DATA_CHANNEL_NODE_KEY.format(data_provider_name=self.data_provider.get_name_for_uri(),
-                                                #  name=convert_to_uri_safe_str(self.name),
                                                  name=self.name,
                                                  type=self.type.value)
 
@@ -236,7 +231,6 @@ class DataLocation(GraphSerializable):
 
     def get_key(self) -> str:
         return DataLocation.DataLocationType.DATA_LOCATION_NODE_KEY.format(
-            # name=convert_to_uri_safe_str(self.name),
             name=self.name,
             type=self.type)
 
@@ -265,11 +259,9 @@ class FilesystemDataLocation(DataLocation):
 
     def get_key(self) -> str:
         return FilesystemDataLocation.DATA_LOCATION_NODE_KEY.format(
-            # name=convert_to_uri_safe_str(self.name),
             name=self.name,
             type=self.type,
             drive=self.drive)
-            # drive=convert_to_uri_safe_str(self.drive))
 
     def get_root(self) -> str:
         return self.drive
@@ -296,10 +288,8 @@ class AwsS3DataLocation(DataLocation):
 
     def get_key(self) -> str:
         return AwsS3DataLocation.DATA_LOCATION_NODE_KEY.format(
-            # name=convert_to_uri_safe_str(self.name),
             name=self.name,
             type=self.type,
-            # bucket=convert_to_uri_safe_str(self.bucket))
             bucket=self.bucket)
 
     def get_root(self) -> str:
@@ -326,10 +316,8 @@ class SharepointDataLocation(DataLocation):
 
     def get_key(self) -> str:
         return SharepointDataLocation.DATA_LOCATION_NODE_KEY.format(
-            # name=convert_to_uri_safe_str(self.name),
             name=self.name,
             type=self.type,
-            # document_library=convert_to_uri_safe_str(self.bucket))
             document_library=self.bucket)
 
     def get_root(self) -> str:
@@ -469,13 +457,8 @@ class File(GraphSerializable):
                                                    data_location_root=self.data_location.get_root(),
                                                    file_type=self.type,
                                                    file_name=self.name)
-                                                #    data_location_name=convert_to_uri_safe_str(self.data_location.name),
-                                                #    data_location_root=convert_to_uri_safe_str(self.data_location.get_root()),
-                                                #    file_type=convert_to_uri_safe_str(self.type),
-                                                #    file_name=convert_to_uri_safe_str(self.name))
 
     def get_key(self) -> str:
-        # return f"{self.data_location.get_key()}/{convert_to_uri_safe_str(self.type)}/{convert_to_uri_safe_str(self.name)}"
         return f"{self.data_location.get_key()}/{self.type}/{self.name}"
 
 class FileTable(GraphSerializable):

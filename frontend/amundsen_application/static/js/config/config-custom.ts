@@ -41,6 +41,10 @@ const configCustom: AppConfigCustom = {
     watermark: {
       style: CustomBadgeStyle.WATERMARK,
       displayName: 'Watermark',
+    },
+    primarykey: {
+      style: CustomBadgeStyle.PRIMARY_KEY,
+      displayName: 'Primary Key',
     }
   },
   browse: {

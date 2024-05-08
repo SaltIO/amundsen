@@ -22,15 +22,18 @@ class DataLicense:
         self.desc = desc
 
 class DataLicenseType(Enum):
-    CREATIVE_COMMONS_LICENSES = DataLicense(name="Creative Commons licenses", desc="A set of copyright licenses that allow creators to specify the conditions under which their work may be used, adapted, and distributed. There are several types of Creative Commons licenses, each with its own terms and conditions regarding attribution, commercial use, and derivative works.")
-    OPEN_DATA_COMMONS_PUBLIC_DOMAIN_DEDICATION = DataLicense(name="Open Data Commons Public Domain Dedication and License", alias="PDDL", desc="A license that allows creators to waive all their copyright and related rights over a work worldwide, placing it in the public domain. Anyone can then freely use, modify, and distribute the work without restrictions.")
-    OPEN_DATA_COMMONS_ATTRIBUTION_LICENSE = DataLicense(name="Open Data Commons Attribution License", alias="ODC-BY", desc="A license that requires users to attribute the data provider when using the data. Users are free to use, modify, and distribute the data, but they must provide appropriate credit to the original source.")
-    OPEN_DATA_COMMONS_DATABASE_LICENSE = DataLicense(name="Open Data Commons Open Database License", alias="ODbL", desc="A license that allows users to share, adapt, and distribute the database, but any new work must also be shared under the same license. It requires attribution and share-alike conditions.")
+    PROPRIETARY_LICENSE = DataLicense(name="Proprietary License", alias="PROP", desc="This type of license is created by an organization to govern the use and distribution of its data within the confines of the organization or with specified external parties. The terms of a proprietary license are not public and are designed to restrict access, use, duplication, and distribution of the data to authorized users only.")
+    PUBLIC_DOMAIN_DEDICATION = DataLicense(name="Public Domain Dedication", alias="CCO", desc="A public domain dedication tool that allows licensors to waive all their copyright and related rights, effectively placing their work in the public domain.")
+    CREATIVE_COMMONS_LICENSE_BY_ATTRIBUTION = DataLicense(name="Creative Commons License By Attribution", alias="CC BY", desc="Allows users to distribute, remix, adapt, and build upon the material in any medium or format, as long as attribution is given to the creator.")
+    CREATIVE_COMMONS_LICENSE_BY_ATTRIBUTION_SHARE_ALIKE = DataLicense(name="Creative Commons License By Attribution-ShareAlike", alias="CC BY-SA", desc="Allows users to distribute, remix, adapt, and build upon the material in any medium or format, as long as attribution is given to the creator, but requires adaptations of the work to be released under the same license.")
+    CREATIVE_COMMONS_LICENSE_BY_ATTRIBUTION_NO_DERIVATIVES = DataLicense(name="Creative Commons License By Attribution-NoDerivatives", alias="CC BY-ND", desc="Allows for redistribution, commercial and non-commercial, as long as it is passed along unchanged and in whole, with credit to the creator.")
+    CREATIVE_COMMONS_LICENSE_BY_ATTRIBUTION_NON_COMMERCIAL = DataLicense(name="Creative Commons License By Attribution-NonCommercial", alias="CC BY-NC", desc="Allows others to remix, tweak, and build upon the work non-commercially, and although their new works must also acknowledge the creator and be non-commercial, they don’t have to license their derivative works on the same terms.")
+    OPEN_DATA_COMMONS_ATTRIBUTION_LICENSE = DataLicense(name="Open Data Commons Attribution License", alias="ODC-BY", desc="Allows users to use the data in any way, as long as they attribute the source of the data.")
+    OPEN_DATA_COMMONS_DATABASE_LICENSE = DataLicense(name="Open Data Commons Open Database License", alias="ODC-ODbL", desc="Users are free to share, modify, and use the database while keeping the resulting databases open.")
     GNU_GENERAL_PUBLIC_LICENSE = DataLicense(name="GNU General Public License", alias="GPL", desc="A copyleft license primarily associated with software, but it can also be applied to data. It ensures that any derivative works are also open, meaning they must be licensed under the same terms.")
-    MIT_LICENSE = DataLicense(name="MIT License", desc="A permissive software license that allows users to use, modify, and distribute the software with minimal restrictions. It grants users the freedom to do almost anything they want with the software, including using it for commercial purposes, without requiring them to share their modifications.")
-    APACHE_LICENSE = DataLicense(name="Apache License", desc="A permissive software license that allows users to use, modify, and distribute the software with minimal restrictions. It includes patent grant clauses, which provide some protection to users against patent claims.")
-    ODC_ATTRIBUTION_LICENSE = DataLicense(name="ODC Attribution License", alias="ODC-By", desc="A license that requires users to attribute the data provider when using the data. It allows users to use, modify, and distribute the data with attribution, but there is no share-alike requirement.")
-    ODC_OPEN_DATABASE_LICENSE = DataLicense(name="ODC Open Database License", alias="ODbL", desc="A license that allows users to share, adapt, and distribute the database. However, any new work must also be shared under the same license, and attribution is required.")
+    MIT_LICENSE = DataLicense(name="MIT License", alias="MIT", desc="A permissive free software license originating at the Massachusetts Institute of Technology (MIT). It has minimal restrictions on how the software can be redistributed, allowing for both private and commercial use, distribution, modification, and private modification without conditions.")
+    APACHE_LICENSE = DataLicense(name="Apache License", alias="Apache 2.0", desc="A permissive free software license written by the Apache Software Foundation. It allows users to freely use, modify, and distribute their own versions of the work, even in proprietary projects, provided that they include a copy of the license and notices that any changes have been made.")
+    BSD_LICENSE = DataLicense(name="BSD License", alias="BSD", desc="A permissive free software licenses. The original versions require minimal restrictions on redistribution. This permits users to use portions of the code in proprietary products.")
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DataLocation:
@@ -60,22 +63,6 @@ class FilesystemDataLocationSchema(AttrsSchema):
 class AwsS3DataLocation(DataLocation):
     bucket: Optional[str] = None
 
-@attr.s(auto_attribs=True, kw_only=True)
-class DataProvider:
-    name: str
-    key: Optional[str] = None
-    description: Optional[str] = None
-    website: Optional[str] = None
-    # tags: List[Tag] = []
-    # badges: List[Badge] = []
-
-
-class DataProviderSchema(AttrsSchema):
-    class Meta:
-        target = DataProvider
-        register_as_scheme = True
-
-
 class AwsS3DataLocationSchema(AttrsSchema):
     class Meta:
         target = AwsS3DataLocation
@@ -89,7 +76,6 @@ class DataChannel:
     license: Optional[DataLicenseType] = None
     type: Optional[str] = None
     url: Optional[str] = None
-    dataProvider: Optional[DataProvider] = None
 
 class DataChannelSchema(AttrsSchema):
     license = fields.Method(serialize="get_license", deserialize="set_license")
@@ -119,6 +105,21 @@ class DataChannelSchema(AttrsSchema):
 
     class Meta:
         target = DataChannel
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
+class DataProvider:
+    name: str
+    key: Optional[str] = None
+    description: Optional[str] = None
+    website: Optional[str] = None
+    data_channels: Optional[List[DataChannel]] = None
+    # tags: List[Tag] = []
+    # badges: List[Badge] = []
+
+class DataProviderSchema(AttrsSchema):
+    class Meta:
+        target = DataProvider
         register_as_scheme = True
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -162,7 +163,7 @@ class File:
     path: str = None
     is_directory: bool = None
     dataLocation: Optional[Union[FilesystemDataLocation, AwsS3DataLocation, DataLocation]] = None
-    dataChannel: Optional[DataChannel] = None
+    dataProvider: Optional[DataProvider] = None
     fileTables: Optional[List[FileTable]] = None
     prospectusWaterfallSchemes: Optional[List[ProspectusWaterfallScheme]] = None
     tags: Optional[List[Tag]] = None

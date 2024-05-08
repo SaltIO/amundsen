@@ -5,7 +5,7 @@ import { Badge } from './Badges';
 import { Tag } from './Tags';
 import { User } from './User';
 import { DataLocation, FilesystemDataLocation, AwsS3DataLocation } from './DataLocation';
-import { DataChannel } from './DataChannel';
+import { ProviderMetadata } from './ProviderMetadata';
 
 
 
@@ -33,7 +33,7 @@ export interface FileMetadata {
   category?: string;
   path: string;
   dataLocation?: FilesystemDataLocation | AwsS3DataLocation | DataLocation;
-  dataChannel?: DataChannel;
+  dataProvider?: ProviderMetadata;
   tags?:  Tag[];
   fileTables?: FileTable[]
   prospectusWaterfallSchemes?: ProspectusWaterfallScheme[];
