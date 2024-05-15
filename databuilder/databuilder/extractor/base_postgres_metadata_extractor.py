@@ -10,6 +10,7 @@ from typing import (
 )
 
 from pyhocon import ConfigFactory, ConfigTree
+from sqlalchemy import create_engine
 
 from databuilder import Scoped
 from databuilder.extractor.base_extractor import Extractor
@@ -46,6 +47,10 @@ class BasePostgresMetadataExtractor(Extractor):
         """
         return None
 
+    @abc.abstractmethod
+    def get_primary_key_sql_statement(self, schema_name, table_name) -> Any:
+        return None
+
     def init(self, conf: ConfigTree) -> None:
         conf = conf.with_fallback(BasePostgresMetadataExtractor.DEFAULT_CONFIG)
         self._cluster = conf.get_string(BasePostgresMetadataExtractor.CLUSTER_KEY)
@@ -65,8 +70,26 @@ class BasePostgresMetadataExtractor(Extractor):
 
         LOGGER.info('SQL for postgres metadata: %s', self.sql_stmt)
 
+        self.connection = self._get_connection(sql_alch_conf)
+
         self._alchemy_extractor.init(sql_alch_conf)
         self._extract_iter: Union[None, Iterator] = None
+
+    def _get_connection(self, sql_alch_conf) -> Any:
+        """
+        Create a SQLAlchemy connection to Database
+        """
+        conn_string = sql_alch_conf.get_string(SQLAlchemyExtractor.CONN_STRING)
+
+        connect_args = {
+            k: v
+            for k, v in sql_alch_conf.get_config(
+                'connect_args', default=ConfigTree()
+            ).items()
+        }
+        engine = create_engine(conn_string, connect_args=connect_args)
+        conn = engine.connect()
+        return conn
 
     def extract(self) -> Union[TableMetadata, None]:
         if not self._extract_iter:
@@ -83,11 +106,33 @@ class BasePostgresMetadataExtractor(Extractor):
         """
         for key, group in groupby(self._get_raw_extract_iter(), self._get_table_key):
             columns = []
+            pk_cols = None
 
             for row in group:
                 last_row = row
-                columns.append(ColumnMetadata(row['col_name'], row['col_description'],
-                                              row['col_type'], row['col_sort_order']))
+
+                if pk_cols is None:
+                    results = self.connection.execute(self.get_primary_key_sql_statement(schema_name=last_row['schema'], table_name=last_row['name']))
+                    pk_rows = results.fetchone()
+                    # LOGGER.info(f"pk_rows={pk_rows}")
+                    if pk_rows:
+                        pk_cols = pk_rows[2]
+                        if pk_cols:
+                            pk_cols = pk_cols.split(',')
+                            # LOGGER.info(f"pk_cols={pk_cols}")
+                        else:
+                            pk_cols = []
+
+                col_badges = []
+                if pk_cols is not None and row['col_name'] in pk_cols:
+                    LOGGER.info(f"Found PK={row['col_name']}")
+                    col_badges = ['primarykey']
+
+                col_metadata = ColumnMetadata(row['col_name'], row['col_description'],
+                                              row['col_type'], row['col_sort_order'],
+                                              badges=col_badges)
+
+                columns.append(col_metadata)
 
             yield TableMetadata(self._database, last_row['cluster'],
                                 last_row['schema'],

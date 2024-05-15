@@ -15,7 +15,6 @@ from databuilder import Scoped
 from databuilder.extractor.base_extractor import Extractor
 from databuilder.extractor.sql_alchemy_extractor import SQLAlchemyExtractor
 from databuilder.models.table_metadata import ColumnMetadata, TableMetadata
-from databuilder.models.badge import Badge, BadgeMetadata
 
 TableKey = namedtuple('TableKey', ['schema', 'table_name'])
 
