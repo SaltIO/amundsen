@@ -103,7 +103,7 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
             AND tc.constraint_schema = kcu.constraint_schema
             WHERE tc.constraint_type = 'PRIMARY KEY'
             AND tc.table_schema = '{schema_name}'
-            AND tc.table_name '{table_name}'
+            AND tc.table_name = '{table_name}'
             GROUP BY tc.table_schema, tc.table_name;
         """.format(schema_name=schema_name, table_name=table_name)
 

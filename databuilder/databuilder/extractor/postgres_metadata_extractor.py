@@ -53,14 +53,18 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
 
     def get_primary_key_sql_statement(self, schema_name, table_name) -> Any:
         return """
-            SELECT tc.table_schema, tc.table_name, array_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS primary_key_columns
-            FROM information_schema.table_constraints tc
+            SELECT
+                tc.table_schema,
+                tc.table_name,
+                array_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS primary_key_columns
+            FROM
+                information_schema.table_constraints tc
             JOIN information_schema.key_column_usage kcu
-            ON tc.constraint_name = kcu.constraint_name
-            AND tc.constraint_schema = kcu.constraint_schema
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.constraint_schema = kcu.constraint_schema
             WHERE tc.constraint_type = 'PRIMARY KEY'
-            AND tc.table_schema = '{schema_name}'
-            AND tc.table_name '{table_name}'
+                AND tc.table_schema = '{schema_name}'
+                AND tc.table_name = '{table_name}'
             GROUP BY tc.table_schema, tc.table_name;
         """.format(schema_name=schema_name, table_name=table_name)
 
