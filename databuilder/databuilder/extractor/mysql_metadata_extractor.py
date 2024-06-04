@@ -11,10 +11,15 @@ from typing import (
 from pyhocon import ConfigFactory, ConfigTree
 from sqlalchemy import create_engine
 
+from queryparser.mysql import MySQLQueryProcessor
+from queryparser.exceptions import QuerySyntaxError
+import re
+
 from databuilder import Scoped
 from databuilder.extractor.base_extractor import Extractor
 from databuilder.extractor.sql_alchemy_extractor import SQLAlchemyExtractor
 from databuilder.models.table_metadata import ColumnMetadata, TableMetadata
+from databuilder.models.table_lineage import TableLineage
 
 TableKey = namedtuple('TableKey', ['schema', 'table_name'])
 
@@ -47,11 +52,38 @@ class MysqlMetadataExtractor(Extractor):
         ORDER by cluster, "schema", name, col_sort_order ;
     """
 
-    PK_SQL_STATEMENT = """
-        SELECT table_schema, table_name, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS primary_key_columns
-        FROM INFORMATION_SCHEMA.STATISTICS
-        WHERE INDEX_NAME = 'PRIMARY' and table_schema = '{schema_name}' and table_name = '{table_name}'
-        GROUP BY TABLE_NAME;
+    # PK_SQL_STATEMENT = """
+    #     SELECT table_schema, table_name, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS primary_key_columns
+    #     FROM INFORMATION_SCHEMA.STATISTICS
+    #     WHERE INDEX_NAME = 'PRIMARY' and table_schema = '{schema_name}' and table_name = '{table_name}'
+    #     GROUP BY TABLE_NAME;
+    # """
+    KEY_SQL_STATMENT = """
+         SELECT
+            tc.constraint_type,
+            tc.table_schema,
+            tc.table_name,
+            kcu.column_name
+        FROM
+            information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.constraint_schema = kcu.constraint_schema
+        WHERE
+            tc.constraint_type in ('UNIQUE', 'PRIMARY KEY', 'FOREIGN KEY')
+            AND tc.TABLE_SCHEMA = '{schema_name}'
+            AND tc.TABLE_NAME = '{table_name}'
+        GROUP BY tc.table_schema, tc.table_name, kcu.column_name, tc.constraint_type;
+    """
+
+    VIEW_SQL_STATEMENT = """
+        SELECT
+            VIEW_DEFINITION
+        FROM
+            information_schema.VIEWS
+        WHERE
+            TABLE_SCHEMA = '{schema_name}'
+            AND TABLE_NAME = '{table_name}';
     """
 
     # CONFIG KEYS
@@ -130,39 +162,82 @@ class MysqlMetadataExtractor(Extractor):
         """
         for key, group in groupby(self._get_raw_extract_iter(), self._get_table_key):
             columns = []
-            pk_cols = None
+            key_cols = None
 
             for row in group:
                 last_row = row
 
-                if pk_cols is None:
-                    results = self.connection.execute(MysqlMetadataExtractor.PK_SQL_STATEMENT.format(schema_name=last_row['schema'], table_name=last_row['name']))
-                    pk_rows = results.fetchone()
-                    # LOGGER.info(f"pk_rows={pk_rows}")
-                    if pk_rows:
-                        pk_cols = pk_rows[2]
-                        if pk_cols:
-                            pk_cols = pk_cols.split(',')
-                            # LOGGER.info(f"pk_cols={pk_cols}")
-                        else:
-                            pk_cols = []
+                if key_cols is None:
+                    results = self.connection.execute(MysqlMetadataExtractor.KEY_SQL_STATMENT.format(schema_name=last_row['schema'], table_name=last_row['name']))
+                    # LOGGER.info(f"results={results}")
+                    if results:
+                        key_cols = {}
+                        for key_row in results:
+                            LOGGER.info(f"key_row={key_row}")
+                            # Access columns by name or index
+                            constraint_type = key_row['CONSTRAINT_TYPE'].lower().replace(" ", "")
+                            key_column = key_row['COLUMN_NAME']
+
+                            if key_column in key_cols:
+                                key_cols[key_column].append(constraint_type)
+                            else:
+                                key_cols[key_column] = [constraint_type]
 
                 col_badges = []
-                if pk_cols is not None and row['col_name'] in pk_cols:
-                    LOGGER.info(f"Found PK={row['col_name']}")
-                    col_badges = ['primarykey']
+                if key_cols is not None and row['col_name'] in key_cols:
+                    LOGGER.info(f"Found KEY={row['col_name']}")
+                    LOGGER.info(f"Badges={key_cols[row['col_name']]}")
+                    col_badges = key_cols[row['col_name']]
 
                 col_metadata = ColumnMetadata(row['col_name'], row['col_description'],
                                               row['col_type'], row['col_sort_order'],
                                               badges=col_badges)
                 columns.append(col_metadata)
 
-            yield TableMetadata(self._database, last_row['cluster'],
-                                last_row['schema'],
-                                last_row['name'],
-                                last_row['description'],
-                                columns,
-                                is_view=last_row['is_view'])
+            table_metadata = TableMetadata(self._database,
+                                           last_row['cluster'],
+                                           last_row['schema'],
+                                           last_row['name'],
+                                           last_row['description'],
+                                           columns,
+                                           is_view=last_row['is_view'])
+            yield table_metadata
+
+            if bool(last_row['is_view']) == True:
+                results = self.connection.execute(MysqlMetadataExtractor.VIEW_SQL_STATEMENT.format(schema_name=last_row['schema'], table_name=last_row['name']))
+                view_row = results.fetchone()
+                LOGGER.info(f"view_row={view_row}")
+                if view_row:
+                    view_def = view_row[0]
+                    if view_def:
+                        qp = MySQLQueryProcessor()
+                        try:
+                            view_def = MysqlMetadataExtractor.clean_view_def(view_def)
+                            qp.set_query(view_def)
+
+                            qp.process_query()
+
+                            LOGGER.info(f"View table: {qp.tables}")
+
+                            if qp.tables is not None and len(qp.tables) > 0:
+                                for table in qp.tables:
+                                    table_key = TableMetadata.TABLE_KEY_FORMAT.format(db=self._database, cluster=last_row['cluster'], schema=table[0].lower(), tbl=table[1].lower())
+                                    LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
+                                    yield TableLineage(
+                                        table_key=table_key,
+                                        downstream_deps=[table_metadata._get_table_key()]
+                                    )
+
+                        except QuerySyntaxError as e:
+                            LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
+
+    def clean_view_def(view_def:str) -> str:
+        # Regular expression pattern to match " - interval X day"
+        pattern = r" [+-] interval \d+ day"
+        # Replace all matches with an empty string
+        cleaned_sql = re.sub(pattern, '', view_def).replace('coalesce', '').replace('collate', '').replace('utf8_general_ci', '')
+
+        return cleaned_sql
 
     def _get_raw_extract_iter(self) -> Iterator[Dict[str, Any]]:
         """

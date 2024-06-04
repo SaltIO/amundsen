@@ -12,10 +12,15 @@ from typing import (
 from pyhocon import ConfigFactory, ConfigTree
 from sqlalchemy import create_engine
 
+from queryparser.postgresql import PostgreSQLQueryProcessor
+from queryparser.exceptions import QuerySyntaxError
+
+
 from databuilder import Scoped
 from databuilder.extractor.base_extractor import Extractor
 from databuilder.extractor.sql_alchemy_extractor import SQLAlchemyExtractor
 from databuilder.models.table_metadata import ColumnMetadata, TableMetadata
+from databuilder.models.table_lineage import TableLineage
 
 TableKey = namedtuple('TableKey', ['schema', 'table_name'])
 
@@ -48,7 +53,11 @@ class BasePostgresMetadataExtractor(Extractor):
         return None
 
     @abc.abstractmethod
-    def get_primary_key_sql_statement(self, schema_name, table_name) -> Any:
+    def get_key_sql_statement(self, schema_name, table_name) -> Any:
+        return None
+
+    @abc.abstractmethod
+    def get_view_def_sql_statement(self, schema_name, table_name) -> Any:
         return None
 
     def init(self, conf: ConfigTree) -> None:
@@ -106,27 +115,31 @@ class BasePostgresMetadataExtractor(Extractor):
         """
         for key, group in groupby(self._get_raw_extract_iter(), self._get_table_key):
             columns = []
-            pk_cols = None
+            key_cols = None
 
             for row in group:
                 last_row = row
 
-                if pk_cols is None:
-                    results = self.connection.execute(self.get_primary_key_sql_statement(schema_name=last_row['schema'], table_name=last_row['name']))
-                    pk_rows = results.fetchone()
-                    # LOGGER.info(f"pk_rows={pk_rows}")
-                    if pk_rows:
-                        pk_cols = pk_rows[2]
-                        if pk_cols:
-                            pk_cols = pk_cols.split(',')
-                            # LOGGER.info(f"pk_cols={pk_cols}")
-                        else:
-                            pk_cols = []
+                if key_cols is None:
+                    results = self.connection.execute(self.get_key_sql_statement(schema_name=last_row['schema'], table_name=last_row['name']))
+                    LOGGER.info(f"results={results}")
+                    if results:
+                        key_cols = {}
+                        for key_row in results:
+                            # Access columns by name or index
+                            constraint_type = key_row['constraint_type'].lower().replace(" ", "")
+                            key_column = key_row['column_name']
+
+                            if key_column in key_cols:
+                                key_cols[key_column].append(constraint_type)
+                            else:
+                                key_cols[key_column] = [constraint_type]
 
                 col_badges = []
-                if pk_cols is not None and row['col_name'] in pk_cols:
-                    LOGGER.info(f"Found PK={row['col_name']}")
-                    col_badges = ['primarykey']
+                if key_cols is not None and row['col_name'] in key_cols:
+                    LOGGER.info(f"Found KEY={row['col_name']}")
+                    LOGGER.info(f"Badges={key_cols[row['col_name']]}")
+                    col_badges = key_cols[row['col_name']]
 
                 col_metadata = ColumnMetadata(row['col_name'], row['col_description'],
                                               row['col_type'], row['col_sort_order'],
@@ -134,11 +147,40 @@ class BasePostgresMetadataExtractor(Extractor):
 
                 columns.append(col_metadata)
 
-            yield TableMetadata(self._database, last_row['cluster'],
-                                last_row['schema'],
-                                last_row['name'],
-                                last_row['description'],
-                                columns)
+            table_metadata = TableMetadata(self._database, last_row['cluster'],
+                                           last_row['schema'],
+                                           last_row['name'],
+                                           last_row['description'],
+                                           columns,
+                                           is_view=last_row['is_view'])
+            yield table_metadata
+
+            if bool(last_row['is_view']) == True:
+                results = self.connection.execute(self.get_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name']))
+                view_row = results.fetchone()
+                LOGGER.info(f"view_row={view_row}")
+                if view_row:
+                    view_def = view_row[0]
+                    if view_def:
+                        qp = PostgreSQLQueryProcessor()
+                        try:
+                            qp.set_query(view_def)
+
+                            qp.process_query()
+
+                            LOGGER.info(f"View table: {qp.tables}")
+
+                            if qp.tables is not None and len(qp.tables) > 0:
+                                for table in qp.tables:
+                                    table_key = TableMetadata.TABLE_KEY_FORMAT.format(db=self._database, cluster=last_row['cluster'], schema=table[0].lower(), tbl=table[1].lower())
+                                    LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
+                                    yield TableLineage(
+                                        table_key=table_key,
+                                        downstream_deps=[table_metadata._get_table_key()]
+                                    )
+
+                        except QuerySyntaxError as e:
+                            LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
 
     def _get_raw_extract_iter(self) -> Iterator[Dict[str, Any]]:
         """

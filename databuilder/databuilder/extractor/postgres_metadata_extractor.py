@@ -30,11 +30,18 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
                 att.attname as col_name,
                 pgtyp.typname as col_type,
                 pgcd.description as col_description,
-                att.attnum as col_sort_order
+                att.attnum as col_sort_order,
+                CASE
+                    WHEN pg_class.relkind = 'v' THEN true
+                    ELSE false
+                END AS is_view
             FROM pg_catalog.pg_attribute att
             INNER JOIN
                 pg_catalog.pg_statio_all_tables as st
                 on att.attrelid=st.relid
+            INNER JOIN
+                pg_catalog.pg_class pg_class
+                ON st.relid = pg_class.oid
             LEFT JOIN
                 pg_catalog.pg_type pgtyp
                 on pgtyp.oid=att.atttypid
@@ -51,22 +58,43 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
             where_clause_suffix=where_clause_suffix,
         )
 
-    def get_primary_key_sql_statement(self, schema_name, table_name) -> Any:
+    def get_key_sql_statement(self, schema_name, table_name) -> Any:
         return """
             SELECT
-                tc.table_schema,
-                tc.table_name,
-                array_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS primary_key_columns
+                CASE
+                    WHEN con.contype = 'u' THEN 'UNIQUE'
+                    WHEN con.contype = 'p' THEN 'PRIMARY KEY'
+                    WHEN con.contype = 'f' THEN 'FOREIGN KEY'
+                    ELSE 'OTHER'
+                END AS constraint_type,
+                ns.nspname AS table_schema,
+                tbl.relname AS table_name,
+                col.attname AS column_name
             FROM
-                information_schema.table_constraints tc
-            JOIN information_schema.key_column_usage kcu
-                ON tc.constraint_name = kcu.constraint_name
-                AND tc.constraint_schema = kcu.constraint_schema
-            WHERE tc.constraint_type = 'PRIMARY KEY'
-                AND tc.table_schema = '{schema_name}'
-                AND tc.table_name = '{table_name}'
-            GROUP BY tc.table_schema, tc.table_name;
+                pg_constraint con
+            JOIN
+                pg_namespace ns ON ns.oid = con.connamespace
+            JOIN
+                pg_class tbl ON tbl.oid = con.conrelid
+            JOIN
+                pg_attribute col ON col.attrelid = con.conrelid
+                AND col.attnum = ANY(con.conkey)
+            WHERE
+                con.contype IN ('u', 'p', 'f') -- Unique, Primary Key, Foreign Key
+                AND ns.nspname = '{schema_name}'
+                AND tbl.relname = '{table_name}';
         """.format(schema_name=schema_name, table_name=table_name)
+
+    def get_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return """
+            SELECT
+                view_definition
+            FROM
+                pg_views
+            WHERE
+                view_schema = '{schema_name}'
+                AND view_name = '{view_name}';
+        """.format(schema_name=schema_name, view_name=view_name)
 
     def get_scope(self) -> str:
         return 'extractor.postgres_metadata'

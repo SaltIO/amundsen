@@ -104,11 +104,6 @@ class EditableText extends React.Component<
       getLatestValue
     } = this.props;
 
-    // console.log(`refreshValue=${refreshValue}`)
-    // console.log(`stateValue=${stateValue}`)
-    // console.log(`propValue=${propValue}`)
-    // console.log(`prevProps.value=${prevProps.value}`)
-
     if (prevProps.value !== propValue) {
       this.setState({ value: propValue });
     }

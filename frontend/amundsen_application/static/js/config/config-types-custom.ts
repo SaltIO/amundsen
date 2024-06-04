@@ -9,5 +9,7 @@ export enum CustomBadgeStyle {
   MSSQL = 'mssql',
   DBT = 'dbt',
   WATERMARK = 'watermark',
-  PRIMARY_KEY = 'primarykey'
+  PRIMARY_KEY = 'primarykey',
+  FOREIGN_KEY = 'foreignkey',
+  UNIQUE = 'unique'
 }

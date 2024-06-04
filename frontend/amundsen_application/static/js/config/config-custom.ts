@@ -45,6 +45,14 @@ const configCustom: AppConfigCustom = {
     primarykey: {
       style: CustomBadgeStyle.PRIMARY_KEY,
       displayName: 'Primary Key',
+    },
+    foreignkey: {
+      style: CustomBadgeStyle.FOREIGN_KEY,
+      displayName: 'Foreign Key',
+    },
+    unique: {
+      style: CustomBadgeStyle.UNIQUE,
+      displayName: 'Unique',
     }
   },
   browse: {

@@ -42,6 +42,30 @@ class TableUri:
         return TableUri(**spec)
 
 @dataclass
+class ColumnUri:
+    database: str
+    cluster: str
+    schema: str
+    table: str
+    column: str
+
+    def __str__(self) -> str:
+        return f"{self.database}://{self.cluster}.{self.schema}/{self.table}/{self.column}"
+
+    @classmethod
+    def from_uri(cls, uri: str) -> 'TableUri':
+        """
+        COLUMN_KEY_FORMAT = '{db}://{cluster}.{schema}/{tbl}/{col}'
+        """
+        pattern = re.compile(r'^(?P<database>.*?)://(?P<cluster>.*)\.(?P<schema>.*?)/(?P<table>.*?)/(?P<column>.*?)$', re.X)
+
+        groups = pattern.match(uri)
+
+        spec = groups.groupdict() if groups else {}
+
+        return ColumnUri(**spec)
+
+@dataclass
 class FileUri:
     name: str
     type: str
@@ -217,6 +241,8 @@ def marshall_lineage_item(entity: Dict) -> Dict:
     type = entity.get('type')
     if type == "Table":
         return marshall_lineage_table(entity)
+    elif type == "Column":
+        return marshall_lineage_column(entity)
     elif type == "File":
         return marshall_lineage_file(entity)
 
@@ -235,6 +261,18 @@ def marshall_lineage_table(table_dict: Dict) -> Dict:
     table_dict['lineage_item_detail']['cluster'] = table_uri.cluster
     table_dict['lineage_item_detail']['name'] = table_uri.table
     return table_dict
+
+def marshall_lineage_column(column_dict: Dict) -> Dict:
+    column_key = str(column_dict.get('key'))
+    column_uri = ColumnUri.from_uri(column_key)
+
+    column_dict['lineage_item_detail'] = {}
+    column_dict['lineage_item_detail']['database'] = column_uri.database
+    column_dict['lineage_item_detail']['schema'] = column_uri.schema
+    column_dict['lineage_item_detail']['cluster'] = column_uri.cluster
+    column_dict['lineage_item_detail']['table'] = column_uri.table
+    column_dict['lineage_item_detail']['column'] = column_uri.column
+    return column_dict
 
 def marshall_lineage_file(file_dict: Dict) -> Dict:
     """

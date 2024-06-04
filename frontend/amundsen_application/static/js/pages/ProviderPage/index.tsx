@@ -51,7 +51,7 @@ import { FormattedDataType } from 'interfaces/ColumnList';
 
 import ProviderHeaderBullets from './ProviderHeaderBullets';
 
-import TableDescEditableText from '../TableDetailPage/TableDescEditableText';
+import ProviderDescEditableText from './ProviderDescEditableText';
 import RequestMetadataForm from '../TableDetailPage/RequestMetadataForm';
 
 import * as Constants from './constants';
@@ -383,8 +383,8 @@ export class ProviderPage extends React.Component<
                 editText={editText}
                 editUrl={editUrl || undefined}
               >
-                <TableDescEditableText
-                  maxLength={getMaxLength('tableDescLength')}
+                <ProviderDescEditableText
+                  maxLength={getMaxLength('providerDescLength')}
                   value={data.description}
                   editable={data.is_editable}
                 />

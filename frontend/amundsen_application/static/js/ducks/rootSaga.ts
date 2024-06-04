@@ -73,6 +73,7 @@ import {
 import {
   getProviderDataWatcher,
   getProviderDescriptionWatcher,
+  updateProviderDescriptionWatcher
 } from './providerMetadata/sagas';
 import {
   getFileDataWatcher,
@@ -141,6 +142,7 @@ export default function* rootSaga() {
     getGPTReponseWatcher(),
     getProviderDataWatcher(),
     getProviderDescriptionWatcher(),
+    updateProviderDescriptionWatcher(),
     getFileDataWatcher(),
     getFileDescriptionWatcher(),
     updateFileDescriptionWatcher(),
