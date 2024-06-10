@@ -57,7 +57,11 @@ class BasePostgresMetadataExtractor(Extractor):
         return None
 
     @abc.abstractmethod
-    def get_view_def_sql_statement(self, schema_name, table_name) -> Any:
+    def get_old_view_def_sql_statement(self, schema_name, table_name) -> Any:
+        return None
+
+    @abc.abstractmethod
+    def get_new_view_def_sql_statement(self, schema_name, view_name) -> Any:
         return None
 
     def init(self, conf: ConfigTree) -> None:
@@ -65,6 +69,10 @@ class BasePostgresMetadataExtractor(Extractor):
         self._cluster = conf.get_string(BasePostgresMetadataExtractor.CLUSTER_KEY)
 
         self._database = conf.get_string(BasePostgresMetadataExtractor.DATABASE_KEY, default='postgres')
+
+        # where_clause_suffix = conf.get_string(BasePostgresMetadataExtractor.WHERE_CLAUSE_SUFFIX_KEY)
+        # if where_clause_suffix and where_clause_suffix != '':
+        #     where_clause_suffix = f'WHERE {where_clause_suffix}'
 
         self.sql_stmt = self.get_sql_statement(
             use_catalog_as_cluster_name=conf.get_bool(BasePostgresMetadataExtractor.USE_CATALOG_AS_CLUSTER_NAME),
@@ -150,37 +158,43 @@ class BasePostgresMetadataExtractor(Extractor):
             table_metadata = TableMetadata(self._database, last_row['cluster'],
                                            last_row['schema'],
                                            last_row['name'],
-                                           last_row['description'],
+                                           last_row['description'] if 'description' in last_row else None,
                                            columns,
                                            is_view=last_row['is_view'])
             yield table_metadata
 
             if bool(last_row['is_view']) == True:
-                results = self.connection.execute(self.get_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name']))
-                view_row = results.fetchone()
-                LOGGER.info(f"view_row={view_row}")
-                if view_row:
-                    view_def = view_row[0]
-                    if view_def:
-                        qp = PostgreSQLQueryProcessor()
-                        try:
-                            qp.set_query(view_def)
+                results = None
+                try:
+                    results = self.connection.execute(self.get_new_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name']))
+                except Exception as e:
+                    results = self.connection.execute(self.get_old_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name']))
+                finally:
+                    if results is not None:
+                        view_row = results.fetchone()
+                        LOGGER.info(f"view_row={view_row}")
+                        if view_row:
+                            view_def = view_row[0]
+                            if view_def:
+                                qp = PostgreSQLQueryProcessor()
+                                try:
+                                    qp.set_query(view_def)
 
-                            qp.process_query()
+                                    qp.process_query()
 
-                            LOGGER.info(f"View table: {qp.tables}")
+                                    LOGGER.info(f"View table: {qp.tables}")
 
-                            if qp.tables is not None and len(qp.tables) > 0:
-                                for table in qp.tables:
-                                    table_key = TableMetadata.TABLE_KEY_FORMAT.format(db=self._database, cluster=last_row['cluster'], schema=table[0].lower(), tbl=table[1].lower())
-                                    LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
-                                    yield TableLineage(
-                                        table_key=table_key,
-                                        downstream_deps=[table_metadata._get_table_key()]
-                                    )
+                                    if qp.tables is not None and len(qp.tables) > 0:
+                                        for table in qp.tables:
+                                            table_key = TableMetadata.TABLE_KEY_FORMAT.format(db=self._database, cluster=last_row['cluster'], schema=table[0].lower(), tbl=table[1].lower())
+                                            LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
+                                            yield TableLineage(
+                                                table_key=table_key,
+                                                downstream_deps=[table_metadata._get_table_key()]
+                                            )
 
-                        except QuerySyntaxError as e:
-                            LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
+                                except QuerySyntaxError as e:
+                                    LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
 
     def _get_raw_extract_iter(self) -> Iterator[Dict[str, Any]]:
         """

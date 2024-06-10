@@ -22,37 +22,46 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
             cluster_source = f"'{self._cluster}'"
 
         return """
+            WITH Objects AS (
+                SELECT
+                    current_database() AS cluster,
+                    n.nspname AS schema,
+                    c.relname AS name,
+                    CASE WHEN c.relkind = 'r' THEN NULL ELSE v.definition END AS object_description,
+                    c.relkind = 'v' AS is_view
+                FROM pg_catalog.pg_class c
+                LEFT JOIN pg_catalog.pg_views v ON c.relname = v.viewname
+                INNER JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+                WHERE c.relkind IN ('r', 'v') {where_clause_suffix}
+            ),
+            Columns AS (
+                SELECT
+                    current_database() AS cluster,
+                    n.nspname AS schema,
+                    c.relname AS name,
+                    a.attname AS col_name,
+                    format_type(a.atttypid, a.atttypmod) AS col_type,
+                    pd.description AS col_description,
+                    a.attnum AS col_sort_order
+                FROM pg_catalog.pg_attribute a
+                INNER JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+                INNER JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+                LEFT JOIN pg_catalog.pg_description pd ON c.oid = pd.objoid AND a.attnum = pd.objsubid
+                WHERE c.relkind IN ('r', 'v') {where_clause_suffix} AND a.attnum > 0
+            )
             SELECT
-                {cluster_source} as cluster,
-                st.schemaname as schema,
-                st.relname as name,
-                pgtd.description as description,
-                att.attname as col_name,
-                pgtyp.typname as col_type,
-                pgcd.description as col_description,
-                att.attnum as col_sort_order,
-                CASE
-                    WHEN pg_class.relkind = 'v' THEN true
-                    ELSE false
-                END AS is_view
-            FROM pg_catalog.pg_attribute att
-            INNER JOIN
-                pg_catalog.pg_statio_all_tables as st
-                on att.attrelid=st.relid
-            INNER JOIN
-                pg_catalog.pg_class pg_class
-                ON st.relid = pg_class.oid
-            LEFT JOIN
-                pg_catalog.pg_type pgtyp
-                on pgtyp.oid=att.atttypid
-            LEFT JOIN
-                pg_catalog.pg_description pgtd
-                on pgtd.objoid=st.relid and pgtd.objsubid=0
-            LEFT JOIN
-              pg_catalog.pg_description pgcd
-              on pgcd.objoid=st.relid and pgcd.objsubid=att.attnum
-            WHERE att.attnum >=0 and {where_clause_suffix}
-            ORDER by cluster, schema, name, col_sort_order;
+                o.cluster,
+                o.schema,
+                o.name,
+                o.object_description,
+                c.col_name,
+                c.col_type,
+                c.col_description,
+                c.col_sort_order,
+                o.is_view
+            FROM Objects o
+            LEFT JOIN Columns c ON o.schema = c.schema AND o.name = c.name
+            ORDER BY o.cluster, o.schema, o.name, c.col_sort_order;
         """.format(
             cluster_source=cluster_source,
             where_clause_suffix=where_clause_suffix,
@@ -85,7 +94,7 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
                 AND tbl.relname = '{table_name}';
         """.format(schema_name=schema_name, table_name=table_name)
 
-    def get_view_def_sql_statement(self, schema_name, view_name) -> Any:
+    def get_old_view_def_sql_statement(self, schema_name, view_name) -> Any:
         return """
             SELECT
                 view_definition
@@ -94,6 +103,17 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
             WHERE
                 view_schema = '{schema_name}'
                 AND view_name = '{view_name}';
+        """.format(schema_name=schema_name, view_name=view_name)
+
+    def get_new_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return """
+            SELECT
+                definition
+            FROM
+                pg_views
+            WHERE
+                schemaname = '{schema_name}'
+                AND viewname = '{view_name}';
         """.format(schema_name=schema_name, view_name=view_name)
 
     def get_scope(self) -> str:

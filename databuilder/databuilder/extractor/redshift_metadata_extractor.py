@@ -125,7 +125,7 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
                 AND c.relname = '{table_name}';
         """.format(schema_name=schema_name, table_name=table_name)
 
-    def get_view_def_sql_statement(self, schema_name, view_name) -> Any:
+    def _get_view_def_sql_statement(self, schema_name, view_name) -> Any:
         return """
             SELECT
                 view_definition
@@ -135,6 +135,12 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
                 table_schema = '{schema_name}'
                 AND table_name = '{view_name}';
         """.format(schema_name=schema_name, view_name=view_name)
+
+    def get_old_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return self._get_view_def_sql_statement(schema_name=schema_name, view_name=view_name)
+
+    def get_new_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return self._get_view_def_sql_statement(schema_name=schema_name, view_name=view_name)
 
     def get_scope(self) -> str:
         return 'extractor.redshift_metadata'
