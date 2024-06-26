@@ -49,7 +49,7 @@ export function getProviderDescription(providerData: ProviderMetadata) {
   const providerParams = getProviderQueryParams({ key: providerData.key });
 
   return axios
-    .get(`${API_PATH}/get_provider_description?${providerParams}`)
+    .get(`${API_PATH}/get_data_provider_description?${providerParams}`)
     .then((response: AxiosResponse<DescriptionAPI>) => {
       providerData.description = response.data.description;
 
@@ -61,7 +61,7 @@ export function updateProviderDescription(
   description: string,
   providerData: ProviderMetadata
 ) {
-  return axios.put(`${API_PATH}/put_provider_description`, {
+  return axios.put(`${API_PATH}/put_data_provider_description`, {
     description,
     key: providerData.key,
     source: 'user',

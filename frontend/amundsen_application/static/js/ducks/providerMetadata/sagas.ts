@@ -23,7 +23,6 @@ export function* getProviderDataWorker(action: GetProviderDataRequest): SagaIter
   const { key, searchIndex, source } = action.payload;
 
   try {
-    console.log(`getProviderDataWorker`);
     const { data, statusCode, tags } = yield call(
       API.getProviderData,
       key,
@@ -37,7 +36,6 @@ export function* getProviderDataWorker(action: GetProviderDataRequest): SagaIter
   }
 }
 export function* getProviderDataWatcher(): SagaIterator {
-  console.log(`getProviderDataWatcher`);
   yield takeEvery(GetProviderData.REQUEST, getProviderDataWorker);
 }
 

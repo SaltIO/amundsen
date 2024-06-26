@@ -66,3 +66,13 @@
     color: $badge-text-color;
 }
 
+.label-unique {
+    background-color: $badge-unique-color;
+    color: $badge-text-color;
+}
+
+.label-foreignkey {
+    background-color: $badge-foreignkey-color;
+    color: $badge-text-color;
+}
+

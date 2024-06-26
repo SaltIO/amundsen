@@ -48,22 +48,22 @@ interface LineageListProps {
   title: string;
 }
 
-const getLink = (table, direction) => {
-  const { cluster, database, schema, name } = table;
-  // TODO - column lineage should return the column name as a separate field
-  const [tableName, columnName] = name.split('/');
+const getLink = (lineageItem, direction) => {
+  const { database, cluster, schema, table, column } = lineageItem.lineage_item_detail;
+  // name.split('/');
 
   return (
-    `/table_detail/${cluster}/${database}/${schema}/${tableName}` +
-    `?source=column_lineage_${direction}&${TAB_URL_PARAM}=${TABLE_TAB.COLUMN}&column=${columnName}`
+    `/table_detail/${cluster}/${database}/${schema}/${table}` +
+    `?source=column_lineage_${direction}&${TAB_URL_PARAM}=${TABLE_TAB.COLUMN}&column=${column}`
   );
 };
 
-const renderLineageLinks = (entity, index, direction) => {
+const renderLineageLinks = (lineageItem, index, direction) => {
   if (index >= COLUMN_LINEAGE_LIST_SIZE) {
     return null;
   }
-  const lineageDisplayText = entity.schema + '.' + entity.name;
+  const { database, cluster, schema, table, column } = lineageItem.lineage_item_detail;
+  const lineageDisplayText = schema + '.' + table + '/' + column;
 
   return (
     <OverlayTrigger
@@ -77,7 +77,7 @@ const renderLineageLinks = (entity, index, direction) => {
     >
       <div className="column-lineage-item">
         <a
-          href={getLink(entity, direction)}
+          href={getLink(lineageItem, direction)}
           className="body-link"
           target="_blank"
           rel="noreferrer"

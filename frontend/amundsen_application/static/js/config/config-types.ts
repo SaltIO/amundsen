@@ -614,6 +614,7 @@ interface IndexFeaturesConfig {
 interface EditableTextConfig {
   tableDescLength: number;
   fileDescLength: number;
+  providerDescLength: number;
   columnDescLength: number;
 }
 /**

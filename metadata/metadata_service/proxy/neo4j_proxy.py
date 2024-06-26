@@ -2964,14 +2964,15 @@ class Neo4jProxy(BaseProxy):
     def _get_data_provider_query_statement(self) -> str:
         data_provider_query = textwrap.dedent("""
             MATCH (data_provider:Data_Provider {key: $data_provider_key})
+            OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
             OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider)
             OPTIONAL MATCH (data_location:Data_Location)-[:DATA_LOCATION_OF]->(data_channel)
-            WITH data_provider, data_channel, collect(data_location) AS data_locations
-            WITH data_provider,
+            WITH data_provider, data_provider_desc, data_channel, collect(data_location) AS data_locations
+            WITH data_provider, data_provider_desc,
                 CASE WHEN data_channel IS NULL THEN NULL
                 ELSE collect({data_channel: data_channel, data_locations: data_locations})
                 END AS data_channels
-            RETURN data_provider AS data_provider, data_channels
+            RETURN data_provider AS data_provider, data_provider_desc, data_channels
         """)
         return data_provider_query
 
@@ -3038,14 +3039,14 @@ class Neo4jProxy(BaseProxy):
         data_provider_rec = record["data_provider"]
         data_provider = DataProvider(name=data_provider_rec["name"],
                                      key=data_provider_rec["key"],
-                                     description=data_provider_rec.get("desc", None),
+                                     description=self._safe_get(record, "data_provider_desc", "description"),
                                      website=data_provider_rec.get("website", None),
                                      data_channels=data_channels)
 
         return data_provider
 
     def _get_file_query_statement(self) -> str:
-        data_provider_query = textwrap.dedent("""
+        file_query = textwrap.dedent("""
             MATCH (file:File {key: $file_key})
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
             OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
@@ -3058,7 +3059,7 @@ class Neo4jProxy(BaseProxy):
             WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
             RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
         """)
-        return data_provider_query
+        return file_query
 
     @timer_with_counter
     def get_file(self, *, file_uri: str) -> File:
@@ -3159,7 +3160,7 @@ class Neo4jProxy(BaseProxy):
     def get_file_description(self, *,
                              id: str) -> Description:
         """
-        Get the file description based on dashboard uri. Any exception will propagate back to api server.
+        Get the file description. Any exception will propagate back to api server.
 
         :param id:
         :return:
@@ -3172,11 +3173,37 @@ class Neo4jProxy(BaseProxy):
                              id: str,
                              description: str) -> None:
         """
-        Update Dashboard description
-        :param id: Dashboard URI
-        :param description: new value for Dashboard description
+        Update File description
+        :param id: File URI
+        :param description: new value for File description
         """
 
         self.put_resource_description(resource_type=ResourceType.File,
+                                      uri=id,
+                                      description=description)
+
+    @timer_with_counter
+    def get_data_provider_description(self, *,
+                             id: str) -> Description:
+        """
+        Get the Provider description. Any exception will propagate back to api server.
+
+        :param id:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.Data_Provider, uri=id)
+
+    @timer_with_counter
+    def put_data_provider_description(self, *,
+                                      id: str,
+                                      description: str) -> None:
+        """
+        Update Data Provider description
+        :param id: Data Provider URI
+        :param description: new value for Data Provider description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.Data_Provider,
                                       uri=id,
                                       description=description)

@@ -10,8 +10,6 @@ import _ from 'lodash';
 // Any defined members of customHost will override configCustom.
 // const appConfig: AppConfig = { ...configDefault, ...configCustom, ...configHost };
 
-console.log("starting appconfig")
-
 // Merge badges
 const mergedBadges = _.merge(
     {},
@@ -37,8 +35,5 @@ const appConfig: AppConfig = {
     badges: mergedBadges, // Use the merged result
     resourceConfig: mergedResourceConfig
 };
-
-// console.log("AppConfig");
-// console.log(JSON.stringify(appConfig, null, 2));
 
 export default appConfig;

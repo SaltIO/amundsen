@@ -39,6 +39,44 @@ class DataProviderDetailAPI(Resource):
         except NotFoundException:
             return {'message': 'data_provider_uri {} does not exist'.format(data_provider_uri)}, HTTPStatus.NOT_FOUND
 
+class DataProviderDescriptionAPI(BaseAPI):
+    """
+    DataProviderDescriptionAPI supports PUT and GET operation to upsert data provider description
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super().__init__(DescriptionSchema, 'data_provider_description', self.client)
+
+    # @swag_from('swagger_doc/common/description_get.yml')
+    def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
+        """
+        Returns description
+        """
+        try:
+            return super().get(id=id)
+
+        except NotFoundException:
+            return {'message': 'Data Provider {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+
+        except Exception:
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+    # @swag_from('swagger_doc/common/description_put.yml')
+    def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
+        """
+        Updates Data Provider description (passed as a request body)
+        :param id:
+        :return:
+        """
+        try:
+            description = json.loads(request.data).get('description')
+            self.client.put_data_provider_description(id=id, description=description)
+            return None, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+
 class FileDetailAPI(Resource):
     """
     FileDetailAPI API
@@ -123,7 +161,7 @@ class FileDescriptionAPI(BaseAPI):
             return super().get(id=id)
 
         except NotFoundException:
-            return {'message': 'Dashboard {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+            return {'message': 'File {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR

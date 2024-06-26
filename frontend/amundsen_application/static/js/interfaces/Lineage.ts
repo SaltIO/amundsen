@@ -16,6 +16,24 @@ export function isTableLineageItemDetail(detail: any): detail is TableLineageIte
          'database' in detail;
 }
 
+export interface ColumnLineageItemDetail {
+  column: string;
+  table: string;
+  schema: string;
+  cluster: string;
+  database: string;
+}
+
+export function isColumnLineageItemDetail(detail: any): detail is ColumnLineageItemDetail {
+  return detail !== null &&
+         typeof detail === 'object' &&
+         'column' in detail &&
+         'table' in detail &&
+         'schema' in detail &&
+         'cluster' in detail &&
+         'database' in detail;
+}
+
 export interface FileLineageItemDetail {
   name: string;
   type: string;
@@ -44,7 +62,7 @@ export interface LineageItem {
   source?: string;
   link?: string;
   in_amundsen?: boolean;
-  lineage_item_detail: TableLineageItemDetail | FileLineageItemDetail;
+  lineage_item_detail: TableLineageItemDetail | ColumnLineageItemDetail | FileLineageItemDetail;
 }
 
 export interface Lineage {
