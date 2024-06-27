@@ -198,9 +198,25 @@ class Neo4jProxy(BaseProxy):
         return table
 
     def _get_col_query_statement(self) -> str:
+        # column_level_query = textwrap.dedent("""
+        #     MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)
+        #     -[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+        #     OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_dscrpt:Description)
+        #     OPTIONAL MATCH (col:Column)-[:STAT]->(stat:Stat)
+        #     OPTIONAL MATCH (col:Column)-[:HAS_BADGE]->(badge:Badge)
+        #     OPTIONAL MATCH (col:Column)-[:TYPE_METADATA]->(Type_Metadata)-[:SUBTYPE *0..]->(tm:Type_Metadata)
+        #     OPTIONAL MATCH (tm:Type_Metadata)-[:DESCRIPTION]->(tm_dscrpt:Description)
+        #     OPTIONAL MATCH (tm:Type_Metadata)-[:HAS_BADGE]->(tm_badge:Badge)
+        #     WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, collect(distinct stat) as col_stats,
+        #     collect(distinct badge) as col_badges,
+        #     {node: tm, description: tm_dscrpt, badges: collect(distinct tm_badge)} as tm_results
+        #     RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges,
+        #     collect(distinct tm_results) as col_type_metadata
+        #     ORDER BY col.sort_order;
+        # """)
         column_level_query = textwrap.dedent("""
-            MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)
-            -[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
+            MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
             OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_dscrpt:Description)
             OPTIONAL MATCH (col:Column)-[:STAT]->(stat:Stat)
@@ -208,36 +224,22 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (col:Column)-[:TYPE_METADATA]->(Type_Metadata)-[:SUBTYPE *0..]->(tm:Type_Metadata)
             OPTIONAL MATCH (tm:Type_Metadata)-[:DESCRIPTION]->(tm_dscrpt:Description)
             OPTIONAL MATCH (tm:Type_Metadata)-[:HAS_BADGE]->(tm_badge:Badge)
-            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, collect(distinct stat) as col_stats,
-            collect(distinct badge) as col_badges,
-            {node: tm, description: tm_dscrpt, badges: collect(distinct tm_badge)} as tm_results
-            RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges,
-            collect(distinct tm_results) as col_type_metadata
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt,
+                collect(distinct stat) as col_stats,
+                collect(distinct badge) as col_badges,
+                tm, tm_dscrpt, tm_badge
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges, tm,
+                tm_dscrpt, collect(distinct tm_badge) as tm_badges
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges,
+                collect(distinct {node: tm, description: tm_dscrpt, badges: tm_badges}) as col_type_metadata
+            RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges, col_type_metadata
             ORDER BY col.sort_order;
         """)
         return column_level_query
 
     @timer_with_counter
     def _exec_col_query(self, table_uri: str) -> Tuple:
-        # Return Value: (Columns, Last Processed Record)
 
-        # column_level_query = textwrap.dedent("""
-        # MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)
-        # -[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
-        # OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
-        # OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_dscrpt:Description)
-        # OPTIONAL MATCH (col:Column)-[:STAT]->(stat:Stat)
-        # OPTIONAL MATCH (col:Column)-[:HAS_BADGE]->(badge:Badge)
-        # OPTIONAL MATCH (col:Column)-[:TYPE_METADATA]->(Type_Metadata)-[:SUBTYPE *0..]->(tm:Type_Metadata)
-        # OPTIONAL MATCH (tm:Type_Metadata)-[:DESCRIPTION]->(tm_dscrpt:Description)
-        # OPTIONAL MATCH (tm:Type_Metadata)-[:HAS_BADGE]->(tm_badge:Badge)
-        # WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, collect(distinct stat) as col_stats,
-        # collect(distinct badge) as col_badges,
-        # {node: tm, description: tm_dscrpt, badges: collect(distinct tm_badge)} as tm_results
-        # RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges,
-        # collect(distinct tm_results) as col_type_metadata
-        # ORDER BY col.sort_order;
-        # """)
         column_level_query = self._get_col_query_statement()
         tbl_col_neo4j_records = self._execute_cypher_query(
             statement=column_level_query, param_dict={'table_key': table_uri})
@@ -349,22 +351,22 @@ class Neo4jProxy(BaseProxy):
         return type_metadata
 
     def _get_usage_query_statement(self) -> str:
-        usage_query = textwrap.dedent("""\
+        # usage_query = textwrap.dedent("""
+        #     MATCH (user:User)-[read:READ]->(table:Table {key: $table_key})
+        #     RETURN user.email as email, read.read_count as read_count, table.name as table_name
+        #     ORDER BY read.read_count DESC LIMIT 5;
+        # """)
+        usage_query = textwrap.dedent("""
             MATCH (user:User)-[read:READ]->(table:Table {key: $table_key})
-            RETURN user.email as email, read.read_count as read_count, table.name as table_name
-            ORDER BY read.read_count DESC LIMIT 5;
+            WITH user.email as email, read.read_count as read_count, table.name as table_name
+            ORDER BY read_count DESC
+            LIMIT 5
+            RETURN email, read_count, table_name;
         """)
         return usage_query
 
     @timer_with_counter
     def _exec_usage_query(self, table_uri: str) -> List[Reader]:
-        # Return Value: List[Reader]
-
-        # usage_query = textwrap.dedent("""\
-        # MATCH (user:User)-[read:READ]->(table:Table {key: $table_key})
-        # RETURN user.email as email, read.read_count as read_count, table.name as table_name
-        # ORDER BY read.read_count DESC LIMIT 5;
-        # """)
 
         usage_query = self._get_usage_query_statement()
         usage_neo4j_records = self._execute_cypher_query(statement=usage_query,
@@ -379,48 +381,83 @@ class Neo4jProxy(BaseProxy):
         return readers
 
     def _get_table_query_statement(self) -> str:
-        table_level_query = textwrap.dedent("""\
+        # table_level_query = textwrap.dedent("""\
+        #     MATCH (table:Table {key: $table_key})
+        #     OPTIONAL MATCH (wmk:Watermark)-[:BELONG_TO_TABLE]->(table)
+        #     OPTIONAL MATCH (app_producer:Application)-[:GENERATES]->(table)
+        #     OPTIONAL MATCH (app_consumer:Application)-[:CONSUMES]->(table)
+        #     OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(t:Timestamp)
+        #     OPTIONAL MATCH (owner:User)<-[:OWNER]-(table)
+        #     OPTIONAL MATCH (table)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
+        #     OPTIONAL MATCH (table)-[:HAS_BADGE]->(badge:Badge)
+        #     OPTIONAL MATCH (table)-[:SOURCE]->(src:Source)
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
+        #     OPTIONAL MATCH (table)-[:UPDATE_FREQUENCY]->(update_frequency:Update_Frequency)
+        #     OPTIONAL MATCH (table)-[:HAS_REPORT]->(resource_reports:Report)
+        #     RETURN collect(distinct wmk) as wmk_records,
+        #     collect(distinct app_producer) as producing_apps,
+        #     collect(distinct app_consumer) as consuming_apps,
+        #     t.last_updated_timestamp as last_updated_timestamp,
+        #     collect(distinct owner) as owner_records,
+        #     collect(distinct tag) as tag_records,
+        #     collect(distinct badge) as badge_records,
+        #     collect(distinct src) as sources,
+        #     collect(distinct prog_descriptions) as prog_descriptions,
+        #     update_frequency.frequency as update_frequency,
+        #     collect(distinct resource_reports) as resource_reports
+        # """)
+        table_level_query = textwrap.dedent("""
             MATCH (table:Table {key: $table_key})
             OPTIONAL MATCH (wmk:Watermark)-[:BELONG_TO_TABLE]->(table)
             OPTIONAL MATCH (app_producer:Application)-[:GENERATES]->(table)
             OPTIONAL MATCH (app_consumer:Application)-[:CONSUMES]->(table)
             OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(t:Timestamp)
             OPTIONAL MATCH (owner:User)<-[:OWNER]-(table)
-            OPTIONAL MATCH (table)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
+            OPTIONAL MATCH (table)-[:TAGGED_BY]->(tag:Tag {tag_type: $tag_normal_type})
             OPTIONAL MATCH (table)-[:HAS_BADGE]->(badge:Badge)
             OPTIONAL MATCH (table)-[:SOURCE]->(src:Source)
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
             OPTIONAL MATCH (table)-[:UPDATE_FREQUENCY]->(update_frequency:Update_Frequency)
             OPTIONAL MATCH (table)-[:HAS_REPORT]->(resource_reports:Report)
-            RETURN collect(distinct wmk) as wmk_records,
-            collect(distinct app_producer) as producing_apps,
-            collect(distinct app_consumer) as consuming_apps,
-            t.last_updated_timestamp as last_updated_timestamp,
-            collect(distinct owner) as owner_records,
-            collect(distinct tag) as tag_records,
-            collect(distinct badge) as badge_records,
-            collect(distinct src) as sources,
-            collect(distinct prog_descriptions) as prog_descriptions,
-            update_frequency.frequency as update_frequency,
-            collect(distinct resource_reports) as resource_reports
+            WITH table, t, update_frequency,
+                collect(distinct wmk) as wmk_records,
+                collect(distinct app_producer) as producing_apps,
+                collect(distinct app_consumer) as consuming_apps,
+                collect(distinct owner) as owner_records,
+                collect(distinct tag) as tag_records,
+                collect(distinct badge) as badge_records,
+                collect(distinct src) as sources,
+                collect(distinct prog_descriptions) as prog_descriptions,
+                collect(distinct resource_reports) as resource_reports
+            RETURN wmk_records,
+                producing_apps,
+                consuming_apps,
+                t.last_updated_timestamp as last_updated_timestamp,
+                owner_records,
+                tag_records,
+                badge_records,
+                sources,
+                prog_descriptions,
+                update_frequency.frequency as update_frequency,
+                resource_reports;
         """)
         return table_level_query
 
     def _get_owners_query_statement(self) -> str:
+        # owners_query = textwrap.dedent("""\
+        #     MATCH (owner:User)<-[:OWNER]-(tbl:Table {key: $tbl_key})
+        #     RETURN collect(distinct owner) as owner_records
+        # """)
         owners_query = textwrap.dedent("""\
             MATCH (owner:User)<-[:OWNER]-(tbl:Table {key: $tbl_key})
-            RETURN collect(distinct owner) as owner_records
+            WITH collect(distinct owner) as owner_records
+            RETURN owner_records;
         """)
         return owners_query
 
 
     @timer_with_counter
     def _exec_owners_query(self, table_uri: str) -> List[User]:
-        # Return Value: List[User]
-        # owners_query = textwrap.dedent("""
-        #     MATCH (owner:User)<-[:OWNER]-(tbl:Table {key: $tbl_key})
-        #     RETURN collect(distinct owner) as owner_records
-        # """)
         owners_query = self._get_owners_query_statement();
         owners_neo4j_records = self._execute_cypher_query(statement=owners_query,
                                                           param_dict={'tbl_key': table_uri})
@@ -441,32 +478,6 @@ class Neo4jProxy(BaseProxy):
         Queries one Cypher record with watermark list, Application,
         ,timestamp, and tag records.
         """
-
-        # Return Value: (Watermark Results, Table Writer, Last Updated Timestamp, tag records)
-
-        # table_level_query = textwrap.dedent("""\
-        # MATCH (table:Table {key: $table_key})
-        # OPTIONAL MATCH (wmk:Watermark)-[:BELONG_TO_TABLE]->(table)
-        # OPTIONAL MATCH (app_producer:Application)-[:GENERATES]->(table)
-        # OPTIONAL MATCH (app_consumer:Application)-[:CONSUMES]->(table)
-        # OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(t:Timestamp)
-        # OPTIONAL MATCH (owner:User)<-[:OWNER]-(table)
-        # OPTIONAL MATCH (table)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
-        # OPTIONAL MATCH (table)-[:HAS_BADGE]->(badge:Badge)
-        # OPTIONAL MATCH (table)-[:SOURCE]->(src:Source)
-        # OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
-        # OPTIONAL MATCH (table)-[:HAS_REPORT]->(resource_reports:Report)
-        # RETURN collect(distinct wmk) as wmk_records,
-        # collect(distinct app_producer) as producing_apps,
-        # collect(distinct app_consumer) as consuming_apps,
-        # t.last_updated_timestamp as last_updated_timestamp,
-        # collect(distinct owner) as owner_records,
-        # collect(distinct tag) as tag_records,
-        # collect(distinct badge) as badge_records,
-        # src,
-        # collect(distinct prog_descriptions) as prog_descriptions,
-        # collect(distinct resource_reports) as resource_reports
-        # """)
 
         table_level_query = self._get_table_query_statement()
         table_records = self._execute_cypher_query(statement=table_level_query,
@@ -535,6 +546,56 @@ class Neo4jProxy(BaseProxy):
             tags, sources, badges, prog_descriptions, update_frequency, resource_reports
 
     def _get_table_query_query_statement(self) -> str:
+        # table_query_level_query = textwrap.dedent("""
+        #     MATCH (table:Table {key: $table_key})
+        #     OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
+        #     OPTIONAL MATCH (j)-[JOIN_OF_COLUMN]->(col2:Column)
+        #     OPTIONAL MATCH (j)-[JOIN_OF_QUERY]->(jq:Query)-[:HAS_EXECUTION]->(exec:Execution)
+        #     WITH table, j, col, col2,
+        #         sum(coalesce(exec.execution_count, 0)) as join_exec_cnt
+        #     ORDER BY join_exec_cnt desc
+        #     LIMIT 5
+        #     WITH table,
+        #         COLLECT(DISTINCT {
+        #         join: {
+        #             joined_on_table: {
+        #                 database: case when j.left_table_key = $table_key
+        #                         then j.right_database
+        #                         else j.left_database
+        #                         end,
+        #                 cluster: case when j.left_table_key = $table_key
+        #                         then j.right_cluster
+        #                         else j.left_cluster
+        #                         end,
+        #                 schema: case when j.left_table_key = $table_key
+        #                         then j.right_schema
+        #                         else j.left_schema
+        #                         end,
+        #                 name: case when j.left_table_key = $table_key
+        #                     then j.right_table
+        #                     else j.left_table
+        #                     end
+        #             },
+        #             joined_on_column: col2.name,
+        #             column: col.name,
+        #             join_type: j.join_type,
+        #             join_sql: j.join_sql
+        #         },
+        #         join_exec_cnt: join_exec_cnt
+        #     }) as joins
+        #     WITH table, joins
+        #     OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[USES_WHERE_CLAUSE]->(whr:Where)
+        #     OPTIONAL MATCH (whr)-[WHERE_CLAUSE_OF]->(wq:Query)-[:HAS_EXECUTION]->(whrexec:Execution)
+        #     WITH table, joins,
+        #         whr, sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
+        #     ORDER BY where_exec_cnt desc
+        #     LIMIT 5
+        #     RETURN table, joins,
+        #     COLLECT(DISTINCT {
+        #         where_clause: whr.where_clause,
+        #         where_exec_cnt: where_exec_cnt
+        #     }) as filters
+        # """)
         table_query_level_query = textwrap.dedent("""
             MATCH (table:Table {key: $table_key})
             OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
@@ -542,48 +603,36 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (j)-[JOIN_OF_QUERY]->(jq:Query)-[:HAS_EXECUTION]->(exec:Execution)
             WITH table, j, col, col2,
                 sum(coalesce(exec.execution_count, 0)) as join_exec_cnt
-            ORDER BY join_exec_cnt desc
+            ORDER BY join_exec_cnt DESC
             LIMIT 5
             WITH table,
-                COLLECT(DISTINCT {
-                join: {
-                    joined_on_table: {
-                        database: case when j.left_table_key = $table_key
-                                then j.right_database
-                                else j.left_database
-                                end,
-                        cluster: case when j.left_table_key = $table_key
-                                then j.right_cluster
-                                else j.left_cluster
-                                end,
-                        schema: case when j.left_table_key = $table_key
-                                then j.right_schema
-                                else j.left_schema
-                                end,
-                        name: case when j.left_table_key = $table_key
-                            then j.right_table
-                            else j.left_table
-                            end
+                collect(distinct {
+                    join: {
+                        joined_on_table: {
+                            database: case when j.left_table_key = $table_key then j.right_database else j.left_database end,
+                            cluster: case when j.left_table_key = $table_key then j.right_cluster else j.left_cluster end,
+                            schema: case when j.left_table_key = $table_key then j.right_schema else j.left_schema end,
+                            name: case when j.left_table_key = $table_key then j.right_table else j.left_table end
+                        },
+                        joined_on_column: col2.name,
+                        column: col.name,
+                        join_type: j.join_type,
+                        join_sql: j.join_sql
                     },
-                    joined_on_column: col2.name,
-                    column: col.name,
-                    join_type: j.join_type,
-                    join_sql: j.join_sql
-                },
-                join_exec_cnt: join_exec_cnt
-            }) as joins
+                    join_exec_cnt: join_exec_cnt
+                }) as joins
             WITH table, joins
             OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[USES_WHERE_CLAUSE]->(whr:Where)
             OPTIONAL MATCH (whr)-[WHERE_CLAUSE_OF]->(wq:Query)-[:HAS_EXECUTION]->(whrexec:Execution)
-            WITH table, joins,
-                whr, sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
-            ORDER BY where_exec_cnt desc
+            WITH table, joins, whr,
+                sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
+            ORDER BY where_exec_cnt DESC
             LIMIT 5
             RETURN table, joins,
-            COLLECT(DISTINCT {
-                where_clause: whr.where_clause,
-                where_exec_cnt: where_exec_cnt
-            }) as filters
+                collect(distinct {
+                    where_clause: whr.where_clause,
+                    where_exec_cnt: where_exec_cnt
+                }) as filters;
         """)
         return table_query_level_query
 
@@ -594,58 +643,6 @@ class Neo4jProxy(BaseProxy):
         and entities (e.g. joins, where clauses, etc.) associated to queries that are executed
         on the table.
         """
-
-        # Return Value: (Watermark Results, Table Writer, Last Updated Timestamp, owner records, tag records)
-        # table_query_level_query = textwrap.dedent("""
-        # MATCH (table:Table {key: $table_key})
-        # OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
-        # OPTIONAL MATCH (j)-[JOIN_OF_COLUMN]->(col2:Column)
-        # OPTIONAL MATCH (j)-[JOIN_OF_QUERY]->(jq:Query)-[:HAS_EXECUTION]->(exec:Execution)
-        # WITH table, j, col, col2,
-        #     sum(coalesce(exec.execution_count, 0)) as join_exec_cnt
-        # ORDER BY join_exec_cnt desc
-        # LIMIT 5
-        # WITH table,
-        #     COLLECT(DISTINCT {
-        #     join: {
-        #         joined_on_table: {
-        #             database: case when j.left_table_key = $table_key
-        #                       then j.right_database
-        #                       else j.left_database
-        #                       end,
-        #             cluster: case when j.left_table_key = $table_key
-        #                      then j.right_cluster
-        #                      else j.left_cluster
-        #                      end,
-        #             schema: case when j.left_table_key = $table_key
-        #                     then j.right_schema
-        #                     else j.left_schema
-        #                     end,
-        #             name: case when j.left_table_key = $table_key
-        #                   then j.right_table
-        #                   else j.left_table
-        #                   end
-        #         },
-        #         joined_on_column: col2.name,
-        #         column: col.name,
-        #         join_type: j.join_type,
-        #         join_sql: j.join_sql
-        #     },
-        #     join_exec_cnt: join_exec_cnt
-        # }) as joins
-        # WITH table, joins
-        # OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[USES_WHERE_CLAUSE]->(whr:Where)
-        # OPTIONAL MATCH (whr)-[WHERE_CLAUSE_OF]->(wq:Query)-[:HAS_EXECUTION]->(whrexec:Execution)
-        # WITH table, joins,
-        #     whr, sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
-        # ORDER BY where_exec_cnt desc
-        # LIMIT 5
-        # RETURN table, joins,
-        #   COLLECT(DISTINCT {
-        #     where_clause: whr.where_clause,
-        #     where_exec_cnt: where_exec_cnt
-        #   }) as filters
-        # """)
 
         table_query_level_query = self._get_table_query_query_statement()
         query_records = self._execute_cypher_query(statement=table_query_level_query, param_dict={'table_key': table_uri})
@@ -753,6 +750,10 @@ class Neo4jProxy(BaseProxy):
         return _badges
 
     def _get_description_query_statement(self, resource_type: ResourceType) -> str:
+        # description_query = textwrap.dedent("""
+        #     MATCH ({node_name}:{node_label} {{key: $key}})-[:DESCRIPTION]->(d:Description)
+        #     RETURN d.description AS description;
+        # """.format(node_name=resource_type.name.lower(), node_label=resource_type.name))
         description_query = textwrap.dedent("""
             MATCH ({node_name}:{node_label} {{key: $key}})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
@@ -770,11 +771,6 @@ class Neo4jProxy(BaseProxy):
         :param id:
         :return:
         """
-
-        # description_query = textwrap.dedent("""
-        # MATCH (n:{node_label} {{key: $key}})-[:DESCRIPTION]->(d:Description)
-        # RETURN d.description AS description;
-        # """.format(node_label=resource_type.name))
 
         description_query = self._get_description_query_statement(resource_type=resource_type)
 
@@ -1014,6 +1010,10 @@ class Neo4jProxy(BaseProxy):
                                       description=description)
 
     def _get_column_description_query_statement(self) -> str:
+        # column_description_query = textwrap.dedent("""
+        #     MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+        #     RETURN d.description AS description;
+        # """)
         column_description_query = textwrap.dedent("""
             MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
             RETURN d.description AS description;
@@ -1031,11 +1031,6 @@ class Neo4jProxy(BaseProxy):
         :param column_name:
         :return:
         """
-        # column_description_query = textwrap.dedent("""
-        # MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
-        # RETURN d.description AS description;
-        # """)
-
         column_description_query = self._get_column_description_query_statement()
         result = self._execute_cypher_query(statement=column_description_query,
                                             param_dict={'table_key': table_uri, 'column_name': column_name})
@@ -1335,16 +1330,12 @@ class Neo4jProxy(BaseProxy):
 
     def _get_badge_query_statement(self) -> str:
         query = textwrap.dedent("""
-            MATCH (badge:Badge) RETURN badge
+            MATCH (badge:Badge) RETURN badge;
         """)
         return query
 
     @timer_with_counter
     def get_badges(self) -> List:
-        LOGGER.info('Get all badges')
-        # query = textwrap.dedent("""
-        # MATCH (badge:Badge) RETURN badge
-        # """)
         query = self._get_badge_query_statement()
         records = self._execute_cypher_query(statement=query,
                                              param_dict={})
@@ -1468,6 +1459,13 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     def _get_tags_query_statement(self, optional_resource: bool = True) -> str:
+        # query = textwrap.dedent(f"""
+        #     MATCH (t:Tag{{tag_type: 'default'}})
+        #     {'OPTIONAL' if optional_resource is True else '' } MATCH (resource)-[:TAGGED_BY]->(t)
+        #     WITH t as tag_name, count(distinct resource.key) as tag_count
+        #     WHERE tag_count > 0
+        #     RETURN tag_name, tag_count
+        # """)
         query = textwrap.dedent(f"""
             MATCH (t:Tag{{tag_type: 'default'}})
             {'OPTIONAL' if optional_resource is True else '' } MATCH (resource)-[:TAGGED_BY]->(t)
@@ -1484,15 +1482,6 @@ class Neo4jProxy(BaseProxy):
 
         :return:
         """
-        LOGGER.info('Get all the tags')
-        # todo: Currently all the tags are default type, we could open it up if we want to include badge
-        # query = textwrap.dedent("""
-        # MATCH (t:Tag{tag_type: 'default'})
-        # OPTIONAL MATCH (resource)-[:TAGGED_BY]->(t)
-        # WITH t as tag_name, count(distinct resource.key) as tag_count
-        # WHERE tag_count > 0
-        # RETURN tag_name, tag_count
-        # """)
         query = self._get_tags_query_statement()
         records = self._execute_cypher_query(statement=query,
                                              param_dict={})
@@ -1504,7 +1493,8 @@ class Neo4jProxy(BaseProxy):
 
     def _get_latest_updated_ts_query_statement(self) -> str:
         query = textwrap.dedent("""
-            MATCH (n:Updatedtimestamp{key: 'amundsen_updated_timestamp'}) RETURN n as ts
+            MATCH (n:Updatedtimestamp{key: 'amundsen_updated_timestamp'})
+            RETURN n as ts
         """)
         return query
 
@@ -1515,9 +1505,6 @@ class Neo4jProxy(BaseProxy):
 
         :return:
         """
-        # query = textwrap.dedent("""
-        # MATCH (n:Updatedtimestamp{key: 'amundsen_updated_timestamp'}) RETURN n as ts
-        # """)
         query = self._get_latest_updated_ts_query_statement()
         record = self._execute_cypher_query(statement=query,
                                             param_dict={})
@@ -1529,25 +1516,58 @@ class Neo4jProxy(BaseProxy):
             return None
 
     def _get_statistics_query_statement(self) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH (table:Table) with count(table) as number_of_tables
+        #     MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
+        #     WHERE size(description_node.description)>2 and exists(item_node.is_view)
+        #     with count(item_node) as number_of_documented_tables, number_of_tables
+        #     MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
+        #     WHERE  size(description_node.description)>2 and exists(item_node.sort_order)
+        #     with count(item_node) as number_of_documented_cols, number_of_documented_tables, number_of_tables
+        #     MATCH p=(table)-[r:OWNER]->(user_node) with count(distinct table) as number_of_tables_with_owners,
+        #     count(distinct user_node) as number_of_owners, number_of_documented_cols,
+        #     number_of_documented_tables, number_of_tables
+        #     MATCH (item_node)-[:DESCRIPTION]->(description_node)
+        #     WHERE  size(description_node.description)>2 and exists(item_node.is_view)
+        #     MATCH  (item_node)-[:OWNER]->(user_node)
+        #     with count(item_node) as number_of_documented_and_owned_tables,
+        #     number_of_tables_with_owners, number_of_owners, number_of_documented_cols,
+        #     number_of_documented_tables, number_of_tables
+        #     Return number_of_tables, number_of_documented_tables, number_of_documented_cols,
+        #     number_of_owners, number_of_tables_with_owners, number_of_documented_and_owned_tables
+        # """)
         query = textwrap.dedent("""
-            MATCH (table:Table) with count(table) as number_of_tables
-            MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
-            WHERE size(description_node.description)>2 and exists(item_node.is_view)
-            with count(item_node) as number_of_documented_tables, number_of_tables
-            MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
-            WHERE  size(description_node.description)>2 and exists(item_node.sort_order)
-            with count(item_node) as number_of_documented_cols, number_of_documented_tables, number_of_tables
-            MATCH p=(table)-[r:OWNER]->(user_node) with count(distinct table) as number_of_tables_with_owners,
-            count(distinct user_node) as number_of_owners, number_of_documented_cols,
-            number_of_documented_tables, number_of_tables
+            // Count the total number of tables
+            MATCH (table:Table)
+            WITH count(table) as number_of_tables
+
+            // Count the number of documented tables
             MATCH (item_node)-[:DESCRIPTION]->(description_node)
-            WHERE  size(description_node.description)>2 and exists(item_node.is_view)
-            MATCH  (item_node)-[:OWNER]->(user_node)
-            with count(item_node) as number_of_documented_and_owned_tables,
-            number_of_tables_with_owners, number_of_owners, number_of_documented_cols,
-            number_of_documented_tables, number_of_tables
-            Return number_of_tables, number_of_documented_tables, number_of_documented_cols,
-            number_of_owners, number_of_tables_with_owners, number_of_documented_and_owned_tables
+            WHERE size(description_node.description) > 2 AND exists(item_node.is_view)
+            WITH count(item_node) as number_of_documented_tables, number_of_tables
+
+            // Count the number of documented columns
+            MATCH (item_node)-[:DESCRIPTION]->(description_node)
+            WHERE size(description_node.description) > 2 AND exists(item_node.sort_order)
+            WITH count(item_node) as number_of_documented_cols, number_of_documented_tables, number_of_tables
+
+            // Count the number of tables with owners and the number of distinct owners
+            MATCH (table)-[:OWNER]->(user_node)
+            WITH count(distinct table) as number_of_tables_with_owners,
+                count(distinct user_node) as number_of_owners,
+                number_of_documented_cols, number_of_documented_tables, number_of_tables
+
+            // Count the number of documented and owned tables
+            MATCH (item_node)-[:DESCRIPTION]->(description_node)
+            WHERE size(description_node.description) > 2 AND exists(item_node.is_view)
+            MATCH (item_node)-[:OWNER]->(user_node)
+            WITH count(item_node) as number_of_documented_and_owned_tables,
+                number_of_tables_with_owners, number_of_owners,
+                number_of_documented_cols, number_of_documented_tables, number_of_tables
+
+            // Return the final counts
+            RETURN number_of_tables, number_of_documented_tables, number_of_documented_cols,
+                number_of_owners, number_of_tables_with_owners, number_of_documented_and_owned_tables;
         """)
         return query
 
@@ -1557,26 +1577,6 @@ class Neo4jProxy(BaseProxy):
         API method to fetch statistics metrics for neo4j
         :return: dictionary of statistics
         """
-        # query = textwrap.dedent("""
-        # MATCH (table_node:Table) with count(table_node) as number_of_tables
-        # MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
-        # WHERE size(description_node.description)>2 and exists(item_node.is_view)
-        # with count(item_node) as number_of_documented_tables, number_of_tables
-        # MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
-        # WHERE  size(description_node.description)>2 and exists(item_node.sort_order)
-        # with count(item_node) as number_of_documented_cols, number_of_documented_tables, number_of_tables
-        # MATCH p=(table_node)-[r:OWNER]->(user_node) with count(distinct table_node) as number_of_tables_with_owners,
-        # count(distinct user_node) as number_of_owners, number_of_documented_cols,
-        # number_of_documented_tables, number_of_tables
-        # MATCH (item_node)-[:DESCRIPTION]->(description_node)
-        # WHERE  size(description_node.description)>2 and exists(item_node.is_view)
-        # MATCH  (item_node)-[:OWNER]->(user_node)
-        # with count(item_node) as number_of_documented_and_owned_tables,
-        # number_of_tables_with_owners, number_of_owners, number_of_documented_cols,
-        # number_of_documented_tables, number_of_tables
-        # Return number_of_tables, number_of_documented_tables, number_of_documented_cols,
-        # number_of_owners, number_of_tables_with_owners, number_of_documented_and_owned_tables
-        # """)
         query = self._get_statistics_query_statement()
         LOGGER.info('Getting Neo4j Statistics')
         records = self._execute_cypher_query(statement=query,
@@ -1593,14 +1593,23 @@ class Neo4jProxy(BaseProxy):
         return {}
 
     def _get_global_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH ({node_name}:{node_label})-[r:READ_BY]->(u:User)
+        #     WITH {node_name}.key as resource_key, count(distinct u) as readers, sum(r.read_count) as total_reads
+        #     WHERE readers >= $num_readers
+        #     RETURN resource_key, readers, total_reads, (readers * log(total_reads)) as score
+        #     ORDER BY score DESC
+        #     LIMIT $num_entries;
+        # """).format(node_name=resource_type.name.lower(), node_label=resource_type.name)
         query = textwrap.dedent("""
             MATCH ({node_name}:{node_label})-[r:READ_BY]->(u:User)
             WITH {node_name}.key as resource_key, count(distinct u) as readers, sum(r.read_count) as total_reads
             WHERE readers >= $num_readers
-            RETURN resource_key, readers, total_reads, (readers * log(total_reads)) as score
-            ORDER BY score DESC LIMIT $num_entries;
+            WITH resource_key, readers, total_reads, (readers * log(total_reads)) as score
+            ORDER BY score DESC
+            LIMIT $num_entries
+            RETURN resource_key, readers, total_reads, score;
         """).format(node_name=resource_type.name.lower(), node_label=resource_type.name)
-        # format(resource_type=resource_type.name)
         return query
 
     @_CACHE.cache('_get_global_popular_resources_uris', expire=_GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC)
@@ -1616,13 +1625,6 @@ class Neo4jProxy(BaseProxy):
         number of users reading a lot of times.
         :return: Iterable of table uri
         """
-        # query = textwrap.dedent("""
-        # MATCH (resource:{resource_type})-[r:READ_BY]->(u:User)
-        # WITH resource.key as resource_key, count(distinct u) as readers, sum(r.read_count) as total_reads
-        # WHERE readers >= $num_readers
-        # RETURN resource_key, readers, total_reads, (readers * log(total_reads)) as score
-        # ORDER BY score DESC LIMIT $num_entries;
-        # """).format(resource_type=resource_type.name)
         query = self._get_global_popular_resources_uris_query_statement(resource_type)
         LOGGER.info('Querying popular tables URIs')
         num_readers = current_app.config['POPULAR_RESOURCES_MINIMUM_READER_COUNT']
@@ -1633,14 +1635,24 @@ class Neo4jProxy(BaseProxy):
         return [record['resource_key'] for record in records]
 
     def _get_personal_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
+        # statement = textwrap.dedent("""
+        #     MATCH (:User {{key:$user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->
+        #         (coUser:User)<-[coRead:READ_BY]-(resource:{resource_type})
+        #     WITH resource.key AS resource_key, count(DISTINCT coUser) AS co_readers,
+        #         sum(coRead.read_count) AS total_co_reads
+        #     WHERE co_readers >= $num_readers
+        #     RETURN resource_key, (co_readers * log(total_co_reads)) AS score
+        #     ORDER BY score DESC LIMIT $num_entries;
+        # """).format(resource_type=resource_type.name)
         statement = textwrap.dedent("""
-            MATCH (:User {{key:$user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->
-                (coUser:User)<-[coRead:READ_BY]-(resource:{resource_type})
-            WITH resource.key AS resource_key, count(DISTINCT coUser) AS co_readers,
-                sum(coRead.read_count) AS total_co_reads
+            MATCH (:User {{key: $user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->(coUser:User)
+            MATCH (coUser)<-[coRead:READ_BY]-(resource:{resource_type})
+            WITH resource.key AS resource_key, count(DISTINCT coUser) AS co_readers, sum(coRead.read_count) AS total_co_reads
             WHERE co_readers >= $num_readers
-            RETURN resource_key, (co_readers * log(total_co_reads)) AS score
-            ORDER BY score DESC LIMIT $num_entries;
+            WITH resource_key, co_readers, total_co_reads, (co_readers * log(total_co_reads)) AS score
+            ORDER BY score DESC
+            LIMIT $num_entries
+            RETURN resource_key, score;
         """).format(resource_type=resource_type.name)
         return statement
 
@@ -1659,15 +1671,6 @@ class Neo4jProxy(BaseProxy):
 
         :return: Iterable of table uri
         """
-        # statement = textwrap.dedent("""
-        # MATCH (:User {{key:$user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->
-        #      (coUser:User)<-[coRead:READ_BY]-(resource:{resource_type})
-        # WITH resource.key AS resource_key, count(DISTINCT coUser) AS co_readers,
-        #      sum(coRead.read_count) AS total_co_reads
-        # WHERE co_readers >= $num_readers
-        # RETURN resource_key, (co_readers * log(total_co_reads)) AS score
-        # ORDER BY score DESC LIMIT $num_entries;
-        # """).format(resource_type=resource_type.name)
         statement = self._get_personal_popular_resources_uris_query_statement(resource_type)
         LOGGER.info('Querying popular tables URIs')
         num_readers = current_app.config['POPULAR_RESOURCES_MINIMUM_READER_COUNT']
@@ -1679,13 +1682,20 @@ class Neo4jProxy(BaseProxy):
         return [record['resource_key'] for record in records]
 
     def _get_popular_tables_query_statement(self) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
+        #     WHERE table.key IN $table_uris
+        #     WITH db.name as database_name, clstr.name as cluster_name, schema.name as schema_name, table
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(dscrpt:Description)
+        #     RETURN database_name, cluster_name, schema_name, table.name as table_name,
+        #     dscrpt.description as table_description;
+        # """)
         query = textwrap.dedent("""
             MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
             WHERE table.key IN $table_uris
             WITH db.name as database_name, clstr.name as cluster_name, schema.name as schema_name, table
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(dscrpt:Description)
-            RETURN database_name, cluster_name, schema_name, table.name as table_name,
-            dscrpt.description as table_description;
+            RETURN database_name, cluster_name, schema_name, table.name as table_name, dscrpt.description as table_description;
         """)
         return query
 
@@ -1711,14 +1721,6 @@ class Neo4jProxy(BaseProxy):
         if not table_uris:
             return []
 
-        # query = textwrap.dedent("""
-        # MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
-        # WHERE table.key IN $table_uris
-        # WITH db.name as database_name, clstr.name as cluster_name, schema.name as schema_name, table
-        # OPTIONAL MATCH (table)-[:DESCRIPTION]->(dscrpt:Description)
-        # RETURN database_name, cluster_name, schema_name, table.name as table_name,
-        # dscrpt.description as table_description;
-        # """)
         query = self._get_popular_tables_query_statement()
         records = self._execute_cypher_query(statement=query,
                                              param_dict={'table_uris': table_uris})
@@ -1763,16 +1765,32 @@ class Neo4jProxy(BaseProxy):
         return popular_tables
 
     def _get_popular_dashboards_query_statement(self) -> str:
+        # query = textwrap.dedent(f"""
+        #     MATCH (dashboard:Dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+        #     WHERE dashboard.key IN $dashboards_uris
+        #     OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(dscrpt:Description)
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution)
+        #     WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
+        #     RETURN c.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
+        #     dashboard.key as uri, dashboard.name as name, dashboard.dashboard_url as url,
+        #     split(dashboard.key, '_')[0] as product,
+        #     dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp
+        # """)
         query = textwrap.dedent(f"""
             MATCH (dashboard:Dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
             WHERE dashboard.key IN $dashboards_uris
             OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(dscrpt:Description)
             OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution)
             WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
-            RETURN c.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
-            dashboard.key as uri, dashboard.name as name, dashboard.dashboard_url as url,
-            split(dashboard.key, '_')[0] as product,
-            dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp
+            RETURN c.name as cluster_name,
+                dg.name as dg_name,
+                dg.dashboard_group_url as dg_url,
+                dashboard.key as uri,
+                dashboard.name as name,
+                dashboard.dashboard_url as url,
+                split(dashboard.key, '_')[0] as product,
+                dscrpt.description as description,
+                last_exec.timestamp as last_successful_run_timestamp;
         """)
         return query
 
@@ -1783,16 +1801,6 @@ class Neo4jProxy(BaseProxy):
         if not resource_uris:
             return []
 
-        # query = textwrap.dedent(f"""
-        # MATCH (d:Dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
-        # WHERE d.key IN $dashboards_uris
-        # OPTIONAL MATCH (d)-[:DESCRIPTION]->(dscrpt:Description)
-        # OPTIONAL MATCH (d)-[:EXECUTED]->(last_exec:Execution)
-        # WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
-        # RETURN c.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
-        # d.key as uri, d.name as name, d.dashboard_url as url,
-        # split(d.key, '_')[0] as product,
-        # dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp""")
         query = self._get_popular_dashboards_query_statement()
         records = self._execute_cypher_query(statement=query,
                                              param_dict={'dashboards_uris': resource_uris})
@@ -1860,11 +1868,6 @@ class Neo4jProxy(BaseProxy):
         :return:
         """
 
-        # query = textwrap.dedent("""
-        # MATCH (user:User {key: $user_id})
-        # OPTIONAL MATCH (user)-[:MANAGE_BY]->(manager:User)
-        # RETURN user as user_record, manager as manager_record
-        # """)
         query = self._get_user_query_statement()
         record = self._execute_cypher_query(statement=query,
                                             param_dict={'user_id': id})
@@ -1939,7 +1942,11 @@ class Neo4jProxy(BaseProxy):
         return ', '.join(props)
 
     def _get_users_query_statement(self) -> str:
-        statement = "MATCH (usr:User) WHERE usr.is_active = true RETURN collect(usr) as users"
+        statement = textwrap.dedent("""
+            MATCH (usr:User)
+            WHERE usr.is_active = true
+            RETURN collect(usr) as users;
+        """)
         return statement
 
     def get_users(self) -> List[UserEntity]:
@@ -2028,15 +2035,30 @@ class Neo4jProxy(BaseProxy):
         # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L18
         # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
 
+        # query = textwrap.dedent(f"""
+        #     MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
+        #     OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
+        #     OPTIONAL MATCH (resource)-[:EXECUTED]->(last_exec:Execution)
+        #     WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
+        #     RETURN clstr.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
+        #     resource.key as uri, resource.name as name, resource.dashboard_url as url,
+        #     split(resource.key, '_')[0] as product,
+        #     dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp
+        # """)
         query = textwrap.dedent(f"""
-            MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
+            MATCH ({rel_clause})<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
             OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
             OPTIONAL MATCH (resource)-[:EXECUTED]->(last_exec:Execution)
             WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
-            RETURN clstr.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
-            resource.key as uri, resource.name as name, resource.dashboard_url as url,
-            split(resource.key, '_')[0] as product,
-            dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp
+            RETURN clstr.name as cluster_name,
+                dg.name as dg_name,
+                dg.dashboard_group_url as dg_url,
+                resource.key as uri,
+                resource.name as name,
+                resource.dashboard_url as url,
+                split(resource.key, '_')[0] as product,
+                dscrpt.description as description,
+                last_exec.timestamp as last_successful_run_timestamp;
         """)
         return query
 
@@ -2050,25 +2072,6 @@ class Neo4jProxy(BaseProxy):
         :param relation_type: the relation between the user and the resource
         :return:
         """
-        # rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
-        #                                                               id='',
-        #                                                               resource_type=ResourceType.Dashboard,
-        #                                                               user_key=user_email)
-
-        # # FYI, to extract last_successful_execution, it searches for its execution ID which is always
-        # # _last_successful_execution
-        # # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L18
-        # # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
-
-        # query = textwrap.dedent(f"""
-        # MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
-        # OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
-        # OPTIONAL MATCH (resource)-[:EXECUTED]->(last_exec:Execution)
-        # WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
-        # RETURN clstr.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
-        # resource.key as uri, resource.name as name, resource.dashboard_url as url,
-        # split(resource.key, '_')[0] as product,
-        # dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp""")
         query = self._get_dashboard_by_user_relation_query_statement(user_email, relation_type)
         records = self._execute_cypher_query(statement=query, param_dict={'user_key': user_email})
 
@@ -2094,11 +2097,17 @@ class Neo4jProxy(BaseProxy):
                                                                       resource_type=ResourceType.Table,
                                                                       user_key=user_email)
 
+        # query = textwrap.dedent(f"""
+        #     MATCH {rel_clause}<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+        #     WITH db, clstr, schema, resource
+        #     OPTIONAL MATCH (resource)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+        #     RETURN db, clstr, schema, resource, tbl_dscrpt
+        # """)
         query = textwrap.dedent(f"""
             MATCH {rel_clause}<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
             WITH db, clstr, schema, resource
             OPTIONAL MATCH (resource)-[:DESCRIPTION]->(tbl_dscrpt:Description)
-            RETURN db, clstr, schema, resource, tbl_dscrpt
+            RETURN db, clstr, schema, resource, tbl_dscrpt;
         """)
         return query
 
@@ -2112,16 +2121,6 @@ class Neo4jProxy(BaseProxy):
         :param relation_type: the relation between the user and the resource
         :return:
         """
-        # rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
-        #                                                               id='',
-        #                                                               resource_type=ResourceType.Table,
-        #                                                               user_key=user_email)
-
-        # query = textwrap.dedent(f"""
-        #     MATCH {rel_clause}<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
-        #     WITH db, clstr, schema, resource
-        #     OPTIONAL MATCH (resource)-[:DESCRIPTION]->(tbl_dscrpt:Description)
-        #     RETURN db, clstr, schema, resource, tbl_dscrpt""")
         query = self._get_table_by_user_relation_query_statement(user_email, relation_type)
 
         table_records = self._execute_cypher_query(statement=query, param_dict={'user_key': user_email})
@@ -2137,13 +2136,23 @@ class Neo4jProxy(BaseProxy):
         return {ResourceType.Table.name.lower(): results}
 
     def _get_frequently_used_tables_query_statement(self) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH (user:User {key: $query_key})-[r:READ]->(table:Table)
+        #     WHERE EXISTS(r.published_tag) AND r.published_tag IS NOT NULL
+        #     WITH user, r, table ORDER BY r.published_tag DESC, r.read_count DESC LIMIT 50
+        #     MATCH (table:Table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+        #     RETURN db, clstr, schema, table, tbl_dscrpt
+        # """)
         query = textwrap.dedent("""
             MATCH (user:User {key: $query_key})-[r:READ]->(table:Table)
             WHERE EXISTS(r.published_tag) AND r.published_tag IS NOT NULL
-            WITH user, r, table ORDER BY r.published_tag DESC, r.read_count DESC LIMIT 50
-            MATCH (table:Table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+            WITH user, r, table
+            ORDER BY r.published_tag DESC, r.read_count DESC
+            LIMIT 50
+            MATCH (table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
-            RETURN db, clstr, schema, table, tbl_dscrpt
+            RETURN db, clstr, schema, table, tbl_dscrpt;
         """)
         return query
 
@@ -2155,15 +2164,6 @@ class Neo4jProxy(BaseProxy):
         :param user_email: the email of the user
         :return:
         """
-
-        # query = textwrap.dedent("""
-        # MATCH (user:User {key: $query_key})-[r:READ]->(table:Table)
-        # WHERE EXISTS(r.published_tag) AND r.published_tag IS NOT NULL
-        # WITH user, r, table ORDER BY r.published_tag DESC, r.read_count DESC LIMIT 50
-        # MATCH (table:Table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
-        # OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
-        # RETURN db, clstr, schema, table, tbl_dscrpt
-        # """)
         query = self._get_frequently_used_tables_query_statement()
         table_records = self._execute_cypher_query(statement=query, param_dict={'query_key': user_email})
 
@@ -2263,35 +2263,79 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
+        # get_dashboard_detail_query = textwrap.dedent(f"""
+        #     MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+        #     OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution) WHERE split(last_exec.key, '/')[5] = '_last_execution'
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
+        #     WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
+        #     OPTIONAL MATCH (dashboard)-[:LAST_UPDATED_AT]->(t:Timestamp)
+        #     OPTIONAL MATCH (dashboard)-[:OWNER]->(owner:User)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, collect(owner) as owners
+        #     OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag{{tag_type: $tag_normal_type}})
+        #     OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badge:Badge)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, collect(tag) as tags,
+        #     collect(badge) as badges
+        #     OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     sum(read.read_count) as recent_view_count
+        #     OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     recent_view_count, collect({{name: query.name, url: query.url, query_text: query.query_text}}) as queries
+        #     OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)-[:HAS_CHART]->(chart:Chart)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     recent_view_count, queries, collect(chart) as charts
+        #     OPTIONAL MATCH (dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)
+        #     <-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database) {table_where_clause}
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     recent_view_count, queries, charts,
+        #     collect({{name: table.name, schema: schema.name, cluster: cluster.name, database: db.name,
+        #     description: table_description.description}}) as tables
+        #     RETURN
+        #     c.name as cluster_name,
+        #     dashboard.key as uri,
+        #     dashboard.dashboard_url as url,
+        #     dashboard.name as name,
+        #     split(dashboard.key, '_')[0] as product,
+        #     toInteger(dashboard.created_timestamp) as created_timestamp,
+        #     description.description as description,
+        #     dg.name as group_name,
+        #     dg.dashboard_group_url as group_url,
+        #     toInteger(last_success_exec.timestamp) as last_successful_run_timestamp,
+        #     toInteger(last_exec.timestamp) as last_run_timestamp,
+        #     last_exec.state as last_run_state,
+        #     toInteger(t.timestamp) as updated_timestamp,
+        #     owners,
+        #     tags,
+        #     badges,
+        #     recent_view_count,
+        #     queries,
+        #     charts,
+        #     tables;
+        # """)
         get_dashboard_detail_query = textwrap.dedent(f"""
             MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
             OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
-            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution) WHERE split(last_exec.key, '/')[5] = '_last_execution'
+            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution)
+            WHERE split(last_exec.key, '/')[5] = '_last_execution'
             OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
             WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
             OPTIONAL MATCH (dashboard)-[:LAST_UPDATED_AT]->(t:Timestamp)
             OPTIONAL MATCH (dashboard)-[:OWNER]->(owner:User)
             WITH c, dg, dashboard, description, last_exec, last_success_exec, t, collect(owner) as owners
-            OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag{{tag_type: $tag_normal_type}})
+            OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag {{tag_type: $tag_normal_type}})
             OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badge:Badge)
-            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, collect(tag) as tags,
-            collect(badge) as badges
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, collect(tag) as tags, collect(badge) as badges
             OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
-            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
-            sum(read.read_count) as recent_view_count
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, sum(read.read_count) as recent_view_count
             OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)
-            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
-            recent_view_count, collect({{name: query.name, url: query.url, query_text: query.query_text}}) as queries
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, recent_view_count, collect({{name: query.name, url: query.url, query_text: query.query_text}}) as queries
             OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)-[:HAS_CHART]->(chart:Chart)
-            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
-            recent_view_count, queries, collect(chart) as charts
-            OPTIONAL MATCH (dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)
-            <-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database) {table_where_clause}
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, recent_view_count, queries, collect(chart) as charts
+            OPTIONAL MATCH (dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database) {table_where_clause}
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
-            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
-            recent_view_count, queries, charts,
-            collect({{name: table.name, schema: schema.name, cluster: cluster.name, database: db.name,
-            description: table_description.description}}) as tables
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, recent_view_count, queries, charts, collect({{name: table.name, schema: schema.name, cluster: cluster.name, database: db.name, description: table_description.description}}) as tables
             RETURN
             c.name as cluster_name,
             dashboard.key as uri,
@@ -2320,59 +2364,6 @@ class Neo4jProxy(BaseProxy):
     def get_dashboard(self,
                       id: str,
                       ) -> DashboardDetailEntity:
-
-        # get_dashboard_detail_query = textwrap.dedent(u"""
-        # MATCH (d:Dashboard {key: $query_key})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
-        # OPTIONAL MATCH (d)-[:DESCRIPTION]->(description:Description)
-        # OPTIONAL MATCH (d)-[:EXECUTED]->(last_exec:Execution) WHERE split(last_exec.key, '/')[5] = '_last_execution'
-        # OPTIONAL MATCH (d)-[:EXECUTED]->(last_success_exec:Execution)
-        # WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
-        # OPTIONAL MATCH (d)-[:LAST_UPDATED_AT]->(t:Timestamp)
-        # OPTIONAL MATCH (d)-[:OWNER]->(owner:User)
-        # WITH c, dg, d, description, last_exec, last_success_exec, t, collect(owner) as owners
-        # OPTIONAL MATCH (d)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
-        # OPTIONAL MATCH (d)-[:HAS_BADGE]->(badge:Badge)
-        # WITH c, dg, d, description, last_exec, last_success_exec, t, owners, collect(tag) as tags,
-        # collect(badge) as badges
-        # OPTIONAL MATCH (d)-[read:READ_BY]->(:User)
-        # WITH c, dg, d, description, last_exec, last_success_exec, t, owners, tags, badges,
-        # sum(read.read_count) as recent_view_count
-        # OPTIONAL MATCH (d)-[:HAS_QUERY]->(query:Query)
-        # WITH c, dg, d, description, last_exec, last_success_exec, t, owners, tags, badges,
-        # recent_view_count, collect({name: query.name, url: query.url, query_text: query.query_text}) as queries
-        # OPTIONAL MATCH (d)-[:HAS_QUERY]->(query:Query)-[:HAS_CHART]->(chart:Chart)
-        # WITH c, dg, d, description, last_exec, last_success_exec, t, owners, tags, badges,
-        # recent_view_count, queries, collect(chart) as charts
-        # OPTIONAL MATCH (d)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)
-        # <-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database)
-        # OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
-        # WITH c, dg, d, description, last_exec, last_success_exec, t, owners, tags, badges,
-        # recent_view_count, queries, charts,
-        # collect({name: table.name, schema: schema.name, cluster: cluster.name, database: db.name,
-        # description: table_description.description}) as tables
-        # RETURN
-        # c.name as cluster_name,
-        # d.key as uri,
-        # d.dashboard_url as url,
-        # d.name as name,
-        # split(d.key, '_')[0] as product,
-        # toInteger(d.created_timestamp) as created_timestamp,
-        # description.description as description,
-        # dg.name as group_name,
-        # dg.dashboard_group_url as group_url,
-        # toInteger(last_success_exec.timestamp) as last_successful_run_timestamp,
-        # toInteger(last_exec.timestamp) as last_run_timestamp,
-        # last_exec.state as last_run_state,
-        # toInteger(t.timestamp) as updated_timestamp,
-        # owners,
-        # tags,
-        # badges,
-        # recent_view_count,
-        # queries,
-        # charts,
-        # tables;
-        # """
-        #                                              )
         get_dashboard_detail_query = self._get_dashboard_query_statement()
         dashboard_records = self._execute_cypher_query(statement=get_dashboard_detail_query,
                                                        param_dict={'query_key': id,
@@ -2450,9 +2441,29 @@ class Neo4jProxy(BaseProxy):
                                       description=description)
 
     def _get_resources_using_table_query_statement(self) -> str:
+        # get_dashboards_using_table_query = textwrap.dedent(u"""
+        #     MATCH (dashboard:Dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table {key: $query_key}),
+        #     (dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+        #     OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
+        #     WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
+        #     OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
+        #     WITH c, dg, dashboard, description, last_success_exec, sum(read.read_count) as recent_view_count
+        #     RETURN
+        #     dashboard.key as uri,
+        #     c.name as cluster,
+        #     dg.name as group_name,
+        #     dg.dashboard_group_url as group_url,
+        #     dashboard.name as name,
+        #     dashboard.dashboard_url as url,
+        #     description.description as description,
+        #     split(dashboard.key, '_')[0] as product,
+        #     toInteger(last_success_exec.timestamp) as last_successful_run_timestamp
+        #     ORDER BY recent_view_count DESC;
+        # """)
         get_dashboards_using_table_query = textwrap.dedent(u"""
             MATCH (dashboard:Dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table {key: $query_key}),
-            (dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+                (dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
             OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
             OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
             WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
@@ -2467,7 +2478,8 @@ class Neo4jProxy(BaseProxy):
             dashboard.dashboard_url as url,
             description.description as description,
             split(dashboard.key, '_')[0] as product,
-            toInteger(last_success_exec.timestamp) as last_successful_run_timestamp
+            toInteger(last_success_exec.timestamp) as last_successful_run_timestamp,
+            recent_view_count
             ORDER BY recent_view_count DESC;
         """)
         return get_dashboards_using_table_query
@@ -2485,26 +2497,6 @@ class Neo4jProxy(BaseProxy):
         if resource_type != ResourceType.Dashboard:
             raise NotImplementedError('{} is not supported'.format(resource_type))
 
-        # get_dashboards_using_table_query = textwrap.dedent(u"""
-        # MATCH (d:Dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table {key: $query_key}),
-        # (d)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
-        # OPTIONAL MATCH (d)-[:DESCRIPTION]->(description:Description)
-        # OPTIONAL MATCH (d)-[:EXECUTED]->(last_success_exec:Execution)
-        # WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
-        # OPTIONAL MATCH (d)-[read:READ_BY]->(:User)
-        # WITH c, dg, d, description, last_success_exec, sum(read.read_count) as recent_view_count
-        # RETURN
-        # d.key as uri,
-        # c.name as cluster,
-        # dg.name as group_name,
-        # dg.dashboard_group_url as group_url,
-        # d.name as name,
-        # d.dashboard_url as url,
-        # description.description as description,
-        # split(d.key, '_')[0] as product,
-        # toInteger(last_success_exec.timestamp) as last_successful_run_timestamp
-        # ORDER BY recent_view_count DESC;
-        # """)
         get_dashboards_using_table_query = self._get_resources_using_table_query_statement()
         records = self._execute_cypher_query(statement=get_dashboards_using_table_query,
                                              param_dict={'query_key': id})
@@ -2516,33 +2508,6 @@ class Neo4jProxy(BaseProxy):
         return {'dashboards': results}
 
     def _get_both_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
-        get_both_lineage_query = textwrap.dedent(u"""
-            MATCH (source:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
-            OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
-            WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
-            OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
-            OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
-            WITH CASE WHEN downstream_badge IS NULL THEN []
-            ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
-            END AS downstream_badges, CASE WHEN upstream_badge IS NULL THEN []
-            ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
-            END AS upstream_badges, upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath
-            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
-            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
-            downstream_badges, upstream_badges, sum(downstream_read.read_count) as downstream_read_count
-            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
-            WITH upstream_entity, downstream_entity, upstream_len, downstream_len,
-            downstream_badges, upstream_badges, downstream_read_count,
-            sum(upstream_read.read_count) as upstream_read_count, upath, dpath
-            WITH CASE WHEN upstream_len IS NULL THEN []
-            ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
-            key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(upath)[-2].key}})
-            END AS upstream_entities, CASE WHEN downstream_len IS NULL THEN []
-            ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-            key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
-            END AS downstream_entities RETURN downstream_entities, upstream_entities
-        """).format(depth=depth, resource_label=resource_type.name)
         # get_both_lineage_query = textwrap.dedent(u"""
         #     MATCH (source:{resource_label} {{key: $query_key}})
         #     OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
@@ -2570,25 +2535,55 @@ class Neo4jProxy(BaseProxy):
         #     key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(dpath)[-2].key}})
         #     END AS downstream_entities RETURN downstream_entities, upstream_entities
         # """).format(depth=depth, resource_label=resource_type.name)
+        get_both_lineage_query = textwrap.dedent(u"""
+            MATCH (source:{resource_label} {{key: $query_key}})
+            OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+            OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+            WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
+
+            OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+            OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
+                collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}}) AS downstream_badges,
+                collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}}) AS upstream_badges
+
+            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
+                downstream_badges, upstream_badges, sum(downstream_read.read_count) AS downstream_read_count
+
+            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+            WITH upstream_entity, downstream_entity, upstream_len, downstream_len,
+                downstream_badges, upstream_badges, downstream_read_count,
+                sum(upstream_read.read_count) AS upstream_read_count, upath, dpath
+
+            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
+                downstream_badges, upstream_badges, downstream_read_count, upstream_read_count,
+                CASE WHEN upstream_len IS NULL THEN []
+                    ELSE collect(distinct {{
+                        level: SIZE(upstream_len),
+                        source: split(upstream_entity.key,'://')[0],
+                        key: upstream_entity.key,
+                        label: labels(upstream_entity)[0],
+                        badges: upstream_badges,
+                        usage: upstream_read_count,
+                        parent: nodes(upath)[-2].key
+                    }}) END AS upstream_entities,
+                CASE WHEN downstream_len IS NULL THEN []
+                    ELSE collect(distinct {{
+                        level: SIZE(downstream_len),
+                        source: split(downstream_entity.key,'://')[0],
+                        key: downstream_entity.key,
+                        label: labels(downstream_entity)[0],
+                        badges: downstream_badges,
+                        usage: downstream_read_count,
+                        parent: nodes(dpath)[-2].key
+                    }}) END AS downstream_entities
+
+            RETURN downstream_entities, upstream_entities
+        """).format(depth=depth, resource_label=resource_type.name)
         return get_both_lineage_query
 
     def _get_upstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
-        get_upstream_lineage_query = textwrap.dedent(u"""
-            MATCH (source:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
-            WITH upstream_entity, upstream_len, path
-            OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
-            WITH CASE WHEN upstream_badge IS NULL THEN []
-            ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
-            END AS upstream_badges, upstream_entity, upstream_len, path
-            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
-            WITH upstream_entity, upstream_len, upstream_badges,
-            sum(upstream_read.read_count) as upstream_read_count, path
-            WITH CASE WHEN upstream_len IS NULL THEN []
-            ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
-            key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
-            END AS upstream_entities RETURN upstream_entities
-        """).format(depth=depth, resource_label=resource_type.name)
         # get_upstream_lineage_query = textwrap.dedent(u"""
         #     MATCH (source:{resource_label} {{key: $query_key}})
         #     OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
@@ -2605,25 +2600,34 @@ class Neo4jProxy(BaseProxy):
         #     key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
         #     END AS upstream_entities RETURN upstream_entities
         # """).format(depth=depth, resource_label=resource_type.name)
+        get_upstream_lineage_query = textwrap.dedent(u"""
+            MATCH (source:{resource_label} {key: $query_key})
+            OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+            WITH upstream_entity, upstream_len, path
+            OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+            WITH upstream_entity, upstream_len, path,
+                CASE WHEN upstream_badge IS NULL THEN []
+                    ELSE collect(distinct {{key: upstream_badge.key, category: upstream_badge.category}})
+                END AS upstream_badges
+            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+            WITH upstream_entity, upstream_len, path, upstream_badges,
+                sum(upstream_read.read_count) AS upstream_read_count
+            WITH CASE WHEN upstream_len IS NULL THEN []
+                    ELSE collect(distinct {{
+                        level: SIZE(upstream_len),
+                        source: split(upstream_entity.key, '://')[0],
+                        key: upstream_entity.key,
+                        label: labels(upstream_entity)[0],
+                        badges: upstream_badges,
+                        usage: upstream_read_count,
+                        parent: nodes(path)[-2].key
+                    }})
+                END AS upstream_entities
+            RETURN upstream_entities;
+        """).format(depth=depth, resource_label=resource_type.name)
         return get_upstream_lineage_query
 
     def _get_downstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
-        get_downstream_lineage_query = textwrap.dedent(u"""
-            MATCH (source:{resource_label} {{key: $query_key}})
-            OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
-            WITH downstream_entity, downstream_len, path
-            OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
-            WITH CASE WHEN downstream_badge IS NULL THEN []
-            ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
-            END AS downstream_badges, downstream_entity, downstream_len, path
-            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
-            WITH downstream_entity, downstream_len, downstream_badges,
-            sum(downstream_read.read_count) as downstream_read_count, path
-            WITH CASE WHEN downstream_len IS NULL THEN []
-            ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
-            key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
-            END AS downstream_entities RETURN downstream_entities
-        """).format(depth=depth, resource_label=resource_type.name)
         # get_downstream_lineage_query = textwrap.dedent(u"""
         #     MATCH (source:{resource_label} {{key: $query_key}})
         #     OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
@@ -2640,6 +2644,31 @@ class Neo4jProxy(BaseProxy):
         #     key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
         #     END AS downstream_entities RETURN downstream_entities
         # """).format(depth=depth, resource_label=resource_type.name)
+        get_downstream_lineage_query = textwrap.dedent(u"""
+            MATCH (source:{resource_label} {key: $query_key})
+            OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+            WITH downstream_entity, downstream_len, path
+            OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+            WITH downstream_entity, downstream_len, path,
+                CASE WHEN downstream_badge IS NULL THEN []
+                    ELSE collect(distinct {{key: downstream_badge.key, category: downstream_badge.category}})
+                END AS downstream_badges
+            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+            WITH downstream_entity, downstream_len, path, downstream_badges,
+                sum(downstream_read.read_count) AS downstream_read_count
+            WITH CASE WHEN downstream_len IS NULL THEN []
+                    ELSE collect(distinct {{
+                        level: SIZE(downstream_len),
+                        source: split(downstream_entity.key, '://')[0],
+                        key: downstream_entity.key,
+                        label: labels(downstream_entity)[0],
+                        badges: downstream_badges,
+                        usage: downstream_read_count,
+                        parent: nodes(path)[-2].key
+                    }})
+                END AS downstream_entities
+            RETURN downstream_entities;
+        """).format(depth=depth, resource_label=resource_type.name)
         return get_downstream_lineage_query
 
     @timer_with_counter
@@ -2767,6 +2796,24 @@ class Neo4jProxy(BaseProxy):
         return table_writer, table_apps
 
     def _get_exec_feature_query_statement(self) -> str:
+        # feature_query = textwrap.dedent("""\
+        #     MATCH (feature:Feature {key: $feature_key})
+        #     OPTIONAL MATCH (db:Database)-[:AVAILABLE_FEATURE]->(feature)
+        #     OPTIONAL MATCH (fg:Feature_Group)-[:GROUPS]->(feature)
+        #     OPTIONAL MATCH (feature)-[:OWNER]->(owner:User)
+        #     OPTIONAL MATCH (feature)-[:TAGGED_BY]->(tag:Tag)
+        #     OPTIONAL MATCH (feature)-[:HAS_BADGE]->(badge:Badge)
+        #     OPTIONAL MATCH (feature)-[:DESCRIPTION]->(desc:Description)
+        #     OPTIONAL MATCH (feature)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
+        #     OPTIONAL MATCH (wmk:Feature_Watermark)-[:BELONG_TO_FEATURE]->(feature)
+        #     RETURN feature, desc, fg,
+        #     collect(distinct wmk) as wmk_records,
+        #     collect(distinct db) as availability_records,
+        #     collect(distinct owner) as owner_records,
+        #     collect(distinct tag) as tag_records,
+        #     collect(distinct badge) as badge_records,
+        #     collect(distinct prog_descriptions) as prog_descriptions
+        # """)
         feature_query = textwrap.dedent("""\
             MATCH (feature:Feature {key: $feature_key})
             OPTIONAL MATCH (db:Database)-[:AVAILABLE_FEATURE]->(feature)
@@ -2778,12 +2825,12 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (feature)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
             OPTIONAL MATCH (wmk:Feature_Watermark)-[:BELONG_TO_FEATURE]->(feature)
             RETURN feature, desc, fg,
-            collect(distinct wmk) as wmk_records,
-            collect(distinct db) as availability_records,
-            collect(distinct owner) as owner_records,
-            collect(distinct tag) as tag_records,
-            collect(distinct badge) as badge_records,
-            collect(distinct prog_descriptions) as prog_descriptions
+                collect(distinct wmk) as wmk_records,
+                collect(distinct db) as availability_records,
+                collect(distinct owner) as owner_records,
+                collect(distinct tag) as tag_records,
+                collect(distinct badge) as badge_records,
+                collect(distinct prog_descriptions) as prog_descriptions;
         """)
         return feature_query
 
@@ -2793,24 +2840,6 @@ class Neo4jProxy(BaseProxy):
         Executes cypher query to get feature and related nodes
         """
 
-        # feature_query = textwrap.dedent("""\
-        # MATCH (feat:Feature {key: $feature_key})
-        # OPTIONAL MATCH (db:Database)-[:AVAILABLE_FEATURE]->(feat)
-        # OPTIONAL MATCH (fg:Feature_Group)-[:GROUPS]->(feat)
-        # OPTIONAL MATCH (feat)-[:OWNER]->(owner:User)
-        # OPTIONAL MATCH (feat)-[:TAGGED_BY]->(tag:Tag)
-        # OPTIONAL MATCH (feat)-[:HAS_BADGE]->(badge:Badge)
-        # OPTIONAL MATCH (feat)-[:DESCRIPTION]->(desc:Description)
-        # OPTIONAL MATCH (feat)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
-        # OPTIONAL MATCH (wmk:Feature_Watermark)-[:BELONG_TO_FEATURE]->(feat)
-        # RETURN feat, desc, fg,
-        # collect(distinct wmk) as wmk_records,
-        # collect(distinct db) as availability_records,
-        # collect(distinct owner) as owner_records,
-        # collect(distinct tag) as tag_records,
-        # collect(distinct badge) as badge_records,
-        # collect(distinct prog_descriptions) as prog_descriptions
-        # """)
         feature_query = self._get_exec_feature_query_statement()
         results = self._execute_cypher_query(statement=feature_query,
                                              param_dict={'feature_key': feature_key})
@@ -2890,10 +2919,15 @@ class Neo4jProxy(BaseProxy):
         return feature
 
     def _get_resource_generation_code_query_statement(self, resource_type: ResourceType) -> str:
+        # neo4j_query = textwrap.dedent("""\
+        #     MATCH ({resource_name}:{resource_label} {{key: $resource_key}})
+        #     OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->({resource_name})
+        #     RETURN q as query_records
+        # """.format(resource_name=resource_type.name.lower(), resource_label=resource_type.name))
         neo4j_query = textwrap.dedent("""\
-            MATCH ({resource_name}:{resource_label} {{key: $resource_key}})
+            MATCH ({resource_name}:{resource_label} {key: $resource_key})
             OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->({resource_name})
-            RETURN q as query_records
+            RETURN q as query_records;
         """.format(resource_name=resource_type.name.lower(), resource_label=resource_type.name))
         return neo4j_query
 
@@ -2901,12 +2935,6 @@ class Neo4jProxy(BaseProxy):
         """
         Executes cypher query to get query nodes associated with resource
         """
-
-        # neo4j_query = textwrap.dedent("""\
-        # MATCH (feat:{resource_type} {{key: $resource_key}})
-        # OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->(feat)
-        # RETURN q as query_records
-        # """.format(resource_type=resource_type.name))
         neo4j_query = self._get_resource_generation_code_query_statement(resource_type)
 
         records = self._execute_cypher_query(statement=neo4j_query,
@@ -2924,11 +2952,24 @@ class Neo4jProxy(BaseProxy):
 
 
     def _get_snowflake_table_shares_query_statement(self) -> str:
+        # snowflake_table_share_query = textwrap.dedent("""\
+        #     MATCH (table:Table {key: $table_key})
+        #     MATCH (share:Snowflakeshare)-[:SNOWFLAKE_SHARE_OF]->(table)
+        #     OPTIONAL MATCH (share)-[:SNOWFLAKE_LISTING]->(listing:Snowflakelisting)
+        #     RETURN listing.global_name as listing_global_name, listing.name as listing_name, listing.title as listing_title, listing.subtitle as listing_subtitle, listing.description as listing_description,share.owner_account as share_owner_account, share.name as share_name
+        # """)
         snowflake_table_share_query = textwrap.dedent("""\
             MATCH (table:Table {key: $table_key})
             MATCH (share:Snowflakeshare)-[:SNOWFLAKE_SHARE_OF]->(table)
             OPTIONAL MATCH (share)-[:SNOWFLAKE_LISTING]->(listing:Snowflakelisting)
-            RETURN listing.global_name as listing_global_name, listing.name as listing_name, listing.title as listing_title, listing.subtitle as listing_subtitle, listing.description as listing_description,share.owner_account as share_owner_account, share.name as share_name
+            RETURN
+                listing.global_name as listing_global_name,
+                listing.name as listing_name,
+                listing.title as listing_title,
+                listing.subtitle as listing_subtitle,
+                listing.description as listing_description,
+                share.owner_account as share_owner_account,
+                share.name as share_name;
         """)
         return snowflake_table_share_query
 
@@ -2962,6 +3003,18 @@ class Neo4jProxy(BaseProxy):
 
 
     def _get_data_provider_query_statement(self) -> str:
+        # data_provider_query = textwrap.dedent("""
+        #     MATCH (data_provider:Data_Provider {key: $data_provider_key})
+        #     OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
+        #     OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider)
+        #     OPTIONAL MATCH (data_location:Data_Location)-[:DATA_LOCATION_OF]->(data_channel)
+        #     WITH data_provider, data_provider_desc, data_channel, collect(data_location) AS data_locations
+        #     WITH data_provider, data_provider_desc,
+        #         CASE WHEN data_channel IS NULL THEN NULL
+        #         ELSE collect({data_channel: data_channel, data_locations: data_locations})
+        #         END AS data_channels
+        #     RETURN data_provider AS data_provider, data_provider_desc, data_channels
+        # """)
         data_provider_query = textwrap.dedent("""
             MATCH (data_provider:Data_Provider {key: $data_provider_key})
             OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
@@ -2970,9 +3023,9 @@ class Neo4jProxy(BaseProxy):
             WITH data_provider, data_provider_desc, data_channel, collect(data_location) AS data_locations
             WITH data_provider, data_provider_desc,
                 CASE WHEN data_channel IS NULL THEN NULL
-                ELSE collect({data_channel: data_channel, data_locations: data_locations})
+                    ELSE collect({data_channel: data_channel, data_locations: data_locations})
                 END AS data_channels
-            RETURN data_provider AS data_provider, data_provider_desc, data_channels
+            RETURN data_provider, data_provider_desc, data_channels;
         """)
         return data_provider_query
 
@@ -3046,18 +3099,34 @@ class Neo4jProxy(BaseProxy):
         return data_provider
 
     def _get_file_query_statement(self) -> str:
+        # file_query = textwrap.dedent("""
+        #     MATCH (file:File {key: $file_key})
+        #     OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
+        #     OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
+        #     OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
+        #     OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
+        #     OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+        #     OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
+        #     OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
+        #     OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
+        #     WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+        #     RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
+        # """)
         file_query = textwrap.dedent("""
             MATCH (file:File {key: $file_key})
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
             OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
-            OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
             OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
             OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
             OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
             OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
             OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
-            WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
-            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
+            WITH file, file_desc, data_provider, data_channel, data_location,
+                collect(distinct tag) as tags,
+                collect(distinct owner) as owners,
+                collect(distinct file_table) as file_tables,
+                collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes;
         """)
         return file_query
 
