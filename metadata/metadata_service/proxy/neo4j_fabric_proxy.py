@@ -107,17 +107,23 @@ class Neo4jFabricProxy(Neo4jProxy):
         return federated_statement
 
     def _get_fabric_query_statement(self, fabric_db_name: str, statement: str) -> str:
+        # fabric_statement = textwrap.dedent(f"""
+        #     UNWIND {fabric_db_name}.graphIds() AS graphId
+        #     CALL {{
+        #         USE {fabric_db_name}.graph(graphId)
+        #         {statement.replace(';','')}
+        #     }}
+        #     {self._prepare_federated_return_statement(statement=statement)}
+        # """)
         fabric_statement = textwrap.dedent(f"""
-            UNWIND {fabric_db_name}.graphIds() AS graphId
+            UNWIND graph.names() AS graphName
             CALL {{
-                USE {fabric_db_name}.graph(graphId)
+                USE graph.byName(graphName)
                 {statement.replace(';','')}
             }}
             {self._prepare_federated_return_statement(statement=statement)}
         """)
-        LOGGER.info(f"_fabric_query_statement={fabric_statement}")
         return fabric_statement
-
 
     ########################## OVERRIDE ##########################
 

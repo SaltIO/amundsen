@@ -142,7 +142,13 @@ class Neo4jProxy(BaseProxy):
         checks = {}
         try:
             # dbms.cluster.overview() is only available for enterprise neo4j users
-            cluster_overview = self._execute_cypher_query(statement='CALL dbms.cluster.overview()', param_dict={})
+            # cluster_overview = self._execute_cypher_query(statement='CALL dbms.cluster.overview()', param_dict={})
+            cluster_overview = self._execute_cypher_query(statement=f"""
+                SHOW DATABASES YIELD name, currentStatus
+                WHERE name = '{self._database_name}' and currentStatus = 'online'
+            """, param_dict={})
+            if cluster_overview is None or len(cluster_overview) == 0:
+                raise Exception(f"Database {self._database_name} is not online!")
             checks = dict(cluster_overview[0])
             checks['overview_enabled'] = True
             status = health_check.OK
