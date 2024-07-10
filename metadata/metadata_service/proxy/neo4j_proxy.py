@@ -2018,13 +2018,13 @@ class Neo4jProxy(BaseProxy):
                 user_matcher += ' {key: $user_key}'
 
         if relation_type == UserResourceRel.follow:
-            relation = f'(resource{resource_matcher})-[r1:FOLLOWED_BY]->(usr{user_matcher})-[r2:FOLLOW]->' \
+            relation = f'(start_resource{resource_matcher})-[r1:FOLLOWED_BY]->(usr{user_matcher})-[r2:FOLLOW]->' \
                        f'(resource{resource_matcher})'
         elif relation_type == UserResourceRel.own:
-            relation = f'(resource{resource_matcher})-[r1:OWNER]->(usr{user_matcher})-[r2:OWNER_OF]->' \
+            relation = f'(start_resource{resource_matcher})-[r1:OWNER]->(usr{user_matcher})-[r2:OWNER_OF]->' \
                        f'(resource{resource_matcher})'
         elif relation_type == UserResourceRel.read:
-            relation = f'(resource{resource_matcher})-[r1:READ_BY]->(usr{user_matcher})-[r2:READ]->' \
+            relation = f'(start_resource{resource_matcher})-[r1:READ_BY]->(usr{user_matcher})-[r2:READ]->' \
                        f'(resource{resource_matcher})'
         else:
             raise NotImplementedError(f'The relation type {relation_type} is not defined!')
@@ -2041,16 +2041,6 @@ class Neo4jProxy(BaseProxy):
         # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L18
         # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
 
-        # query = textwrap.dedent(f"""
-        #     MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
-        #     OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
-        #     OPTIONAL MATCH (resource)-[:EXECUTED]->(last_exec:Execution)
-        #     WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
-        #     RETURN clstr.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
-        #     resource.key as uri, resource.name as name, resource.dashboard_url as url,
-        #     split(resource.key, '_')[0] as product,
-        #     dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp
-        # """)
         query = textwrap.dedent(f"""
             MATCH ({rel_clause})<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
             OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
