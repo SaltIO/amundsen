@@ -5,7 +5,7 @@ import os
 
 from setuptools import find_packages, setup
 
-__version__ = '7.4.4+foodtruck.8'
+__version__ = '7.4.4+foodtruck.9'
 
 requirements_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                  'requirements.txt')
@@ -99,9 +99,14 @@ schema_registry = [
     'python-schema-registry-client==2.4.0'
 ]
 
+query_parsing = [
+    'queryparser-python3>=0.7.0',
+    'sqlglot>=25.6.1'
+]
+
 all_deps = requirements + requirements_dev + kafka + cassandra + glue + snowflake + athena + \
     bigquery + jsonpath + db2 + dremio + druid + spark + feast + neptune + rds \
-    + atlas + salesforce + oracle + teradata + schema_registry
+    + atlas + salesforce + oracle + teradata + schema_registry + query_parsing
 
 setup(
     name='amundsen-databuilder',

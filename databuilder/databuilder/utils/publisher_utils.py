@@ -50,13 +50,24 @@ def create_neo4j_node_key_constraint(node_file: str,
             if label not in labels:
                 with driver.session(database=db_name) as session:
                     try:
-                        create_stmt = Template("""
-                            CREATE CONSTRAINT ON (node:{{ LABEL }}) ASSERT node.key IS UNIQUE
-                        """).render(LABEL=label)
+                        result = session.run(f"""
+                            SHOW CONSTRAINTS
+                            YIELD name, type, entityType, labelsOrTypes, properties
+                            WHERE type = 'UNIQUENESS' AND entityType = 'NODE' AND labelsOrTypes = ['{label}'] AND properties = ['key']
+                            RETURN count(*) AS constraintExists
+                        """)
+                        constraint_exists = result.single()["constraintExists"]
 
-                        LOGGER.info(f'Trying to create index for label {label} if not exist: {create_stmt}')
+                        # Step 2: Conditionally create the constraint
+                        if constraint_exists == 0:
 
-                        session.write_transaction(execute_neo4j_statement, create_stmt)
+                            create_stmt = Template("""
+                                CREATE CONSTRAINT FOR (node:{{ LABEL }}) REQUIRE node.key IS UNIQUE
+                            """).render(LABEL=label)
+
+                            LOGGER.info(f'Trying to create index for label {label} if not exist: {create_stmt}')
+
+                            session.write_transaction(execute_neo4j_statement, create_stmt)
                     except Neo4jError as e:
                         if e.code != NEO4J_EQUIVALENT_SCHEMA_RULE_ALREADY_EXISTS_ERROR_CODE\
                                 and e.code != NEO4J_INDEX_ALREADY_EXISTS_ERROR_CODE:

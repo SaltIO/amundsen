@@ -234,4 +234,4 @@ class FileLineageAPI(Resource):
             schema = LineageSchema()
             return schema.dump(lineage), HTTPStatus.OK
         except Exception as e:
-            return {'message': f'Exception raised when getting lineage: {e}'}, HTTPStatus.NOT_FOUND
+            return {'message': f'Exception raised when getting file lineage: {e}'}, HTTPStatus.NOT_FOUND

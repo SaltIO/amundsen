@@ -31,7 +31,7 @@ wheel==0.36.2
 simplejson==3.17.6
 
 ### Preview ###
-SQLAlchemy
+SQLAlchemy==1.4.52
 
 ### Snowflake Preview
 snowflake-connector-python

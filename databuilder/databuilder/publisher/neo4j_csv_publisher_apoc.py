@@ -455,7 +455,7 @@ class Neo4jCsvPublisherApoc(Publisher):
         """
         # TODO: apoc.schema.assert may help here for handling neo4j 3.x and 4.x
         stmt = """
-            CREATE CONSTRAINT ON (node:label) ASSERT node.key IS UNIQUE
+            CREATE CONSTRAINT FOR (node:label) REQUIRE node.key IS UNIQUE
         """
 
         LOGGER.info(f'Trying to create index for label {label} if not exist: {stmt}')

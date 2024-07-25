@@ -11,8 +11,7 @@ from amundsen_common.models.api import health_check
 from amundsen_common.models.search import (
     Filter, HighlightOptions, SearchResponse,
 )
-from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ConnectionError as ElasticConnectionError, ElasticsearchException
+from elasticsearch import Elasticsearch, TransportError, ApiError
 from elasticsearch_dsl import (
     MultiSearch, Q, Search,
 )
@@ -192,15 +191,17 @@ class ElasticsearchProxyV2_1():
         Returns the health of the Elastic search cluster
         """
         try:
+
             if self.elasticsearch.ping():
-                health = self.elasticsearch.cluster.health()
+                health_response = self.elasticsearch.cluster.health()
+                health = health_response.body
                 # ES status vaues: green, yellow, red
                 status = health_check.OK if health['status'] != 'red' else health_check.FAIL
             else:
                 health = {'status': 'Unable to connect'}
                 status = health_check.FAIL
             checks = {f'{type(self).__name__}:connection': health}
-        except ElasticConnectionError:
+        except (TransportError, ApiError) as err:
             status = health_check.FAIL
             checks = {f'{type(self).__name__}:connection': {'status': 'Unable to connect'}}
         return health_check.HealthCheck(status=status, checks=checks)
@@ -461,7 +462,7 @@ class ElasticsearchProxyV2_1():
             query_for_resource = queries.get(resource)
 
             res_index = self.get_index_alias_for_resource(resource_type=resource)
-            if self.elasticsearch.indices.exists(res_index):
+            if self.elasticsearch.indices.exists(index=res_index):
                 search = Search(index=res_index).query(query_for_resource)
                 LOGGER.info(json.dumps(search.to_dict()))
 
@@ -542,7 +543,7 @@ class ElasticsearchProxyV2_1():
         for resource in resource_types:
 
             res_index = self.get_index_alias_for_resource(resource_type=resource)
-            if self.elasticsearch.indices.exists(res_index):
+            if self.elasticsearch.indices.exists(index=res_index):
                 # build a query for each resource to search
                 query_for_resource = self._build_elasticsearch_query(resource=resource,
                                                                     query_term=query_term,
@@ -590,7 +591,7 @@ class ElasticsearchProxyV2_1():
         if len(response) < 1:
             msg = f'No response from ES for key query {key_query[resource_type]}'
             LOGGER.error(msg)
-            raise ElasticsearchException(msg)
+            raise ApiError(msg)
 
         response = response[0]
         if response.success():
