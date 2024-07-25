@@ -518,13 +518,23 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         stmt = Template("""
-            CREATE CONSTRAINT ON (node:{{ LABEL }}) ASSERT node.key IS UNIQUE
+            CREATE CONSTRAINT FOR (node:{{ LABEL }}) REQUIRE node.key IS UNIQUE
         """).render(LABEL=label)
 
         LOGGER.info(f'Trying to create index for label {label} if not exist: {stmt}')
         with self._driver.session(database=self._db_name) as session:
             try:
-                session.run(stmt)
+                result = session.run(f"""
+                    SHOW CONSTRAINTS
+                    YIELD name, type, entityType, labelsOrTypes, properties
+                    WHERE type = 'UNIQUENESS' AND entityType = 'NODE' AND labelsOrTypes = ['{label}'] AND properties = ['key']
+                    RETURN count(*) AS constraintExists
+                """)
+                constraint_exists = result.single()["constraintExists"]
+
+                # Step 2: Conditionally create the constraint
+                if constraint_exists == 0:
+                    session.run(stmt)
             except Neo4jError as e:
                 if 'An equivalent constraint already exists' not in e.__str__():
                     raise

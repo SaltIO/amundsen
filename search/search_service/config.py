@@ -100,7 +100,7 @@ class AwsSearchConfig(LocalConfig):
     (https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html).
     """
     import boto3
-    from elasticsearch import Elasticsearch, RequestsHttpConnection
+    from elasticsearch import Elasticsearch
     from requests_aws4auth import AWS4Auth
 
     service = 'es'
@@ -120,7 +120,7 @@ class AwsSearchConfig(LocalConfig):
             http_auth=aws_auth,
             use_ssl=use_ssl,
             verify_certs=verify_certs,
-            connection_class=RequestsHttpConnection
+            ssl_show_warn=False
         )
 
         ELASTICSEARCH_CLIENT = client

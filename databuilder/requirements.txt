@@ -29,3 +29,5 @@ jsonref==0.2
 # amundsen-common>=0.16.0
 amundsen-common==0.31.0+foodtruck.6
 amundsen-rds==0.0.8
+
+queryparser-python3==0.7.0

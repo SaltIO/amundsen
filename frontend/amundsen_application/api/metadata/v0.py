@@ -1026,6 +1026,7 @@ def get_table_lineage() -> Response:
         url = f'{table_endpoint}/{table_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
+        LOGGER.info(f'DREW={json}')
         downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
         upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
         downstream_count = json.get('downstream_count')
