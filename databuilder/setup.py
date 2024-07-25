@@ -99,9 +99,14 @@ schema_registry = [
     'python-schema-registry-client==2.4.0'
 ]
 
+query_parsing = [
+    'queryparser-python3>=0.7.0',
+    'sqlglot>=25.6.1'
+]
+
 all_deps = requirements + requirements_dev + kafka + cassandra + glue + snowflake + athena + \
     bigquery + jsonpath + db2 + dremio + druid + spark + feast + neptune + rds \
-    + atlas + salesforce + oracle + teradata + schema_registry
+    + atlas + salesforce + oracle + teradata + schema_registry + query_parsing
 
 setup(
     name='amundsen-databuilder',

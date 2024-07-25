@@ -41,7 +41,7 @@ class ColumnLineageAPI(Resource):
             schema = LineageSchema()
             return schema.dump(lineage), HTTPStatus.OK
         except Exception as e:
-            return {'message': f'Exception raised when getting lineage: {e}'}, HTTPStatus.NOT_FOUND
+            return {'message': f'Exception raised when getting column lineage: {e}'}, HTTPStatus.NOT_FOUND
 
 
 class ColumnDescriptionAPI(Resource):

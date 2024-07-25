@@ -133,6 +133,24 @@ class Neo4jProxy(BaseProxy):
 
         self._driver = GraphDatabase.driver(**driver_args)
 
+    def get_database_name(self):
+        if self._database_name is None or self._database_name == '':
+            self._database_name = None
+
+            try:
+                query = "SHOW DATABASES"
+                with self._driver.session(database="system") as session:
+                    result = session.run(query)
+                    for record in result:
+                        if record["default"]:
+                            self._database_name = record["name"]
+                            break
+            except Exception as e:
+                LOGGER.exception("Failed to lookup default database from neo4j: ")
+                self._database_name = None
+
+        return self._database_name
+
     def health(self) -> health_check.HealthCheck:
         """
         Runs one or more series of checks on the service. Can also
@@ -145,10 +163,10 @@ class Neo4jProxy(BaseProxy):
             # cluster_overview = self._execute_cypher_query(statement='CALL dbms.cluster.overview()', param_dict={})
             cluster_overview = self._execute_cypher_query(statement=f"""
                 SHOW DATABASES YIELD name, currentStatus
-                WHERE name = '{self._database_name}' and currentStatus = 'online'
+                WHERE name = '{self.get_database_name()}' and currentStatus = 'online'
             """, param_dict={})
             if cluster_overview is None or len(cluster_overview) == 0:
-                raise Exception(f"Database {self._database_name} is not online!")
+                raise Exception(f"Database {self.get_database_name()} is not online!")
             checks = dict(cluster_overview[0])
             checks['overview_enabled'] = True
             status = health_check.OK
@@ -734,7 +752,7 @@ class Neo4jProxy(BaseProxy):
                                                                                              params=param_dict))
         start = time.time()
         try:
-            with self._driver.session(database=self._database_name) as session:
+            with self._driver.session(database=self.get_database_name()) as session:
                 return session.read_transaction(execute_statement, statement, param_dict)
 
         finally:
@@ -847,7 +865,7 @@ class Neo4jProxy(BaseProxy):
         start = time.time()
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
 
             tx.run(upsert_desc_query, {
                 'description': description,
@@ -928,7 +946,7 @@ class Neo4jProxy(BaseProxy):
         start = time.time()
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
 
             tx.run(upsert_update_frequency_query, {
                 'frequency': frequency,
@@ -979,7 +997,7 @@ class Neo4jProxy(BaseProxy):
         start = time.time()
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
 
             result = tx.run(delete_update_frequency_query, {'uf_key': uf_key})
 
@@ -1086,7 +1104,7 @@ class Neo4jProxy(BaseProxy):
         start = time.time()
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
 
             tx.run(upsert_desc_query, {
                 'description': description,
@@ -1172,7 +1190,7 @@ class Neo4jProxy(BaseProxy):
         """.format(resource_type=resource_type.name))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             # upsert the node
             tx.run(create_owner_query, {
                 'user_email': owner,
@@ -1228,7 +1246,7 @@ class Neo4jProxy(BaseProxy):
         DELETE r1,r2
         """.format(resource_type=resource_type.name))
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             tx.run(delete_query, {'user_email': owner,
                                   'res_key': uri})
         except Exception as e:
@@ -1273,7 +1291,7 @@ class Neo4jProxy(BaseProxy):
         """.format(resource_type=resource_type.name))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             tbl_result = tx.run(validation_query, {'key': id})
 
             if not tbl_result.single():
@@ -1323,7 +1341,7 @@ class Neo4jProxy(BaseProxy):
         """.format(resource_type=resource_type.name))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             tx.run(delete_query, {'badge_name': badge_name,
                                   'key': id,
                                   'category': category})
@@ -1395,7 +1413,7 @@ class Neo4jProxy(BaseProxy):
         """.format(resource_type=resource_type.name))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             tbl_result = tx.run(validation_query, {'key': id})
             if not tbl_result.single():
                 raise NotFoundException('id {} does not exist'.format(id))
@@ -1453,7 +1471,7 @@ class Neo4jProxy(BaseProxy):
         """.format(resource_type=resource_type.name))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             tx.run(delete_query, {'tag': tag,
                                   'key': id,
                                   'tag_type': tag_type})
@@ -1912,7 +1930,7 @@ class Neo4jProxy(BaseProxy):
         """ % (user_props, CREATED_EPOCH_MS, user_props, CREATED_EPOCH_MS))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             result = tx.run(create_update_user_query, user_data)
 
             user_result = result.single()
@@ -2042,7 +2060,7 @@ class Neo4jProxy(BaseProxy):
         # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
 
         query = textwrap.dedent(f"""
-            MATCH ({rel_clause})<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
+            MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
             OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
             OPTIONAL MATCH (resource)-[:EXECUTED]->(last_exec:Execution)
             WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
@@ -2207,7 +2225,7 @@ class Neo4jProxy(BaseProxy):
                    rel_clause=rel_clause))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             # upsert the node
             tx.run(upsert_user_query, {'user_email': user_id})
             result = tx.run(upsert_user_relation_query, {'user_key': user_id, 'resource_key': id})
@@ -2249,7 +2267,7 @@ class Neo4jProxy(BaseProxy):
                 """.format(rel_clause=rel_clause))
 
         try:
-            tx = self._driver.session(database=self._database_name).begin_transaction()
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             tx.run(delete_query, {'user_key': user_id, 'resource_key': id})
             tx.commit()
         except Exception as e:
@@ -2535,45 +2553,59 @@ class Neo4jProxy(BaseProxy):
             MATCH (source:{resource_label} {{key: $query_key}})
             OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
             OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
-            WITH downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
 
             OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
             OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
-            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
-                collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}}) AS downstream_badges,
-                collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}}) AS upstream_badges
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath,
+                collect(distinct {{key:downstream_badge.key, category:downstream_badge.category}}) AS collected_downstream_badges,
+                collect(distinct {{key:upstream_badge.key, category:upstream_badge.category}}) AS collected_upstream_badges
+
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath,
+                CASE WHEN size(collected_downstream_badges) = 1 AND collected_downstream_badges[0].key IS NULL THEN [] ELSE collected_downstream_badges END AS downstream_badges,
+                CASE WHEN size(collected_upstream_badges) = 1 AND collected_upstream_badges[0].key IS NULL THEN [] ELSE collected_upstream_badges END AS upstream_badges
 
             OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
-            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath,
                 downstream_badges, upstream_badges, sum(downstream_read.read_count) AS downstream_read_count
 
             OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
-            WITH upstream_entity, downstream_entity, upstream_len, downstream_len,
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len,
                 downstream_badges, upstream_badges, downstream_read_count,
                 sum(upstream_read.read_count) AS upstream_read_count, upath, dpath
 
-            WITH upstream_entity, downstream_entity, upstream_len, downstream_len, upath, dpath,
-                downstream_badges, upstream_badges, downstream_read_count, upstream_read_count,
-                CASE WHEN upstream_len IS NULL THEN []
-                    ELSE collect(distinct {{
-                        level: SIZE(upstream_len),
-                        source: split(upstream_entity.key,'://')[0],
-                        key: upstream_entity.key,
-                        label: labels(upstream_entity)[0],
-                        badges: upstream_badges,
-                        usage: upstream_read_count,
-                        parent: nodes(upath)[-2].key
-                    }}) END AS upstream_entities,
-                CASE WHEN downstream_len IS NULL THEN []
-                    ELSE collect(distinct {{
-                        level: SIZE(downstream_len),
-                        source: split(downstream_entity.key,'://')[0],
-                        key: downstream_entity.key,
-                        label: labels(downstream_entity)[0],
-                        badges: downstream_badges,
-                        usage: downstream_read_count,
-                        parent: nodes(dpath)[-2].key
-                    }}) END AS downstream_entities
+            // Collect upstream entities first
+            WITH source, downstream_len, downstream_entity, dpath, downstream_badges, downstream_read_count, upstream_len,
+                collect(distinct {{
+                    level: SIZE(upstream_len),
+                    source: split(upstream_entity.key, '://')[0],
+                    key: upstream_entity.key,
+                    label: labels(upstream_entity)[0],
+                    badges: upstream_badges,
+                    usage: upstream_read_count,
+                    parent: CASE WHEN size(nodes(upath)) >= 2 THEN nodes(upath)[-2].key ELSE NULL END
+                }}) AS collected_upstream_entities
+
+            WITH source, downstream_len, downstream_entity, dpath, downstream_badges, downstream_read_count,
+                CASE WHEN size(collected_upstream_entities) = 0 THEN [] ELSE collected_upstream_entities END AS upstream_entities
+
+            // Collect downstream entities separately
+            WITH source, downstream_len, downstream_entity, dpath, downstream_badges, downstream_read_count, upstream_entities,
+                collect(distinct {{
+                    level: SIZE(downstream_len),
+                    source: split(downstream_entity.key, '://')[0],
+                    key: downstream_entity.key,
+                    label: labels(downstream_entity)[0],
+                    badges: downstream_badges,
+                    usage: downstream_read_count,
+                    parent: CASE WHEN size(nodes(dpath)) >= 2 THEN nodes(dpath)[-2].key ELSE NULL END
+                }}) AS collected_downstream_entities
+
+            WITH source, upstream_entities,
+                CASE WHEN size(collected_downstream_entities) = 0 THEN [] ELSE collected_downstream_entities END AS downstream_entities
+
+            WITH apoc.coll.flatten(collect(distinct downstream_entities)) as downstream_entities,
+                apoc.coll.flatten(collect(distinct upstream_entities)) as upstream_entities
 
             RETURN downstream_entities, upstream_entities
         """).format(depth=depth, resource_label=resource_type.name)
@@ -2691,30 +2723,35 @@ class Neo4jProxy(BaseProxy):
 
         records = self._execute_cypher_query(statement=lineage_query,
                                              param_dict={'query_key': id})
+
+        LOGGER.info(f'get_lineage:records:{records}')
         result = get_single_record(records)
+        LOGGER.info(f'get_lineage:result:{result}')
 
         downstream_entities = []
         upstream_entities = []
 
         for downstream in result.get("downstream_entities") or []:
-            downstream_entities.append(LineageItem(**{"key": downstream["key"],
-                                                    "type": downstream["label"],
-                                                    "source": downstream["source"],
-                                                    "level": downstream["level"],
-                                                    "badges": self._make_badges(downstream["badges"]),
-                                                    "usage": downstream.get("usage", 0),
-                                                    "parent": downstream.get("parent", '')
-                                                    }))
+            if downstream["key"] is not None:
+                downstream_entities.append(LineageItem(**{"key": downstream["key"],
+                                                        "type": downstream["label"],
+                                                        "source": downstream["source"],
+                                                        "level": downstream["level"],
+                                                        "badges": self._make_badges(downstream["badges"]),
+                                                        "usage": downstream.get("usage", 0),
+                                                        "parent": downstream.get("parent", '')
+                                                        }))
 
         for upstream in result.get("upstream_entities") or []:
-            upstream_entities.append(LineageItem(**{"key": upstream["key"],
-                                                  "type": upstream["label"],
-                                                  "source": upstream["source"],
-                                                  "level": upstream["level"],
-                                                  "badges": self._make_badges(upstream["badges"]),
-                                                  "usage": upstream.get("usage", 0),
-                                                  "parent": upstream.get("parent", '')
-                                                  }))
+            if upstream["key"] is not None:
+                upstream_entities.append(LineageItem(**{"key": upstream["key"],
+                                                    "type": upstream["label"],
+                                                    "source": upstream["source"],
+                                                    "level": upstream["level"],
+                                                    "badges": self._make_badges(upstream["badges"]),
+                                                    "usage": upstream.get("usage", 0),
+                                                    "parent": upstream.get("parent", '')
+                                                    }))
 
         # ToDo: Add a root_entity as an item, which will make it easier for lineage graph
         return Lineage(**{"key": id,
