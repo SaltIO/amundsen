@@ -3,12 +3,16 @@
 
 import importlib
 from typing import Any
+import logging
 
 from pyhocon import ConfigFactory, ConfigTree
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from databuilder import Scoped
 from databuilder.extractor.base_extractor import Extractor
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SQLAlchemyExtractor(Extractor):
@@ -30,7 +34,9 @@ class SQLAlchemyExtractor(Extractor):
 
         self.connection = self._get_connection()
 
-        self.extract_sql = conf.get_string(SQLAlchemyExtractor.EXTRACT_SQL)
+        self.extract_sql = text(conf.get_string(SQLAlchemyExtractor.EXTRACT_SQL))
+
+        LOGGER.info(f"self.extract_sql:{self.extract_sql}")
 
         model_class = conf.get('model_class', None)
         if model_class:
@@ -68,7 +74,8 @@ class SQLAlchemyExtractor(Extractor):
             results = [self.model_class(**result)
                        for result in self.results]
         else:
-            results = self.results
+            results = [dict(row._mapping) for row in self.results]
+            # results = self.results
         self.iter = iter(results)
 
     def extract(self) -> Any:

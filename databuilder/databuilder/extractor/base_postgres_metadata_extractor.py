@@ -10,7 +10,7 @@ from typing import (
 )
 
 from pyhocon import ConfigFactory, ConfigTree
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from queryparser.postgresql import PostgreSQLQueryProcessor
 from queryparser.exceptions import QuerySyntaxError
@@ -74,10 +74,10 @@ class BasePostgresMetadataExtractor(Extractor):
         # if where_clause_suffix and where_clause_suffix != '':
         #     where_clause_suffix = f'WHERE {where_clause_suffix}'
 
-        self.sql_stmt = self.get_sql_statement(
+        self.sql_stmt = text(self.get_sql_statement(
             use_catalog_as_cluster_name=conf.get_bool(BasePostgresMetadataExtractor.USE_CATALOG_AS_CLUSTER_NAME),
             where_clause_suffix=conf.get_string(BasePostgresMetadataExtractor.WHERE_CLAUSE_SUFFIX_KEY),
-        )
+        ))
 
         self._alchemy_extractor = SQLAlchemyExtractor()
         sql_alch_conf = Scoped.get_scoped_conf(conf, self._alchemy_extractor.get_scope())\
@@ -129,7 +129,8 @@ class BasePostgresMetadataExtractor(Extractor):
                 last_row = row
 
                 if key_cols is None:
-                    results = self.connection.execute(self.get_key_sql_statement(schema_name=last_row['schema'], table_name=last_row['name']))
+                    results = self.connection.execute(text(self.get_key_sql_statement(schema_name=last_row['schema'], table_name=last_row['name'])))
+                    results = [dict(row._mapping) for row in results]
                     LOGGER.info(f"results={results}")
                     if results:
                         key_cols = {}
@@ -166,9 +167,9 @@ class BasePostgresMetadataExtractor(Extractor):
             if bool(last_row['is_view']) == True:
                 results = None
                 try:
-                    results = self.connection.execute(self.get_new_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name']))
+                    results = self.connection.execute(text(self.get_new_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name'])))
                 except Exception as e:
-                    results = self.connection.execute(self.get_old_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name']))
+                    results = self.connection.execute(text(self.get_old_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name'])))
                 finally:
                     if results is not None:
                         view_row = results.fetchone()
@@ -193,7 +194,7 @@ class BasePostgresMetadataExtractor(Extractor):
                                                 downstream_deps=[table_metadata._get_table_key()]
                                             )
 
-                                except QuerySyntaxError as e:
+                                except Exception as e:
                                     LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
 
     def _get_raw_extract_iter(self) -> Iterator[Dict[str, Any]]:
