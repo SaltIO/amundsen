@@ -10,7 +10,7 @@ from typing import (
 
 from pyhocon import ConfigFactory, ConfigTree
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlglot import parse_one, exp
 
 from databuilder import Scoped
@@ -206,7 +206,9 @@ class MSSQLMetadataExtractor(Extractor):
                 last_row = row
 
                 if key_cols is None:
-                    results = self.connection.execute(self.get_key_sql_statement(schema_name=last_row['schema_name'], table_name=last_row['name']))
+                    results = self.connection.execute(text(self.get_key_sql_statement(schema_name=last_row['schema_name'], table_name=last_row['name'])))
+                    results = [dict(row._mapping) for row in results]
+
                     LOGGER.info(f"results={results}")
                     if results:
                         key_cols = {}
