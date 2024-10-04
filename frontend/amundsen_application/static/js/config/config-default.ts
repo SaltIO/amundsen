@@ -420,10 +420,10 @@ const configDefault: AppConfig = {
           type: FilterType.INPUT_SELECT,
         },
         {
-          categoryId: 'column',
-          displayName: 'Column',
+          categoryId: 'cluster',
+          displayName: 'Cluster',
           helpText:
-            'Enter one or more comma separated values with exact column names or regex wildcard patterns',
+            'Enter one or more comma separated values with exact cluster names or regex wildcard patterns',
           type: FilterType.INPUT_SELECT,
         },
         {
@@ -438,6 +438,13 @@ const configDefault: AppConfig = {
           displayName: 'Table',
           helpText:
             'Enter one or more comma separated values with exact table names or regex wildcard patterns',
+          type: FilterType.INPUT_SELECT,
+        },
+        {
+          categoryId: 'column',
+          displayName: 'Column',
+          helpText:
+            'Enter one or more comma separated values with exact column names or regex wildcard patterns',
           type: FilterType.INPUT_SELECT,
         },
         {
