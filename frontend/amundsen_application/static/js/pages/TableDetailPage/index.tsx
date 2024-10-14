@@ -50,6 +50,7 @@ import ColumnDetailsPanel from 'features/ColumnList/ColumnDetailsPanel';
 
 import { AlertList } from 'components/Alert';
 import BookmarkIcon from 'components/Bookmark/BookmarkIcon';
+import ExportMetadataIcon from 'components/ExportMetadata/ExportMetadataIcon';
 import Breadcrumb from 'features/Breadcrumb';
 import EditableSection from 'components/EditableSection';
 import EditableText from 'components/EditableText';
@@ -771,6 +772,9 @@ export class TableDetail extends React.Component<
               <BookmarkIcon
                 bookmarkKey={data.key}
                 resourceType={ResourceType.table}
+              />
+              <ExportMetadataIcon
+                tableData={data}
               />
               <div className="header-details">
                 <TableHeaderBullets
