@@ -78,6 +78,11 @@ width: $icon-size;
     mask-image: url('../images/icons/Alert-Triangle.svg');
 }
 
+&.icon-export-metadata {
+    -webkit-mask-image: url('../images/icons/ExportMetadata.svg');
+    mask-image: url('../images/icons/ExportMetadata.svg');
+}
+
 &.icon-bookmark {
     -webkit-mask-image: url('../images/icons/Favorite.svg');
     mask-image: url('../images/icons/Favorite.svg');

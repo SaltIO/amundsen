@@ -298,6 +298,13 @@ export function bookmarksEnabled(): boolean {
 }
 
 /**
+ * Returns whether or not export features should be enabled
+ */
+export function exportEnabled(): boolean {
+  return AppConfig.export.enabled;
+}
+
+/**
  * Returns whether or not dashboard features should be shown
  */
 export function indexDashboardsEnabled(): boolean {
