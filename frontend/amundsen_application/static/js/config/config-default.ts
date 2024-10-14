@@ -166,6 +166,9 @@ const configDefault: AppConfig = {
   bookmarks: {
     enabled: true,
   },
+  export: {
+    enabled: true,
+  },
   navLinks: [
     {
       href: '/announcements',

@@ -1,0 +1,30 @@
+
+@import 'variables';
+
+.export-metadata-icon {
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-block;
+  height: 32px;
+  margin-left: 4px;
+  padding: 4px;
+  vertical-align: top;
+  width: 32px;
+
+  &:hover,
+  &:focus {
+    background-color: $body-bg-tertiary;
+  }
+
+  .icon {
+    margin: 0;
+
+    &.icon-export-metadata {
+      &,
+      &:hover,
+      &:focus {
+        background-color: $stroke !important;
+      }
+    }
+  }
+}

@@ -37,6 +37,7 @@ export interface AppConfig {
   logoTitle: string;
   footerContentHtml: string;
   bookmarks: BookmarksFeaturesConfig;
+  export: ExportFeaturesConfig;
   mailClientFeatures: MailClientFeaturesConfig;
   navAppSuite: VisualLinkConfig[] | null;
   navLinks: LinkConfig[];
@@ -395,6 +396,15 @@ interface SnowflakeConfig {
  * enabled - Enables the bookmarks feature
  */
 interface BookmarksFeaturesConfig {
+  enabled: boolean;
+}
+
+/**
+ * ExportFeaturesConfig - Enable/disable UI features related to the export
+ *
+ * enabled - Enables the export feature
+ */
+interface ExportFeaturesConfig {
   enabled: boolean;
 }
 
