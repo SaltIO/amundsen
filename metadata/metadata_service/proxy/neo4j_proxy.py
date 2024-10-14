@@ -288,12 +288,12 @@ class Neo4jProxy(BaseProxy):
 
             last_neo4j_record = tbl_col_neo4j_record
             col = Column(name=tbl_col_neo4j_record['col']['name'],
-                         description=self._safe_get(tbl_col_neo4j_record, 'col_dscrpt', 'description'),
-                         col_type=tbl_col_neo4j_record['col']['col_type'],
-                         sort_order=int(tbl_col_neo4j_record['col']['sort_order']),
-                         stats=col_stats,
-                         badges=column_badges,
-                         type_metadata=col_type_metadata)
+                        description=self._safe_get(tbl_col_neo4j_record, 'col_dscrpt', 'description'),
+                        col_type=tbl_col_neo4j_record['col']['col_type'],
+                        sort_order=int(tbl_col_neo4j_record['col']['sort_order']),
+                        stats=col_stats,
+                        badges=column_badges,
+                        type_metadata=col_type_metadata)
 
             cols.append(col)
 
