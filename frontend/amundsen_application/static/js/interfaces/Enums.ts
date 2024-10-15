@@ -27,6 +27,7 @@ export enum SearchType {
 // Image-based Icon types from _icons.scss
 export enum ImageIconType {
   ALERT = 'icon-alert',
+  EXPORT_METADATA = 'icon-export-metadata',
   BOOKMARK = 'icon-bookmark',
   BOOKMARK_FILLED = 'icon-bookmark-filled',
   DELETE = 'icon-delete',
