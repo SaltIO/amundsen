@@ -182,6 +182,12 @@ const configDefault: AppConfig = {
       label: 'Browse',
       use_router: true,
     },
+    {
+      href: '/file_upload',
+      id: 'nav::file_upload',
+      label: 'Upload',
+      use_router: true,
+    },
   ],
   resourceConfig: {
     [ResourceType.dashboard]: {
@@ -660,9 +666,9 @@ const configDefault: AppConfig = {
     iconPath: 'PATH_TO_ICON',
     isBeta: false,
     urlGenerator: (
-      data_location_type: string,
-      data_location_name: string,
-      data_location_container: string,
+      dataLocationType: string,
+      dataLocationName: string,
+      dataLocationContainer: string,
       type: string,
       name: string
     ) =>

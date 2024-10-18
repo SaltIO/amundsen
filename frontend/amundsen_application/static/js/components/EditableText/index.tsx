@@ -5,6 +5,10 @@ import * as autosize from 'autosize';
 import * as React from 'react';
 import * as ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import DOMPurify from 'dompurify';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import he from 'he';
 
 import LoadingSpinnerOverlay from 'components/LoadingSpinnerOverlay';
 import { EditableSectionChildProps } from 'components/EditableSection';
@@ -21,10 +25,8 @@ import {
 } from './constants';
 
 import './styles.scss';
-import { getGPTResponse } from 'ducks/ai/reducer';
-import { GetGPTResponse, GetGPTResponseRequest, GetGPTResponseResponse } from 'ducks/ai/types';
+import { GetGPTResponseRequest, GetGPTResponseResponse } from 'ducks/ai/types';
 import { GPTResponse } from 'interfaces/AI';
-import { PROPOSITION_LABEL } from 'features/Feedback/constants';
 
 export interface StateFromProps {
   refreshValue?: string;
@@ -212,6 +214,20 @@ class EditableText extends React.Component<
     }
   };
 
+  isJsonString = (str: string) => {
+    let isJson = false;
+    try {
+      const parsed = JSON.parse(he.decode(str));
+      isJson = typeof parsed === 'object' && parsed !== null;
+    } catch (e) {
+      console.log(e)
+      isJson = false;
+    }
+
+    console.log(`isJson=${isJson}`)
+    return isJson
+  };
+
   render() {
     const { isEditing, editable, maxLength, allowDangerousHtml } = this.props;
     const { value = '', isDisabled, isAIEnabled, isGPTResponseLoading, aiError } = this.state;
@@ -223,16 +239,27 @@ class EditableText extends React.Component<
     }
 
     if (!isEditing) {
+      const sanitizedContent = allowDangerousHtml ? DOMPurify.sanitize(value) : value;
+      const isJson = this.isJsonString(sanitizedContent)
+
       return (
         <div className="editable-text">
-          <div className="markdown-wrapper">
-            <ReactMarkdown
-              allowDangerousHtml={!!allowDangerousHtml}
-              plugins={[remarkGfm]}
-            >
-              {value}
-            </ReactMarkdown>
-          </div>
+            <div className="markdown-wrapper">
+              {isJson ?
+                (
+                  <SyntaxHighlighter language="json" style={dark}>
+                    {JSON.stringify(JSON.parse(he.decode(sanitizedContent)), null, 2)}
+                  </SyntaxHighlighter>
+                ) : (
+                  <ReactMarkdown
+                    allowDangerousHtml={!!allowDangerousHtml}
+                    plugins={[remarkGfm]}
+                  >
+                    {sanitizedContent}
+                  </ReactMarkdown>
+                )
+              }
+            </div>
           {editable && !value && (
             <button
               className="edit-link btn btn-link"

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  ProgrammaticDescriptions,
   TableColumn,
   TableColumnStats,
   TypeMetadata,
@@ -40,4 +41,5 @@ export type FormattedDataType = {
   typeMetadata?: TypeMetadata;
   isNestedColumn?: boolean;
   kind?: string;
+  programmaticDescriptions?: ProgrammaticDescriptions
 };
