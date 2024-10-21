@@ -32,6 +32,8 @@ import {
   CLOSE_LABEL,
   TYPE_SECTION_TITLE,
 } from './constants';
+import { ProgrammaticDescription } from 'interfaces/TableMetadata';
+import EditableText from 'components/EditableText';
 
 export interface ColumnDetailsPanelProps {
   columnDetails: FormattedDataType;
@@ -74,6 +76,8 @@ const ColumnDetailsPanel: React.FC<ColumnDetailsPanelProps> = ({
     isEditable,
     badges,
     isNestedColumn,
+    programmaticDescriptions,
+
   } = columnDetails;
 
   const panelRef = React.useRef<HTMLButtonElement>(null);
@@ -111,6 +115,25 @@ const ColumnDetailsPanel: React.FC<ColumnDetailsPanelProps> = ({
     navigator.clipboard.writeText(
       getColumnLink(tableParams, getColumnNamePath(key, tableParams))
     );
+  };
+
+  const renderProgrammaticDesc = (
+    descriptions: ProgrammaticDescription[] | undefined
+  ) => {
+    if (!descriptions) {
+      return null;
+    }
+
+    return descriptions.map((d) => (
+      <EditableSection key={`prog_desc:${d.source}`} title={d.source} readOnly>
+        <EditableText
+          maxLength={999999}
+          value={d.text}
+          editable={false}
+          allowDangerousHtml
+        />
+      </EditableSection>
+    ));
   };
 
   return (
@@ -216,6 +239,11 @@ const ColumnDetailsPanel: React.FC<ColumnDetailsPanelProps> = ({
         <div className="metadata-section">
           <ColumnLineage columnName={name} singleColumnDisplay />
         </div>
+      )}
+      {programmaticDescriptions && renderProgrammaticDesc(
+        [...(programmaticDescriptions.left ? programmaticDescriptions.left : []),
+         ...(programmaticDescriptions.right ? programmaticDescriptions.right : []),
+         ...(programmaticDescriptions.other ? programmaticDescriptions.other : [])]
       )}
     </aside>
   );

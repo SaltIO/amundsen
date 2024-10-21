@@ -197,6 +197,10 @@ def marshall_table_full(table_dict: Dict) -> Dict:
         col['key'] = results['key'] + '/' + col['name']
         # Set editable state
         col['is_editable'] = is_editable
+
+        prog_descriptions = col['programmatic_descriptions']
+        col['programmatic_descriptions'] = _convert_prog_descriptions(prog_descriptions)
+
         _recursive_set_type_metadata_is_editable(col['type_metadata'], is_editable)
         # If order is provided, we sort the column based on the pre-defined order
         if app.config['COLUMN_STAT_ORDER']:
