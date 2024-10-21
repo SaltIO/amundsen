@@ -88,6 +88,7 @@ export interface AppConfigCustom {
   mailClientFeatures?: MailClientFeaturesConfig;
   announcements?: AnnoucementsFeaturesConfig;
   bookmarks?: BookmarksFeaturesConfig;
+  export?: ExportFeaturesConfig;
   navAppSuite?: VisualLinkConfig[];
   navLinks?: LinkConfig[];
   navTheme?: 'dark' | 'light';

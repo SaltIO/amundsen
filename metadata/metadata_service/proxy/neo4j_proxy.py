@@ -243,20 +243,21 @@ class Neo4jProxy(BaseProxy):
             MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
             OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
             OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_dscrpt:Description)
+            OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_prog_descriptions:Programmatic_Description)
             OPTIONAL MATCH (col:Column)-[:STAT]->(stat:Stat)
             OPTIONAL MATCH (col:Column)-[:HAS_BADGE]->(badge:Badge)
             OPTIONAL MATCH (col:Column)-[:TYPE_METADATA]->(Type_Metadata)-[:SUBTYPE *0..]->(tm:Type_Metadata)
             OPTIONAL MATCH (tm:Type_Metadata)-[:DESCRIPTION]->(tm_dscrpt:Description)
             OPTIONAL MATCH (tm:Type_Metadata)-[:HAS_BADGE]->(tm_badge:Badge)
-            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt,
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, collect(distinct col_prog_descriptions) as col_prog_descriptions,
                 collect(distinct stat) as col_stats,
                 collect(distinct badge) as col_badges,
                 tm, tm_dscrpt, tm_badge
-            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges, tm,
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_prog_descriptions, col_stats, col_badges, tm,
                 tm_dscrpt, collect(distinct tm_badge) as tm_badges
-            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges,
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_prog_descriptions, col_stats, col_badges,
                 collect(distinct {node: tm, description: tm_dscrpt, badges: tm_badges}) as col_type_metadata
-            RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges, col_type_metadata
+            RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_prog_descriptions, col_stats, col_badges, col_type_metadata
             ORDER BY col.sort_order;
         """)
         return column_level_query
@@ -286,9 +287,14 @@ class Neo4jProxy(BaseProxy):
 
             col_type_metadata = self._get_type_metadata(tbl_col_neo4j_record['col_type_metadata'])
 
+            col_prog_descriptions = self._extract_programmatic_descriptions_from_query(
+                tbl_col_neo4j_record.get('col_prog_descriptions', [])
+            )
+
             last_neo4j_record = tbl_col_neo4j_record
             col = Column(name=tbl_col_neo4j_record['col']['name'],
                         description=self._safe_get(tbl_col_neo4j_record, 'col_dscrpt', 'description'),
+                        programmatic_descriptions=col_prog_descriptions,
                         col_type=tbl_col_neo4j_record['col']['col_type'],
                         sort_order=int(tbl_col_neo4j_record['col']['sort_order']),
                         stats=col_stats,

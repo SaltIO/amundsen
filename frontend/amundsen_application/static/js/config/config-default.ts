@@ -182,6 +182,12 @@ const configDefault: AppConfig = {
       label: 'Browse',
       use_router: true,
     },
+    {
+      href: '/file_upload',
+      id: 'nav::file_upload',
+      label: 'Upload',
+      use_router: true,
+    },
   ],
   resourceConfig: {
     [ResourceType.dashboard]: {
@@ -660,13 +666,13 @@ const configDefault: AppConfig = {
     iconPath: 'PATH_TO_ICON',
     isBeta: false,
     urlGenerator: (
-      data_location_type: string,
-      data_location_name: string,
-      data_location_container: string,
+      dataLocationType: string,
+      dataLocationName: string,
+      dataLocationContainer: string,
       type: string,
       name: string
     ) =>
-      `https://DEFAULT_LINEAGE_URL?data_location_type=${data_location_type}&data_location_name=${data_location_name}&data_location_container=${data_location_container}&type=${type}&name=${name}`,
+      `https://DEFAULT_LINEAGE_URL?data_location_type=${dataLocationType}&data_location_name=${dataLocationName}&data_location_container=${dataLocationContainer}&type=${type}&name=${name}`,
   },
   tableProfile: {
     exploreUrlGenerator: (

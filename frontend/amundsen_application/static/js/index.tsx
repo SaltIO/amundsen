@@ -39,6 +39,7 @@ import ProviderPage from './pages/ProviderPage';
 import Preloader from './components/Preloader';
 import Footer from './features/Footer';
 import NavBar from './features/NavBar';
+import FileUploadComponent from 'components/FileUpload/FileUploadComponent';
 
 const sagaMiddleware = createSagaMiddleware();
 const createStoreWithMiddleware = applyMiddleware(
@@ -78,6 +79,7 @@ const Routes: React.FC = () => {
         <Route path="/file_detail/:uri" component={FilePage} />
         <Route path="/provider_detail/:name" component={ProviderPage} />
         <Route path="/search" component={SearchPage} />
+        <Route path="/file_upload" component={FileUploadComponent} />
         <Route
           path="/table_detail/:cluster/:database/:schema/:table"
           component={TableDetail}
