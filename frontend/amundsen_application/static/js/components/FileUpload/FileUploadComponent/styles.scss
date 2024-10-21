@@ -1,0 +1,63 @@
+@import 'variables';
+
+
+.file-upload-container {
+    display: flex;
+    flex-direction: column;  /* Stack elements vertically */
+    align-items: center;     /* Horizontally center the content */
+    padding-top: 100px;      /* Push content down from the top */
+    padding-bottom: 20px;
+    padding-left: 20px;
+    padding-right: 20px;
+    // border-radius: 8px;
+    // box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    font-family: $font-family-monospace-code;
+  }
+
+  .file-upload-title {
+    margin-bottom: 40px;    /* Space between the title and the input */
+    font-family: $font-family-monospace-code;
+  }
+
+  .file-upload-input {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: $font-family-monospace-code;
+  }
+
+  .file-upload-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: $font-family-monospace-code;
+    margin-top: 20px;
+    text-align: center;
+  }
+
+  .file-upload-progress-bar {
+    width: 100%;
+    max-width: 400px;  /* Limit the width of the progress bar */
+    background-color: $black;
+    height: 10px;
+    border-radius: 5px;
+    margin-top: 20px;
+    font-family: $font-family-monospace-code;
+  }
+
+  .file-upload-progress-bar-inner {
+    background-color: $cmdrvl-neon;
+    height: 100%;
+    border-radius: 5px;
+    font-family: $font-family-monospace-code;
+  }
+
+  .file-upload-selected-file {
+    // margin-bottom: 20px;
+    padding: 10px;
+    // border: 1px solid #ccc;
+    // border-radius: 4px;
+    font-family: $font-family-monospace-code;
+}

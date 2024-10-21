@@ -247,9 +247,11 @@ class EditableText extends React.Component<
             <div className="markdown-wrapper">
               {isJson ?
                 (
-                  <SyntaxHighlighter language="json" style={dark}>
-                    {JSON.stringify(JSON.parse(he.decode(sanitizedContent)), null, 2)}
-                  </SyntaxHighlighter>
+                  <div style={{ width: '400px', height: '500px', overflow: 'auto', border: '1px solid #ddd' }}>
+                    <SyntaxHighlighter language="json" style={dark}>
+                      {JSON.stringify(JSON.parse(he.decode(sanitizedContent)), null, 2)}
+                    </SyntaxHighlighter>
+                  </div>
                 ) : (
                   <ReactMarkdown
                     allowDangerousHtml={!!allowDangerousHtml}

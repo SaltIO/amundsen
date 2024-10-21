@@ -152,6 +152,11 @@ class Config:
     MTLS_CLIENT_KEY = os.getenv('MTLS_CLIENT_KEY')
     """Optional. The path to a PEM formatted key to use with the MTLS_CLIENT_CERT. MTLS_CLIENT_CERT must also be set."""
 
+    HOST_ID = os.getenv('HOST_ID')
+    AWS_DEFAULT_REGION = os.getenv('AWS_DEFAULT_REGION')
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
 
 class LocalConfig(Config):
     DEBUG = False

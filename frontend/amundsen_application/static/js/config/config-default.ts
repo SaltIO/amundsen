@@ -672,7 +672,7 @@ const configDefault: AppConfig = {
       type: string,
       name: string
     ) =>
-      `https://DEFAULT_LINEAGE_URL?data_location_type=${data_location_type}&data_location_name=${data_location_name}&data_location_container=${data_location_container}&type=${type}&name=${name}`,
+      `https://DEFAULT_LINEAGE_URL?data_location_type=${dataLocationType}&data_location_name=${dataLocationName}&data_location_container=${dataLocationContainer}&type=${type}&name=${name}`,
   },
   tableProfile: {
     exploreUrlGenerator: (
