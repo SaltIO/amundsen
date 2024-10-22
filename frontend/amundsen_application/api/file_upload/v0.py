@@ -89,6 +89,9 @@ def complete_multipart_upload():
             }
         )
 
+        message = f"*{app.config['HOST_ID']} - Metadata File Upload*\n{file_name}"
+        _send_notification(message=message)
+
         return make_response(jsonify(response), HTTPStatus.OK)
 
     except Exception as e:
@@ -113,3 +116,10 @@ def _get_s3_client():
 
 def _get_s3_file_key(file_name: str) -> str:
     return f'upload/{file_name}'
+
+def _send_notification(message: str):
+    if app.config.get('SLACK_CLIENT'):
+        try:
+            app.config['SLACK_CLIENT'].post(channel=app.config['SLACK_SUPPORT_CHANNEL'], message=message)
+        except Exception as e:
+            LOGGER.exception(f'Failed to send Slack Notification')
