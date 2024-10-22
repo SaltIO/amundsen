@@ -10,6 +10,8 @@ from flask import Flask  # noqa: F401
 
 from amundsen_application.tests.test_utils import get_test_user
 
+from amundsen_application.client.slack.slack_client import SlackClient
+
 
 class MatchRuleObject:
     def __init__(self,
@@ -156,6 +158,12 @@ class Config:
     AWS_DEFAULT_REGION = os.getenv('AWS_DEFAULT_REGION')
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+    SLACK_TOKEN = os.getenv('SLACK_TOKEN')
+    SLACK_SUPPORT_CHANNEL = os.getenv('SLACK_SUPPORT_CHANNEL')
+
+    if SLACK_TOKEN:
+        SLACK_CLIENT = SlackClient(token=SLACK_TOKEN)
 
 
 class LocalConfig(Config):
