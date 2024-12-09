@@ -8,6 +8,8 @@
     "target": "es2015",
     "strictNullChecks": true,
     "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "jsxFragmentFactory": "React.Fragment",
     "typeRoots": ["node_modules/@types"],
     "allowJs": true,
     "moduleResolution": "node",

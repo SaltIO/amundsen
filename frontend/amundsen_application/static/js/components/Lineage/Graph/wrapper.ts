@@ -1,7 +1,10 @@
+import React from 'react';
+import ReactDOM from 'react-dom';
 import { Lineage } from 'interfaces';
-import { select } from 'd3-selection';
+// import { select } from 'd3-selection';
 // import chart, { LineageChart } from './chart';
-import chart, { LineageChart } from './dag';
+// import chart, { LineageChart } from './dag';
+import LineageChart from './LineageChart';
 import { Dimensions, Labels } from './types';
 
 const actions = {
@@ -10,15 +13,14 @@ const actions = {
     lineage: Lineage,
     dimensions: Dimensions,
     labels: Labels
-  ): LineageChart => {
-    const c = chart;
-
-    select(el).datum({ lineage, dimensions, labels }).call(c);
-
-    return c;
+  ) => {
+    ReactDOM.render(
+      React.createElement(LineageChart, { lineage, dimensions, labels }),
+      el
+    );
   },
   destroy: (el: HTMLElement) => {
-    select(el).remove();
+    ReactDOM.unmountComponentAtNode(el);
   },
 };
 
