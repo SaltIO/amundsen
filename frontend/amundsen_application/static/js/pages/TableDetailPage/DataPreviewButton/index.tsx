@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from 'react';
-import { Modal, OverlayTrigger, Popover, Button } from 'react-bootstrap';
+import { Modal, OverlayTrigger, Popover, Button, Alert } from 'react-bootstrap';
 import Linkify from 'react-linkify';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
@@ -64,6 +64,7 @@ type DataPreviewButtonProps = StateFromProps &
 
 interface DataPreviewButtonState {
   showModal: boolean;
+  showAlert: boolean;
 }
 
 type Column = {
@@ -106,6 +107,7 @@ export class DataPreviewButton extends React.Component<
 
     this.state = {
       showModal: false,
+      showAlert: false,
     };
   }
 
@@ -270,6 +272,62 @@ export class DataPreviewButton extends React.Component<
     this.triggerDownload(csv, `scrubbed.${modalTitle}.csv`);
   };
 
+  handleCopyPreviewStatement = () => {
+    const { previewData } = this.props;
+
+    console.log(`previewData.preview_stmt=${previewData.preview_stmt}`)
+
+    if (previewData.preview_stmt && previewData.preview_stmt != '') {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(previewData.preview_stmt)
+          .then(() => {
+            this.setState({ showAlert: true });
+            setTimeout(() => this.setState({ showAlert: false }), 3000);
+          })
+          .catch((err) => {
+            console.error('Failed to copy preview statment: ', err);
+            alert('Failed to copy preview statment to clipboard.');
+          });
+      } else {
+        // Fallback for older browsers
+        this.fallbackCopyTextToClipboard(previewData.preview_stmt);
+      }
+    }
+    else {
+      console.warn('No preview statment to copy: ');
+      alert('No preview statment to copy.');
+    }
+  };
+
+
+
+fallbackCopyTextToClipboard = (text) => {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+
+  // Avoid scrolling to bottom
+  textArea.style.position = 'fixed';
+  textArea.style.top = '-9999px';
+  document.body.appendChild(textArea);
+
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      this.setState({ showAlert: true });
+      setTimeout(() => this.setState({ showAlert: false }), 3000);
+    } else {
+      alert('Failed to copy preview statment to clipboard.');
+    }
+  } catch (err) {
+    console.error('Fallback: Unable to copy preview statment', err);
+  }
+
+  document.body.removeChild(textArea);
+};
+
   generateFakeValueByType = (column: PreviewColumnItem): any => {
     // Check for specific patterns in column names to infer data type
     if (/email/i.test(column.column_name)) {
@@ -329,8 +387,8 @@ export class DataPreviewButton extends React.Component<
   };
 
   render() {
-    const { modalTitle, status } = this.props;
-    const { showModal } = this.state;
+    const { modalTitle, status, previewData } = this.props;
+    const { showModal, showAlert } = this.state;
 
     return (
       <>
@@ -352,6 +410,19 @@ export class DataPreviewButton extends React.Component<
               <Button variant="primary" onClick={this.handleExportScrubbed}>
                 Export Scrubbed
               </Button>
+              <Button variant="primary" onClick={this.handleCopyPreviewStatement} disabled={!previewData.preview_stmt || previewData.preview_stmt == ''}>
+                Copy Preview Statement
+              </Button>
+              {showAlert && (
+                <Alert
+                  variant="success"
+                  className="copy-alert"
+                  onClose={() => this.setState({ showAlert: false })}
+                  dismissible
+                >
+                  Preview Statement copied to clipboard!
+                </Alert>
+              )}
             </Modal.Footer>
           )}
         </Modal>

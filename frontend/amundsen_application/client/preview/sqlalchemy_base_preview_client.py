@@ -80,7 +80,7 @@ class SqlAlchemyBasePreviewClient(FactoryBasePreviewClient):
             rows = [dict(zip(col_names, row)) for row in result]
             column_metadata = [ColumnItem(n, t) for n, t in zip(col_names, col_types)]
 
-            preview_data = PreviewData(column_metadata, rows)
+            preview_data = PreviewData(columns=column_metadata, data=rows, preview_stmt=sql)
             try:
                 data = PreviewDataSchema().dump(preview_data)
                 PreviewDataSchema().load(data)  # for validation only

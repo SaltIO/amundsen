@@ -14,4 +14,5 @@ export interface PreviewData {
   columns?: PreviewColumnItem[];
   data?: PreviewDataItem[];
   error_text?: string;
+  preview_stmt?: string;
 }

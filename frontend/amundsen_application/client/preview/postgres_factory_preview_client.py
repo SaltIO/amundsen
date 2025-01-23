@@ -11,7 +11,6 @@ from flask import Response, make_response, current_app as app
 from marshmallow import ValidationError
 import simplejson as json
 
-from amundsen_application.models.preview_data import PreviewData, PreviewDataSchema, ColumnItem
 from amundsen_application.client.preview.factory_base_preview_client import FactoryBasePreviewClient
 from amundsen_application.client.preview.postgres_preview_client import PostgresPreviewClient
 

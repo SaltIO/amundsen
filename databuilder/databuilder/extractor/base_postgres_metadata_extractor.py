@@ -131,7 +131,7 @@ class BasePostgresMetadataExtractor(Extractor):
                 if key_cols is None:
                     results = self.connection.execute(text(self.get_key_sql_statement(schema_name=last_row['schema'], table_name=last_row['name'])))
                     results = [dict(row._mapping) for row in results]
-                    LOGGER.info(f"results={results}")
+                    # LOGGER.info(f"results={results}")
                     if results:
                         key_cols = {}
                         for key_row in results:
@@ -146,8 +146,8 @@ class BasePostgresMetadataExtractor(Extractor):
 
                 col_badges = []
                 if key_cols is not None and row['col_name'] in key_cols:
-                    LOGGER.info(f"Found KEY={row['col_name']}")
-                    LOGGER.info(f"Badges={key_cols[row['col_name']]}")
+                    # LOGGER.info(f"Found KEY={row['col_name']}")
+                    # LOGGER.info(f"Badges={key_cols[row['col_name']]}")
                     col_badges = key_cols[row['col_name']]
 
                 col_metadata = ColumnMetadata(row['col_name'], row['col_description'],

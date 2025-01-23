@@ -32,7 +32,8 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
                 FROM pg_catalog.pg_class c
                 LEFT JOIN pg_catalog.pg_views v ON c.relname = v.viewname
                 INNER JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
-                WHERE c.relkind IN ('r', 'v') {where_clause_suffix}
+                LEFT JOIN pg_inherits i ON c.oid = i.inhrelid  -- Join with pg_inherits to check for child partitions
+                WHERE c.relkind IN ('r', 'v') AND i.inhrelid IS NULL {where_clause_suffix}  -- Exclude child partitions
             ),
             Columns AS (
                 SELECT

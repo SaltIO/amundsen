@@ -17,13 +17,15 @@ class ColumnItemSchema(Schema):
 
 
 class PreviewData:
-    def __init__(self, columns: List = [], data: List = [], error_text: str = '') -> None:
+    def __init__(self, columns: List = [], data: List = [], error_text: str = '', preview_stmt: str = '') -> None:
         self.columns = columns
         self.data = data
         self.error_text = error_text
+        self.preview_stmt = preview_stmt
 
 
 class PreviewDataSchema(Schema):
     columns = fields.Nested(ColumnItemSchema, many=True, unknown=EXCLUDE)
     data = fields.List(fields.Dict, many=True)
     error_text = fields.Str()
+    preview_stmt = fields.Str()

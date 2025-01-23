@@ -24,7 +24,7 @@ class PostgresPreviewClient(SqlAlchemyBasePreviewClient):
         self.username = (username if username is not None else os.getenv("PREVIEW_CLIENT_POSTGRES_USERNAME"))
         self.password = (password if password is not None else os.getenv("PREVIEW_CLIENT_POSTGRES_PASSWORD"))
         self.conn_args = (conn_args if conn_args is not None else os.getenv("PREVIEW_CLIENT_POSTGRES_CONN_ARGS"))
-        self.databases = (databases if databases is not None else os.getenv("PREVIEW_CLIENT_POSTGRES_DATABASE"))
+        self.databases = (databases if databases is not None else os.getenv("PREVIEW_CLIENT_POSTGRES_DATABASE").split(",") if os.getenv("PREVIEW_CLIENT_POSTGRES_DATABASE") else None)
         if self.databases is not None:
             self.databases = (db.lower() for db in self.databases)
             self.databases = list(self.databases)
