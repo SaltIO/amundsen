@@ -12,15 +12,16 @@ from typing import (
 from pyhocon import ConfigFactory, ConfigTree
 from sqlalchemy import create_engine, text
 
-from queryparser.postgresql import PostgreSQLQueryProcessor
-from queryparser.exceptions import QuerySyntaxError
+# from queryparser.postgresql import PostgreSQLQueryProcessor
+# from queryparser.exceptions import QuerySyntaxError
+from sqlmetadata.sqlmetadata import SQLMetadata
 
 
 from databuilder import Scoped
 from databuilder.extractor.base_extractor import Extractor
 from databuilder.extractor.sql_alchemy_extractor import SQLAlchemyExtractor
 from databuilder.models.table_metadata import ColumnMetadata, TableMetadata
-from databuilder.models.table_lineage import TableLineage
+from databuilder.models.table_lineage import ColumnLineage, TableLineage
 
 TableKey = namedtuple('TableKey', ['schema', 'table_name'])
 
@@ -165,37 +166,67 @@ class BasePostgresMetadataExtractor(Extractor):
             yield table_metadata
 
             if bool(last_row['is_view']) == True:
-                results = None
-                try:
-                    results = self.connection.execute(text(self.get_new_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name'])))
-                except Exception as e:
-                    results = self.connection.execute(text(self.get_old_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name'])))
-                finally:
-                    if results is not None:
-                        view_row = results.fetchone()
-                        LOGGER.info(f"view_row={view_row}")
-                        if view_row:
-                            view_def = view_row[0]
-                            if view_def:
-                                qp = PostgreSQLQueryProcessor()
-                                try:
-                                    qp.set_query(view_def)
+                view_def = last_row.get('view_definition')
+                # if not view_def:
+                #     results = None
+                #     try:
+                #         results = self.connection.execute(text(self.get_new_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name'])))
+                #     except Exception as e:
+                #         results = self.connection.execute(text(self.get_old_view_def_sql_statement(schema_name=last_row['schema'], view_name=last_row['name'])))
+                #     finally:
+                #         if results is not None:
+                #             view_row = results.fetchone()
+                #             view_def = view_row[0] if view_row else None
 
-                                    qp.process_query()
+                LOGGER.info(f"schema={last_row['schema']}, view_name={last_row['name']}, view_def={view_def}")
+                if view_def:
+                    try:
+                        column_lineage = SQLMetadata.extract_column_lineage(
+                            sql_stmt=view_def,
+                            dialect='postgres'
+                        )
 
-                                    LOGGER.info(f"View table: {qp.tables}")
+                        if column_lineage:
+                            view_column_lineage_columns = column_lineage.get('__SELECT__').get('columns') \
+                                if column_lineage and column_lineage.get('__SELECT__') and column_lineage.get('__SELECT__').get('columns') \
+                                else None
 
-                                    if qp.tables is not None and len(qp.tables) > 0:
-                                        for table in qp.tables:
-                                            table_key = TableMetadata.TABLE_KEY_FORMAT.format(db=self._database, cluster=last_row['cluster'], schema=table[0].lower(), tbl=table[1].lower())
-                                            LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
-                                            yield TableLineage(
-                                                table_key=table_key,
-                                                downstream_deps=[table_metadata._get_table_key()]
-                                            )
+                            if view_column_lineage_columns:
+                                for column in columns:
+                                    view_column_lineage = view_column_lineage_columns.get(column.name, {}) if view_column_lineage_columns else None
 
-                                except Exception as e:
-                                    LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
+                                    lineage = None
+                                    if view_column_lineage:
+                                        lineage = view_column_lineage.get('lineage', [])
+                                        if lineage and len(lineage) > 0:
+                                            for table_lineage in lineage:
+
+                                                # Handles bad sql that does not include the schema.  Assumoption
+                                                # is that the schema is the same
+                                                schema = table_lineage['schema'] if 'schema' in table_lineage and table_lineage['schema'] else last_row['schema']
+                                                column_key = ColumnMetadata.COLUMN_KEY_FORMAT.format(
+                                                    db=self._database,
+                                                    cluster=last_row['cluster'],
+                                                    schema=schema,
+                                                    tbl=table_lineage['table'],
+                                                    col=table_lineage['column'])
+                                                yield ColumnLineage(
+                                                    column_key=column_key,
+                                                    downstream_deps=[table_metadata._get_col_key(column)]
+                                                )
+                                                table_key = TableMetadata.TABLE_KEY_FORMAT.format(
+                                                    db=self._database,
+                                                    cluster=last_row['cluster'],
+                                                    schema=schema,
+                                                    tbl=table_lineage['table'])
+                                                LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
+                                                yield TableLineage(
+                                                    table_key=table_key,
+                                                    downstream_deps=[table_metadata._get_table_key()]
+                                                )
+
+                    except Exception as e:
+                        LOGGER.exception(f"Error parsing the query for {last_row['schema']}.{last_row['name']}:")
 
     def _get_raw_extract_iter(self) -> Iterator[Dict[str, Any]]:
         """
