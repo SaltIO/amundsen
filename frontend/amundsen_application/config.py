@@ -106,6 +106,8 @@ class Config:
 
     # Settings for Issue tracker integration
     ISSUE_LABELS = []  # type: List[str]
+    ISSUE_IGNORE_REPORTER = False  # type: bool
+    ISSUE_PRIORITY_OVERRIDES = None
     ISSUE_TRACKER_API_TOKEN = None  # type: str
     ISSUE_TRACKER_URL = None  # type: str
     ISSUE_TRACKER_USER = None  # type: str

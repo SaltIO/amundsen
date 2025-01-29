@@ -7,6 +7,8 @@ from os import environ
 class FrontendConfigAuth(OidcConfig):
     if 'ISSUE_TRACKER_URL' in os.environ:
         ISSUE_LABELS = []  # type: List[str] (Optional labels to be set on the created tickets)
+        ISSUE_IGNORE_REPORTER = os.environ.get('ISSUE_IGNORE_REPORTER', False)
+        ISSUE_PRIORITY_OVERRIDES = os.environ.get('ISSUE_PRIORITY_OVERRIDES', None)
         ISSUE_TRACKER_URL = os.environ['ISSUE_TRACKER_URL']  # type: str (Your JIRA environment, IE 'https://jira.net')
         ISSUE_TRACKER_USER = os.environ['ISSUE_TRACKER_USER']  # type: str (Recommended to be a service account)
         ISSUE_TRACKER_PASSWORD = os.environ['ISSUE_TRACKER_PASSWORD']  # type: str
@@ -32,6 +34,8 @@ class FrontendConfigAuth(OidcConfig):
 class FrontendConfig(LocalConfig):
     if 'ISSUE_TRACKER_URL' in os.environ:
         ISSUE_LABELS = []  # type: List[str] (Optional labels to be set on the created tickets)
+        ISSUE_IGNORE_REPORTER = os.environ.get('ISSUE_IGNORE_REPORTER', False)
+        ISSUE_PRIORITY_OVERRIDES = os.environ.get('ISSUE_PRIORITY_OVERRIDES', None)
         ISSUE_TRACKER_URL = os.environ['ISSUE_TRACKER_URL']  # type: str (Your JIRA environment, IE 'https://jira.net')
         ISSUE_TRACKER_USER = os.environ['ISSUE_TRACKER_USER']  # type: str (Recommended to be a service account)
         ISSUE_TRACKER_PASSWORD = os.environ['ISSUE_TRACKER_PASSWORD']  # type: str

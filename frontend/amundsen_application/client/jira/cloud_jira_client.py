@@ -11,7 +11,7 @@ from amundsen_application.api.metadata.v0 import USER_ENDPOINT
 from amundsen_application.api.utils.request_utils import request_metadata
 from amundsen_application.base.base_issue_tracker_client import BaseIssueTrackerClient, IssueType
 from amundsen_application.proxy.issue_tracker_clients.issue_exceptions import IssueConfigurationException
-from amundsen_application.models.data_issue import DataIssue, Priority
+from amundsen_application.models.data_issue import DataIssue, Priority, PriorityConfig
 from amundsen_application.models.issue_results import IssueResults
 from amundsen_application.models.user import load_user
 from amundsen_common.models.user import User
@@ -35,13 +35,16 @@ ISSUE_TYPE_NAME = 'Bug'
 
 class CloudJiraClient(BaseIssueTrackerClient):
 
-    def __init__(self, issue_labels: List[str],
+    def __init__(self,
+                 issue_labels: List[str],
+                 issue_set_reporter: bool,
                  issue_tracker_url: str,
                  issue_tracker_user: str,
                  issue_tracker_password: str,
                  issue_tracker_project_id: int,
                  issue_tracker_max_results: int) -> None:
         self.issue_labels = issue_labels
+        self.issue_set_reporter = issue_set_reporter
         self.jira_url = issue_tracker_url
         self.jira_user = issue_tracker_user
         self.jira_password = issue_tracker_password
@@ -158,14 +161,6 @@ class CloudJiraClient(BaseIssueTrackerClient):
             proj_value = project_key if project_key else self.jira_project_id
 
             reporting_user = self._get_users_from_ids([user_email])
-            owners = self._get_users_from_ids(kwargs.get('owner_ids', []))
-            frequent_users = self._get_users_from_ids(kwargs.get('frequent_user_ids', []))
-
-            reporting_user_str = self._generate_reporting_user_str(reporting_user)
-            owners_description_str = self._generate_owners_description_str(owners)
-            frequent_users_description_str = self._generate_frequent_users_description_str(frequent_users)
-            all_users_description_str = self._generate_all_table_users_description_str(owners_description_str,
-                                                                                       frequent_users_description_str)
 
             fields = dict(
                 project={
@@ -183,10 +178,13 @@ class CloudJiraClient(BaseIssueTrackerClient):
                                                        reporting_user=reporting_user,
                                                        **kwargs),
                 priority={
-                    'name': Priority.get_jira_severity_from_level(priority_level)
-                },
-                reporter=reporter
+                    'name': PriorityConfig.get_jira_severity_from_level(priority_level)
+                }
             )
+
+            if self.issue_set_reporter:
+                fields['reporter'] = reporter
+
             logging.debug(f"jira create_issue fields={fields}")
             issue = self.jira_client.create_issue(fields=fields)
 
@@ -273,7 +271,7 @@ class CloudJiraClient(BaseIssueTrackerClient):
                          title=issue.fields.summary,
                          url=issue.permalink(),
                          status=issue.fields.status.name,
-                         priority=Priority.from_jira_severity(issue.fields.priority.name))
+                         priority=PriorityConfig.from_jira_severity(issue.fields.priority.name))
 
     def _generate_issues_url(self, search_stub: str, resource_name: str, resource_uri: str, issueCount: int) -> str:
         """

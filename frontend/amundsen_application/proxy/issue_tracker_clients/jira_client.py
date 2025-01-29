@@ -11,7 +11,7 @@ from amundsen_application.api.metadata.v0 import USER_ENDPOINT
 from amundsen_application.api.utils.request_utils import request_metadata
 from amundsen_application.base.base_issue_tracker_client import BaseIssueTrackerClient, IssueType
 from amundsen_application.proxy.issue_tracker_clients.issue_exceptions import IssueConfigurationException
-from amundsen_application.models.data_issue import DataIssue, Priority
+from amundsen_application.models.data_issue import DataIssue, Priority, PriorityConfig
 from amundsen_application.models.issue_results import IssueResults
 from amundsen_application.models.user import load_user
 from amundsen_common.models.user import User
@@ -37,11 +37,13 @@ class JiraClient(BaseIssueTrackerClient):
 
     def __init__(self, issue_labels: List[str],
                  issue_tracker_url: str,
+                 issue_set_reporter: bool,
                  issue_tracker_user: str,
                  issue_tracker_password: str,
                  issue_tracker_project_id: int,
                  issue_tracker_max_results: int) -> None:
         self.issue_labels = issue_labels
+        self.issue_set_reporter = issue_set_reporter
         self.jira_url = issue_tracker_url
         self.jira_user = issue_tracker_user
         self.jira_password = issue_tracker_password
@@ -157,12 +159,15 @@ class JiraClient(BaseIssueTrackerClient):
 
             reporting_user = self._get_users_from_ids([user_email])
 
-            issue = self.jira_client.create_issue(fields=dict(project={
-                proj_key: proj_value
-            }, issuetype={
-                'id': issue_type_id,
-                'name': ISSUE_TYPE_NAME,
-            }, labels=self.issue_labels,
+            fields = dict(
+                project={
+                    proj_key: proj_value
+                },
+                issuetype={
+                    'id': issue_type_id,
+                    'name': ISSUE_TYPE_NAME,
+                },
+                labels=self.issue_labels,
                 summary=title,
                 description=self._decorate_description(issue_type=issue_type,
                                                        description=description,
@@ -170,8 +175,14 @@ class JiraClient(BaseIssueTrackerClient):
                                                        reporting_user=reporting_user,
                                                        **kwargs),
                 priority={
-                    'name': Priority.get_jira_severity_from_level(priority_level)
-            }, reporter=reporter))
+                    'name': PriorityConfig.get_jira_severity_from_level(priority_level)
+                }
+            )
+
+            if self.issue_set_reporter:
+                fields['reporter'] = reporter
+
+            issue = self.jira_client.create_issue(fields=fields)
 
             # self._add_watchers_to_issue(issue_key=issue.key, users=owners + frequent_users)
 
@@ -256,7 +267,7 @@ class JiraClient(BaseIssueTrackerClient):
                          title=issue.fields.summary,
                          url=issue.permalink(),
                          status=issue.fields.status.name,
-                         priority=Priority.from_jira_severity(issue.fields.priority.name))
+                         priority=PriorityConfig.from_jira_severity(issue.fields.priority.name))
 
     def _generate_issues_url(self, search_stub: str, table_uri: str, issueCount: int) -> str:
         """
