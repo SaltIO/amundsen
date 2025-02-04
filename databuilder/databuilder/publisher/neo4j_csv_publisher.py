@@ -300,9 +300,10 @@ class Neo4jCsvPublisher(Publisher):
         with open(node_file, 'r', encoding='utf8') as node_csv:
             for node_record in pandas.read_csv(node_csv,
                                                na_filter=False).to_dict(orient="records"):
+                # LOGGER.info(f'Executing Neo4J MERGE: \n{node_record}')
                 stmt = self.create_node_merge_statement(node_record=node_record)
                 params = self._create_props_param(node_record)
-                tx = self._execute_statement(stmt, tx, params)
+                tx = self._execute_statement(stmt, tx, params, True)
         return tx
 
     def is_create_only_node(self, node_record: dict) -> bool:
@@ -323,9 +324,10 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         template = Template("""
-            MERGE (node:{{ LABEL }} {key: $KEY})
+            MERGE (node:{{ LABEL }} {key: toLower($KEY)})
             ON CREATE SET {{ PROP_BODY }}
             {% if update %} ON MATCH SET {{ PROP_BODY }} {% endif %}
+            RETURN node
         """)
 
         prop_body = self._create_props_body(node_record, NODE_REQUIRED_KEYS, 'node')
@@ -367,7 +369,7 @@ class Neo4jCsvPublisher(Publisher):
                     )
 
                     if stmt:
-                        tx = self._execute_statement(stmt, tx=tx, params=params)
+                        tx = self._execute_statement(stmt, tx=tx, params=params, expect_result=True)
                         count += 1
 
             LOGGER.info('Executed pre-processing Cypher statement %i times', count)
@@ -400,7 +402,7 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         template = Template("""
-            MATCH (n1:{{ START_LABEL }} {key: $START_KEY}), (n2:{{ END_LABEL }} {key: $END_KEY})
+            MATCH (n1:{{ START_LABEL }} {key: toLower($START_KEY)}), (n2:{{ END_LABEL }} {key: toLower($END_KEY)})
             MERGE (n1)-[r1:{{ TYPE }}]->(n2){{ REVERSE_REL }}
             {% if update_prop_body %}
             ON CREATE SET {{ prop_body }}
@@ -505,7 +507,7 @@ class Neo4jCsvPublisher(Publisher):
 
             return tx
         except Exception as e:
-            LOGGER.exception('Failed to execute Cypher query')
+            LOGGER.exception(f'Failed to execute Cypher query:\nstmt=\n{str(stmt)}\nparams=\n{params}')
             if not tx.closed():
                 tx.rollback()
             raise e

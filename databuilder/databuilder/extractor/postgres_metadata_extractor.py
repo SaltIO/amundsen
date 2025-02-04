@@ -27,16 +27,16 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
                     {cluster_source} AS cluster,
                     n.nspname AS schema,
                     c.relname AS name,
+                    c.relkind AS relkind,
                     CASE
                         WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(format('%I.%I', n.nspname, c.relname), true)
                         ELSE NULL
                     END AS view_definition,
-                    c.relkind IN ('v', 'm') AS is_view,
-                    c.relkind IN ('m') AS is_mat_view
+                    c.relkind IN ('v', 'm') AS is_view
                 FROM pg_catalog.pg_class c
                 INNER JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
                 LEFT JOIN pg_inherits i ON c.oid = i.inhrelid  -- Join with pg_inherits to check for child partitions
-                WHERE c.relkind IN ('r', 'v', 'm', 'p') AND i.inhrelid IS NULL {where_clause_suffix} -- Exclude child partitions
+                WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f') AND i.inhrelid IS NULL {where_clause_suffix} -- Exclude child partitions
             ),
             Columns AS (
                 SELECT
@@ -51,19 +51,19 @@ class PostgresMetadataExtractor(BasePostgresMetadataExtractor):
                 INNER JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
                 INNER JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
                 LEFT JOIN pg_catalog.pg_description pd ON c.oid = pd.objoid AND a.attnum = pd.objsubid
-                WHERE c.relkind IN ('r', 'v', 'm', 'p') AND a.attnum > 0 {where_clause_suffix}
+                WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f') AND a.attnum > 0 {where_clause_suffix}
             ),
             Final AS (
                 SELECT
                     o.cluster,
                     o.schema,
                     o.name,
+                    o.relkind,
                     c.col_name,
                     c.col_type,
                     c.col_description,
                     c.col_sort_order,
                     o.is_view,
-                    o.is_mat_view,
                     o.view_definition
                 FROM Objects o
                 LEFT JOIN Columns c ON o.schema = c.schema AND o.name = c.name

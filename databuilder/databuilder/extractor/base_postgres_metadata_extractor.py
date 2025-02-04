@@ -6,7 +6,7 @@ import logging
 from collections import namedtuple
 from itertools import groupby
 from typing import (
-    Any, Dict, Iterator, Union,
+    Any, Dict, Iterator, Union, List
 )
 
 from pyhocon import ConfigFactory, ConfigTree
@@ -93,6 +93,8 @@ class BasePostgresMetadataExtractor(Extractor):
         self._alchemy_extractor.init(sql_alch_conf)
         self._extract_iter: Union[None, Iterator] = None
 
+        self.lineage_extracts: List[Union[TableLineage, ColumnLineage]] = []
+
     def _get_connection(self, sql_alch_conf) -> Any:
         """
         Create a SQLAlchemy connection to Database
@@ -109,19 +111,25 @@ class BasePostgresMetadataExtractor(Extractor):
         conn = engine.connect()
         return conn
 
-    def extract(self) -> Union[TableMetadata, None]:
+    def extract(self) -> Union[TableMetadata, TableLineage, ColumnLineage, None]:
+
         if not self._extract_iter:
             self._extract_iter = self._get_extract_iter()
         try:
             return next(self._extract_iter)
         except StopIteration:
-            return None
+            if self.lineage_extracts:
+                lineage_extract = self.lineage_extracts.pop(0)  # Remove first element
+                LOGGER.info(f'Extracting lineage: {lineage_extract}')
+                return lineage_extract
+            return None  # No more data left
 
-    def _get_extract_iter(self) -> Iterator[TableMetadata]:
+    def _get_extract_iter(self) -> Iterator[Union[TableMetadata, TableLineage, ColumnLineage]]:
         """
         Using itertools.groupby and raw level iterator, it groups to table and yields TableMetadata
         :return:
         """
+
         for key, group in groupby(self._get_raw_extract_iter(), self._get_table_key):
             columns = []
             key_cols = None
@@ -165,6 +173,8 @@ class BasePostgresMetadataExtractor(Extractor):
                                            is_view=last_row['is_view'])
             yield table_metadata
 
+            LOGGER.info(f'Extracting table: {table_metadata._get_table_key()}')
+
             if bool(last_row['is_view']) == True:
                 view_def = last_row.get('view_definition')
                 # if not view_def:
@@ -178,7 +188,7 @@ class BasePostgresMetadataExtractor(Extractor):
                 #             view_row = results.fetchone()
                 #             view_def = view_row[0] if view_row else None
 
-                LOGGER.info(f"schema={last_row['schema']}, view_name={last_row['name']}, view_def={view_def}")
+                LOGGER.info(f"Found View: schema={last_row['schema']}, view_name={last_row['name']}, view_def={view_def}")
                 if view_def:
                     try:
                         column_lineage = SQLMetadata.extract_column_lineage(
@@ -210,19 +220,31 @@ class BasePostgresMetadataExtractor(Extractor):
                                                     schema=schema,
                                                     tbl=table_lineage['table'],
                                                     col=table_lineage['column'])
-                                                yield ColumnLineage(
-                                                    column_key=column_key,
-                                                    downstream_deps=[table_metadata._get_col_key(column)]
+                                                # yield ColumnLineage(
+                                                #     column_key=column_key,
+                                                #     downstream_deps=[table_metadata._get_col_key(column)]
+                                                # )
+                                                self.lineage_extracts.append(
+                                                    ColumnLineage(
+                                                        column_key=column_key,
+                                                        downstream_deps=[table_metadata._get_col_key(column)]
+                                                    )
                                                 )
                                                 table_key = TableMetadata.TABLE_KEY_FORMAT.format(
                                                     db=self._database,
                                                     cluster=last_row['cluster'],
                                                     schema=schema,
                                                     tbl=table_lineage['table'])
-                                                LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
-                                                yield TableLineage(
-                                                    table_key=table_key,
-                                                    downstream_deps=[table_metadata._get_table_key()]
+                                                # LOGGER.info(f"Table Lineage: table={table_key}   downstream={table_metadata._get_table_key()}")
+                                                # yield TableLineage(
+                                                #     table_key=table_key,
+                                                #     downstream_deps=[table_metadata._get_table_key()]
+                                                # )
+                                                self.lineage_extracts.append(
+                                                    TableLineage(
+                                                        table_key=table_key,
+                                                        downstream_deps=[table_metadata._get_table_key()]
+                                                    )
                                                 )
 
                     except Exception as e:

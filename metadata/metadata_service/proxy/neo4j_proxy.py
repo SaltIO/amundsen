@@ -852,13 +852,13 @@ class Neo4jProxy(BaseProxy):
         published_tag = "edited"
 
         upsert_desc_query = textwrap.dedent("""
-        MERGE (u:Description {key: $desc_key})
-        on CREATE SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
-        on MATCH SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        MERGE (u:Description {key: toLower($desc_key)})
+        on CREATE SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
         """)
 
         upsert_desc_tab_relation_query = textwrap.dedent("""
-        MATCH (n1:Description {{key: $desc_key}}), (n2:{node_label} {{key: $key}})
+        MATCH (n1:Description {{key: toLower($desc_key)}}), (n2:{node_label} {{key: toLower($desc_key)}})
         MERGE (n2)-[r1:DESCRIPTION]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -933,13 +933,13 @@ class Neo4jProxy(BaseProxy):
         published_tag = "edited"
 
         upsert_update_frequency_query = textwrap.dedent("""
-        MERGE (u:Update_Frequency {key: $uf_key})
-        on CREATE SET u={frequency: $frequency, key: $uf_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
-        on MATCH SET u={frequency: $frequency, key: $uf_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        MERGE (u:Update_Frequency {key: toLower($uf_key)})
+        on CREATE SET u={frequency: $frequency, key: toLower($uf_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={frequency: $frequency, key: toLower($uf_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
         """)
 
         upsert_update_frequency_table_relation_query = textwrap.dedent("""
-        MATCH (n1:Update_Frequency {key: $uf_key}), (n2:Table {key: $table_key})
+        MATCH (n1:Update_Frequency {key: toLower($uf_key)}), (n2:Table {key: toLower($table_key)})
         MERGE (n2)-[r1:UPDATE_FREQUENCY]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1091,13 +1091,13 @@ class Neo4jProxy(BaseProxy):
         published_tag = "edited"
 
         upsert_desc_query = textwrap.dedent("""
-            MERGE (u:Description {key: $desc_key})
-            on CREATE SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
-            on MATCH SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+            MERGE (u:Description {key: toLower($desc_key)})
+            on CREATE SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+            on MATCH SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
             """)
 
         upsert_desc_col_relation_query = textwrap.dedent("""
-            MATCH (n1:Description {key: $desc_key}), (n2:Column {key: $column_key})
+            MATCH (n1:Description {key: toLower($desc_key)}), (n2:Column {key: toLower($column_key)})
             MERGE (n2)-[r1:DESCRIPTION]->(n1)
             SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
             SET r1.published_tag = $published_tag
@@ -1181,12 +1181,12 @@ class Neo4jProxy(BaseProxy):
         published_tag = "edited"
 
         create_owner_query = textwrap.dedent("""
-        MERGE (u:User {key: $user_email})
-        on CREATE SET u={email: $user_email, key: $user_email, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        MERGE (u:User {key: toLower($user_email)})
+        on CREATE SET u={email: $user_email, key: toLower($user_email), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
         """)
 
         upsert_owner_relation_query = textwrap.dedent("""
-        MATCH (n1:User {{key: $user_email}}), (n2:{resource_type} {{key: $res_key}})
+        MATCH (n1:User {{key: toLower($user_email)}}), (n2:{resource_type} {{key: toLower($res_key)}})
         MERGE (n1)-[r1:OWNER_OF]->(n2)-[r2:OWNER]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1287,7 +1287,7 @@ class Neo4jProxy(BaseProxy):
 
         upsert_badge_relation_query = textwrap.dedent("""
         MATCH(n1:Badge {{key: $badge_name, category: $category}}),
-        (n2:{resource_type} {{key: $key}})
+        (n2:{resource_type} {{key: toLower($key)}})
         MERGE (n1)-[r1:BADGE_FOR]->(n2)-[r2:HAS_BADGE]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1409,7 +1409,7 @@ class Neo4jProxy(BaseProxy):
         """)
 
         upsert_tag_relation_query = textwrap.dedent("""
-        MATCH (n1:Tag {{key: $tag, tag_type: $tag_type}}), (n2:{resource_type} {{key: $key}})
+        MATCH (n1:Tag {{key: $tag, tag_type: $tag_type}}), (n2:{resource_type} {{key: toLower($key)}})
         MERGE (n1)-[r1:TAG]->(n2)-[r2:TAGGED_BY]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1929,7 +1929,7 @@ class Neo4jProxy(BaseProxy):
         user_props = self._create_props_body(user_data, 'usr')
 
         create_update_user_query = textwrap.dedent("""
-        MERGE (usr:User {key: $user_id})
+        MERGE (usr:User {key: toLower($user_id)})
         on CREATE SET %s, usr.%s=timestamp()
         on MATCH SET %s
         RETURN usr, usr.%s = timestamp() as created
@@ -2216,7 +2216,7 @@ class Neo4jProxy(BaseProxy):
         """
 
         upsert_user_query = textwrap.dedent("""
-        MERGE (u:User {key: $user_email})
+        MERGE (u:User {key: toLower($user_email)})
         on CREATE SET u={email: $user_email, key: $user_email}
         """)
 
@@ -2224,7 +2224,7 @@ class Neo4jProxy(BaseProxy):
                                                                       resource_type=resource_type)
 
         upsert_user_relation_query = textwrap.dedent("""
-        MATCH (usr:User {{key: $user_key}}), (resource:{resource_type} {{key: $resource_key}})
+        MATCH (usr:User {{key: $user_key}}), (resource:{resource_type} {{key: toLower($resource_key)}})
         MERGE {rel_clause}
         RETURN usr.key, resource.key
         """.format(resource_type=resource_type.name,
