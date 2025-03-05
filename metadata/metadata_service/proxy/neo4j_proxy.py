@@ -1342,8 +1342,8 @@ class Neo4jProxy(BaseProxy):
 
         # only deletes relationshop between badge and resource
         delete_query = textwrap.dedent("""
-        MATCH (b:Badge {{key:$badge_name, category:$category}})-
-        [r1:BADGE_FOR]->(n:{resource_type} {{key: $key}})-[r2:HAS_BADGE]->(b) DELETE r1,r2
+        MATCH (b:Badge {{key:$badge_name, category:$category}})-[r1:BADGE_FOR]->(n:{resource_type} {{key: $key}})-[r2:HAS_BADGE]->(b)
+        DELETE r1,r2
         """.format(resource_type=resource_type.name))
 
         try:
