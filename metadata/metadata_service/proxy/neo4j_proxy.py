@@ -49,6 +49,9 @@ from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.proxy.statsd_utilities import timer_with_counter
 from metadata_service.util import UserResourceRel
 
+from metadata_service.auth import requires_auth
+
+
 _CACHE = CacheManager(**parse_cache_config_options({'cache.type': 'memory'}))
 
 # Expire cache every 11 hours + jitter
@@ -179,11 +182,13 @@ class Neo4jProxy(BaseProxy):
         return health_check.HealthCheck(status=status, checks=final_checks)
 
     @timer_with_counter
+    @requires_auth
     def get_table(self, *, table_uri: str) -> Table:
         """
         :param table_uri: Table URI
         :return:  A Table object
         """
+        LOGGER.info("############# GET TABLE #############")
         cols, last_neo4j_record = self._exec_col_query(table_uri)
 
         readers = self._exec_usage_query(table_uri)
@@ -791,6 +796,7 @@ class Neo4jProxy(BaseProxy):
         return description_query
 
     @timer_with_counter
+    @requires_auth
     def get_resource_description(self, *,
                                  resource_type: ResourceType,
                                  uri: str) -> Description:
@@ -836,6 +842,7 @@ class Neo4jProxy(BaseProxy):
                                              uri=type_metadata_key).description
 
     @timer_with_counter
+    @requires_auth
     def put_resource_description(self, *,
                                  resource_type: ResourceType,
                                  uri: str,
@@ -918,6 +925,7 @@ class Neo4jProxy(BaseProxy):
                                       description=description)
 
     @timer_with_counter
+    @requires_auth
     def put_table_update_frequency(self, *,
                                    table_uri: str,
                                    frequency: str) -> None:
@@ -985,6 +993,7 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    @requires_auth
     def delete_table_update_frequency(self, *,
                                       table_uri: str) -> None:
         """
@@ -1026,6 +1035,7 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    @requires_auth
     def put_type_metadata_description(self, *,
                                       type_metadata_key: str,
                                       description: str) -> None:
@@ -1051,6 +1061,7 @@ class Neo4jProxy(BaseProxy):
         return column_description_query
 
     @timer_with_counter
+    @requires_auth
     def get_column_description(self, *,
                                table_uri: str,
                                column_name: str) -> Union[str, None]:
@@ -1072,6 +1083,7 @@ class Neo4jProxy(BaseProxy):
         return column_description
 
     @timer_with_counter
+    @requires_auth
     def put_column_description(self, *,
                                table_uri: str,
                                column_name: str,
@@ -1146,6 +1158,7 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    @requires_auth
     def add_owner(self, *,
                   table_uri: str,
                   owner: str) -> None:
@@ -1163,6 +1176,7 @@ class Neo4jProxy(BaseProxy):
                                 owner=owner)
 
     @timer_with_counter
+    @requires_auth
     def add_resource_owner(self, *,
                            uri: str,
                            resource_type: ResourceType,
@@ -1221,6 +1235,7 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     @timer_with_counter
+    @requires_auth
     def delete_owner(self, *,
                      table_uri: str,
                      owner: str) -> None:
@@ -1235,6 +1250,7 @@ class Neo4jProxy(BaseProxy):
                                    owner=owner)
 
     @timer_with_counter
+    @requires_auth
     def delete_resource_owner(self, *,
                               uri: str,
                               resource_type: ResourceType,
@@ -1264,6 +1280,7 @@ class Neo4jProxy(BaseProxy):
             tx.commit()
 
     @timer_with_counter
+    @requires_auth
     def add_badge(self, *,
                   id: str,
                   badge_name: str,
@@ -1331,6 +1348,7 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     @timer_with_counter
+    @requires_auth
     def delete_badge(self, id: str,
                      badge_name: str,
                      category: str,
@@ -1365,6 +1383,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_badges(self) -> List:
         query = self._get_badge_query_statement()
         records = self._execute_cypher_query(statement=query,
@@ -1377,6 +1396,7 @@ class Neo4jProxy(BaseProxy):
         return results
 
     @timer_with_counter
+    @requires_auth
     def add_tag(self, *,
                 id: str,
                 tag: str,
@@ -1452,6 +1472,7 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     @timer_with_counter
+    @requires_auth
     def delete_tag(self, *,
                    id: str,
                    tag: str,
@@ -1506,6 +1527,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_tags(self) -> List:
         """
         Get all existing tags from neo4j
@@ -1529,6 +1551,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_latest_updated_ts(self) -> Optional[int]:
         """
         API method to fetch last updated / index timestamp for neo4j, es
@@ -1602,6 +1625,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_statistics(self) -> Dict[str, Any]:
         """
         API method to fetch statistics metrics for neo4j
@@ -1730,6 +1754,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_popular_tables(self, *,
                            num_entries: int,
                            user_id: Optional[str] = None) -> List[PopularTable]:
@@ -1852,6 +1877,7 @@ class Neo4jProxy(BaseProxy):
         return popular_dashboards
 
     @timer_with_counter
+    @requires_auth
     def get_popular_resources(self, *,
                               num_entries: int,
                               resource_types: List[str],
@@ -1890,6 +1916,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_user(self, *, id: str) -> Union[UserEntity, None]:
         """
         Retrieve user detail based on user_id(email).
@@ -1916,6 +1943,7 @@ class Neo4jProxy(BaseProxy):
 
         return self._build_user_from_record(record=record, manager_name=manager_name)
 
+    @requires_auth
     def create_update_user(self, *, user: User) -> Tuple[User, bool]:
         """
         Create a user if it does not exist, otherwise update the user. Required
@@ -1979,6 +2007,7 @@ class Neo4jProxy(BaseProxy):
         """)
         return statement
 
+    @requires_auth
     def get_users(self) -> List[UserEntity]:
         # statement = "MATCH (usr:User) WHERE usr.is_active = true RETURN collect(usr) as users"
         statement = self._get_users_query_statement()
@@ -2083,6 +2112,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_dashboard_by_user_relation(self, *, user_email: str, relation_type: UserResourceRel) \
             -> Dict[str, List[DashboardSummary]]:
         """
@@ -2132,6 +2162,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_table_by_user_relation(self, *, user_email: str, relation_type: UserResourceRel) \
             -> Dict[str, List[PopularTable]]:
         """
@@ -2177,6 +2208,7 @@ class Neo4jProxy(BaseProxy):
         return query
 
     @timer_with_counter
+    @requires_auth
     def get_frequently_used_tables(self, *, user_email: str) -> Dict[str, Any]:
         """
         Retrieves all Table the resources per user on READ relation.
@@ -2199,6 +2231,7 @@ class Neo4jProxy(BaseProxy):
         return {'table': results}
 
     @timer_with_counter
+    @requires_auth
     def add_resource_relation_by_user(self, *,
                                       id: str,
                                       user_id: str,
@@ -2248,6 +2281,7 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     @timer_with_counter
+    @requires_auth
     def delete_resource_relation_by_user(self, *,
                                          id: str,
                                          user_id: str,
@@ -2381,6 +2415,7 @@ class Neo4jProxy(BaseProxy):
         return get_dashboard_detail_query
 
     @timer_with_counter
+    @requires_auth
     def get_dashboard(self,
                       id: str,
                       ) -> DashboardDetailEntity:
@@ -2505,6 +2540,7 @@ class Neo4jProxy(BaseProxy):
         return get_dashboards_using_table_query
 
     @timer_with_counter
+    @requires_auth
     def get_resources_using_table(self, *,
                                   id: str,
                                   resource_type: ResourceType) -> Dict[str, List[DashboardSummary]]:
@@ -2679,6 +2715,7 @@ class Neo4jProxy(BaseProxy):
         return get_downstream_lineage_query
 
     @timer_with_counter
+    @requires_auth
     def get_lineage(self, *,
                     id: str, resource_type: ResourceType, direction: str, depth: int = 1) -> Lineage:
         """
@@ -2902,6 +2939,7 @@ class Neo4jProxy(BaseProxy):
             'status': feature_node.get('status')
         }
 
+    @requires_auth
     def get_feature(self, *, feature_uri: str) -> Feature:
         """
         :param feature_uri: uniquely identifying key for a feature node
@@ -2941,6 +2979,7 @@ class Neo4jProxy(BaseProxy):
         """.format(resource_name=resource_type.name.lower(), resource_label=resource_type.name))
         return neo4j_query
 
+    @requires_auth
     def get_resource_generation_code(self, *, uri: str, resource_type: ResourceType) -> GenerationCode:
         """
         Executes cypher query to get query nodes associated with resource
@@ -2984,6 +3023,7 @@ class Neo4jProxy(BaseProxy):
         return snowflake_table_share_query
 
     @timer_with_counter
+    @requires_auth
     def get_snowflake_table_shares(self, *, table_uri: str) -> Union[List[SnowflakeTableShare], None]:
         snowflake_table_share_query = self._get_snowflake_table_shares_query_statement()
         records = self._execute_cypher_query(statement=snowflake_table_share_query,
@@ -3061,6 +3101,7 @@ class Neo4jProxy(BaseProxy):
         return data_location
 
     @timer_with_counter
+    @requires_auth
     def get_data_provider(self, *, data_provider_uri: str) -> DataProvider:
         data_provider_query = self._get_data_provider_query_statement()
         records = self._execute_cypher_query(statement=data_provider_query,
@@ -3141,6 +3182,7 @@ class Neo4jProxy(BaseProxy):
         return file_query
 
     @timer_with_counter
+    @requires_auth
     def get_file(self, *, file_uri: str) -> File:
         file_query = self._get_file_query_statement()
         records = self._execute_cypher_query(statement=file_query,

@@ -454,9 +454,11 @@ class Neo4jCsvPublisher(Publisher):
         :param identifier: identifier that will be used in CYPHER query as shown on above example
         :return: Properties body for Cypher statement
         """
+        lowercase_excludes = {value.lower() for value in excludes} if excludes else None
+
         props = []
         for k, v in record_dict.items():
-            if k in excludes:
+            if lowercase_excludes and k.lower() in lowercase_excludes:
                 continue
 
             if k.endswith(UNQUOTED_SUFFIX):

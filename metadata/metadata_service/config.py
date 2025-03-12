@@ -4,6 +4,7 @@
 import distutils.util
 import logging
 import os
+import ast
 from typing import Any, Callable, Dict, List, Optional, Set  # noqa: F401
 
 import boto3
@@ -101,6 +102,13 @@ class Config:
         'title': 'Metadata Service',
         'uiversion': 3
     }
+
+    METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']      # e.g., your-domain.auth0.com
+    METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']  # e.g., neo4j-api or https://neo4j-api.example.com
+    METADATA_API_AUTH0_ISSUER = f'https://{METADATA_API_AUTH0_DOMAIN}/'
+    METADATA_API_AUTH0_ALGORITHMS = os.environ['METADATA_API_AUTH0_ALGORITHMS']
+    if METADATA_API_AUTH0_ALGORITHMS:
+        METADATA_API_AUTH0_ALGORITHMS = ast.literal_eval(METADATA_API_AUTH0_ALGORITHMS)
 
 
 class LocalConfig(Config):

@@ -15,6 +15,7 @@ from flask_cors import CORS
 from flask_restful import Api
 from werkzeug.utils import import_string
 
+from metadata_service.api.auth import AuthAPI
 from metadata_service.api.badge import BadgeAPI
 from metadata_service.api.column import (ColumnBadgeAPI, ColumnDescriptionAPI,
                                          ColumnLineageAPI)
@@ -114,10 +115,16 @@ def create_app(*, config_module_class: str) -> Flask:
     if init_custom_ext_routes:
         init_custom_ext_routes(app)
 
-    api_bp = Blueprint('api', __name__)
+    api_bp = Blueprint(
+        name='api',
+        import_name=__name__,
+        url_prefix="/metadata-api"
+    )
     api = Api(api_bp)
 
     api.add_resource(HealthcheckAPI, '/healthcheck')
+
+    api.add_resource(AuthAPI, '/auth/token')
 
     # `PopularTablesAPI` is deprecated, and will be removed in version 4.
     api.add_resource(PopularTablesAPI,

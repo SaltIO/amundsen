@@ -1,10 +1,21 @@
 # Copyright Contributors to the Amundsen project.
 # SPDX-License-Identifier: Apache-2.0
 
+from http import HTTPStatus
+import json
 from typing import Dict
+import logging
 
 import requests
-from flask import current_app as app
+from flask import current_app as app, jsonify, make_response
+
+import traceback
+
+
+LOGGER = logging.getLogger(__name__)
+
+AUTH_TOKEN_ENDPOINT = '/auth/token'
+AUTH_TOKEN = None
 
 
 def get_query_param(args: Dict, param: str, error_msg: str = None) -> str:
@@ -21,7 +32,8 @@ def request_metadata(*,     # type: ignore
                      headers=None,
                      timeout_sec: int = 0,
                      data=None,
-                     json=None):
+                     json=None,
+                     auth: bool = True):
     """
     Helper function to make a request to metadata service.
     Sets the client and header information based on the configuration
@@ -45,7 +57,8 @@ def request_metadata(*,     # type: ignore
                            headers=headers,
                            timeout_sec=timeout_sec,
                            data=data,
-                           json=json)
+                           json=json,
+                           auth=auth)
 
 
 def request_search(*,     # type: ignore
@@ -54,7 +67,8 @@ def request_search(*,     # type: ignore
                    headers=None,
                    timeout_sec: int = 0,
                    data=None,
-                   json=None):
+                   json=None,
+                   auth: bool = False):
     """
     Helper function to make a request to search service.
     Sets the client and header information based on the configuration
@@ -79,11 +93,41 @@ def request_search(*,     # type: ignore
                            headers=headers,
                            timeout_sec=timeout_sec,
                            data=data,
-                           json=json)
+                           json=json,
+                           auth=auth)
 
+
+def _get_auth_token():
+    global AUTH_TOKEN
+
+    LOGGER.info("_get_auth_token")
+
+    try:
+        url = app.config['METADATASERVICE_BASE'] + AUTH_TOKEN_ENDPOINT
+        payload = {
+            'client_id': app.config['METADATA_API_AUTH_CLIENT_ID'],
+            'client_secret': app.config['METADATA_API_AUTH_CLIENT_SECRET']
+        }
+
+        response = request_metadata(
+            method="POST",
+            url=url,
+            json=json.dumps(payload),
+            auth=False)
+        status_code = response.status_code
+
+        if status_code == HTTPStatus.OK:
+            message = 'Success'
+            AUTH_TOKEN = response.json().get('access_token')
+            LOGGER.info("Successfully retreived Auth Token")
+        else:
+            raise Exception('Auth Token Service Unavailable')
+    except Exception as e:
+        LOGGER.exception("Failed to retreive Auth Token")
+        raise e
 
 # TODO: Define an interface for envoy_client
-def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, data=None, json=None):  # type: ignore
+def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, data=None, json=None, auth: bool = True):  # type: ignore
     """
     Wraps a request to use Envoy client and headers, if available
     :param method: DELETE | GET | POST | PUT
@@ -94,33 +138,61 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
     :param data: Optional request payload
     :return:
     """
+    global AUTH_TOKEN
+
+    stack = traceback.format_stack()
+    LOGGER.info(f'request_wrapper API: \n url={url} \n auth={auth}\n headers={headers} \n AUTH_TOKEN={AUTH_TOKEN}\n {"".join(stack)}')
+
+    if auth and auth == True:
+        if not AUTH_TOKEN:
+            _get_auth_token()
+
+        if not headers:
+            headers = {}
+
+        headers["Authorization"] = f"Bearer {AUTH_TOKEN}"
+
     # If no timeout specified, use the one from the configurations.
     timeout_sec = timeout_sec or app.config['REQUEST_SESSION_TIMEOUT_SEC']
 
-    if client is not None:
-        if method == 'DELETE':
-            return client.delete(url, headers=headers, raw_response=True, data=data, json=json)
-        elif method == 'GET':
-            return client.get(url, headers=headers, raw_response=True)
-        elif method == 'POST':
-            return client.post(url, headers=headers, raw_response=True, raw_request=True, data=data, json=json)
-        elif method == 'PUT':
-            return client.put(url, headers=headers, raw_response=True, raw_request=True, data=data, json=json)
-        else:
-            raise Exception('Method not allowed: {}'.format(method))
-    else:
-        with build_session() as s:
+    LOGGER.info(f'Calling API: \n url={url}\n headers={headers}')
+
+    attempts = 0
+    while(attempts < 3):
+        response = None
+        if client is not None:
             if method == 'DELETE':
-                return s.delete(url, headers=headers, timeout=timeout_sec, data=data, json=json)
+                response = client.delete(url, headers=headers, raw_response=True, data=data, json=json)
             elif method == 'GET':
-                return s.get(url, headers=headers, timeout=timeout_sec)
+                response = client.get(url, headers=headers, raw_response=True)
             elif method == 'POST':
-                return s.post(url, headers=headers, timeout=timeout_sec, data=data, json=json)
+                response = client.post(url, headers=headers, raw_response=True, raw_request=True, data=data, json=json)
             elif method == 'PUT':
-                return s.put(url, headers=headers, timeout=timeout_sec, data=data, json=json)
+                response = client.put(url, headers=headers, raw_response=True, raw_request=True, data=data, json=json)
             else:
                 raise Exception('Method not allowed: {}'.format(method))
+        else:
+            with build_session() as s:
+                if method == 'DELETE':
+                    response = s.delete(url, headers=headers, timeout=timeout_sec, data=data, json=json)
+                elif method == 'GET':
+                    response = s.get(url, headers=headers, timeout=timeout_sec)
+                elif method == 'POST':
+                    response = s.post(url, headers=headers, timeout=timeout_sec, data=data, json=json)
+                elif method == 'PUT':
+                    response = s.put(url, headers=headers, timeout=timeout_sec, data=data, json=json)
+                else:
+                    raise Exception('Method not allowed: {}'.format(method))
 
+        LOGGER.info(f'Response: \n url={url}\n code={response.status_code}\n json={response.json()}')
+
+        if auth and response and response.status_code == 401:
+            LOGGER.warning("Metadata Service Request Failed (401).  Retrieving new Auth Token")
+            _get_auth_token()
+        else:
+            return response
+
+        attempts = attempts + 1
 
 def build_session() -> requests.Session:
     session = requests.Session()

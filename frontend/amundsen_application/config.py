@@ -202,6 +202,9 @@ class LocalConfig(Config):
                                               PORT=METADATA_PORT)
                                           )
 
+    METADATA_API_AUTH_CLIENT_ID = os.environ.get('FLASK_OIDC_CLIENT_ID')
+    METADATA_API_AUTH_CLIENT_SECRET = os.environ.get('FLASK_OIDC_CLIENT_SECRET')
+
 
 class TestConfig(LocalConfig):
     POPULAR_RESOURCES_PERSONALIZATION = True
