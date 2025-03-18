@@ -15,9 +15,8 @@ requestBody:
   content:
     application/json:
       schema:
-        $ref: '#/components/schemas/Description'
+        $ref: '#/components/schemas/DescriptionPut'
         description: Resource description
-        required: true
 responses:
   200:
     description: 'Empty response'

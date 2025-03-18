@@ -45,7 +45,8 @@ class TagCommon:
         self.client = client
 
     def put(self, id: str, resource_type: ResourceType,
-            tag: str, tag_type: str = 'default') -> Tuple[Any, HTTPStatus]:
+            tag: str, tag_type: str = 'default',
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[Any, HTTPStatus]:
         """
         Method to add a tag to existing resource.
 
@@ -78,7 +79,8 @@ class TagCommon:
                 self.client.add_tag(id=id,
                                     tag=tag,
                                     tag_type=tag_type,
-                                    resource_type=resource_type)
+                                    resource_type=resource_type,
+                                    published_tag=published_tag)
                 return {'message': 'The tag {} for id {} with type {} and resource_type {} '
                                    'is added successfully'.format(tag,
                                                                   id,

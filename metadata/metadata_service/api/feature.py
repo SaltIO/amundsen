@@ -49,8 +49,8 @@ class FeatureLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('direction', type=str, required=False, default="both")
-        self.parser.add_argument('depth', type=int, required=False, default=1)
+        self.parser.add_argument('direction', type=str, location="args", required=False, default="both")
+        self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
 
     @swag_from('swagger_doc/feature/lineage_get.yml')
     def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
@@ -176,7 +176,7 @@ class FeatureDescriptionAPI(Resource):
             description = json.loads(request.data).get('description')
             self.client.put_resource_description(resource_type=ResourceType.Feature,
                                                  uri=id, description=description)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             LOGGER.error(f'NotFoundException: feature_uri {id} does not exist')
@@ -195,7 +195,7 @@ class FeatureTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
 
         self._tag_common = TagCommon(client=self.client)
 
@@ -241,7 +241,7 @@ class FeatureBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
 
         self._badge_common = BadgeCommon(client=self.client)
 

@@ -23,8 +23,8 @@ class ColumnLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('direction', type=str, required=False, default="both")
-        self.parser.add_argument('depth', type=int, required=False, default=1)
+        self.parser.add_argument('direction', type=str, location="args", required=False, default="both")
+        self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(ColumnLineageAPI, self).__init__()
 
     @swag_from('swagger_doc/column/lineage_get.yml')
@@ -68,7 +68,7 @@ class ColumnDescriptionAPI(Resource):
             self.client.put_column_description(table_uri=table_uri,
                                                column_name=column_name,
                                                description=description)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             msg = 'table_uri {} with column {} does not exist'.format(table_uri, column_name)
@@ -97,7 +97,7 @@ class ColumnBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
         super(ColumnBadgeAPI, self).__init__()
 
         self._badge_common = BadgeCommon(client=self.client)

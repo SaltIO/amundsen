@@ -14,9 +14,8 @@ requestBody:
   content:
     application/json:
       schema:
-        $ref: '#/components/schemas/Description'
+        $ref: '#/components/schemas/DescriptionPut'
         description: 'TypeMetadata description'
-        required: true
 responses:
   200:
     description: 'Empty json response'

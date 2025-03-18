@@ -72,7 +72,7 @@ class DataProviderDescriptionAPI(BaseAPI):
         try:
             description = json.loads(request.data).get('description')
             self.client.put_data_provider_description(id=id, description=description)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -104,7 +104,7 @@ class FileTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
         super(FileTagAPI, self).__init__()
 
         self._tag_common = TagCommon(client=self.client)
@@ -176,7 +176,7 @@ class FileDescriptionAPI(BaseAPI):
         try:
             description = json.loads(request.data).get('description')
             self.client.put_file_description(id=id, description=description)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -217,8 +217,8 @@ class FileLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('direction', type=str, required=False, default="both")
-        self.parser.add_argument('depth', type=int, required=False, default=1)
+        self.parser.add_argument('direction', type=str, location="args", required=False, default="both")
+        self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(FileLineageAPI, self).__init__()
 
     # @swag_from('swagger_doc/table/lineage_get.yml')

@@ -26,6 +26,12 @@ parameters:
     required: false
     default: 'default'
     example: 'badge'
+requestBody:
+  required: false
+  content:
+    application/json:
+      schema:
+        type: object  # ✅ Allows an empty JSON body
 responses:
   200:
     description: 'The tag was added successfully'

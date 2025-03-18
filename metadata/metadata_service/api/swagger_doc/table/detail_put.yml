@@ -1,0 +1,35 @@
+Gets table descriptions
+---
+tags:
+  - 'table'
+requestBody:
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/TableDetail'
+        description: 'Table Details'
+responses:
+  200:
+    description: 'Existing table found and updated'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/KeyStatus'
+  201:
+    description: 'New table created'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/KeyStatus'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    description: 'Internal server error'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

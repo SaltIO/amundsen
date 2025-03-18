@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from http import HTTPStatus
-import json
+import json as JSON
 from typing import Dict
 import logging
 
@@ -112,7 +112,7 @@ def _get_auth_token():
         response = request_metadata(
             method="POST",
             url=url,
-            json=json.dumps(payload),
+            json=JSON.dumps(payload),
             auth=False)
         status_code = response.status_code
 
@@ -127,7 +127,7 @@ def _get_auth_token():
         raise e
 
 # TODO: Define an interface for envoy_client
-def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, data=None, json=None, auth: bool = True):  # type: ignore
+def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, data=None, json=None, auth: bool = False):  # type: ignore
     """
     Wraps a request to use Envoy client and headers, if available
     :param method: DELETE | GET | POST | PUT
@@ -140,10 +140,7 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
     """
     global AUTH_TOKEN
 
-    stack = traceback.format_stack()
-    LOGGER.info(f'request_wrapper API: \n url={url} \n auth={auth}\n headers={headers} \n AUTH_TOKEN={AUTH_TOKEN}\n {"".join(stack)}')
-
-    if auth and auth == True:
+    if auth:
         if not AUTH_TOKEN:
             _get_auth_token()
 
@@ -155,7 +152,35 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
     # If no timeout specified, use the one from the configurations.
     timeout_sec = timeout_sec or app.config['REQUEST_SESSION_TIMEOUT_SEC']
 
-    LOGGER.info(f'Calling API: \n url={url}\n headers={headers}')
+    # Add Content-Type: application/json
+    add_json_content_type = False
+    if json or (data and isinstance(data, dict)):
+        add_json_content_type = True
+    elif data and isinstance(data, str):
+        try:
+            JSON.loads(data)
+            add_json_content_type = True
+        except:
+            LOGGER.exception('Failed to load data as json')
+    elif method in ['PUT', 'POST', 'DELETE']:
+        add_json_content_type = True
+
+    if add_json_content_type:
+        if not headers:
+            headers = {}
+        if 'Content-Type' not in headers:
+            headers['Content-Type'] = 'application/json'
+
+    # Set the Content-Length to 0 when no data
+    if method in ['PUT', 'POST', 'DELETE'] and (not data and not json):
+        if not headers:
+            headers = {}
+        if 'Content-Length' not in headers:
+            headers['Content-Length'] = "0"
+        data = {}
+        json = {}
+
+    LOGGER.info(f'Calling API: \n url={url}\n method={method}\n headers={headers}\n data={data}\n json={json}')
 
     attempts = 0
     while(attempts < 3):
@@ -187,7 +212,7 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
         LOGGER.info(f'Response: \n url={url}\n code={response.status_code}\n json={response.json()}')
 
         if auth and response and response.status_code == 401:
-            LOGGER.warning("Metadata Service Request Failed (401).  Retrieving new Auth Token")
+            LOGGER.warning("Service Request Failed (401).  Retrieving new Auth Token")
             _get_auth_token()
         else:
             return response

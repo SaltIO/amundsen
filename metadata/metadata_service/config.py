@@ -27,13 +27,6 @@ PROXY_CLIENT_KWARGS = 'PROXY_CLIENT_KWARGS'
 PROXY_CLIENTS = {
     'NEO4J': 'metadata_service.proxy.neo4j_proxy.Neo4jProxy',
     'NEO4J_FABRIC': 'metadata_service.proxy.neo4j_fabric_proxy.Neo4jFabricProxy',
-    'ATLAS': 'metadata_service.proxy.atlas_proxy.AtlasProxy',
-    'NEPTUNE': 'metadata_service.proxy.neptune_proxy.NeptuneGremlinProxy',
-    'MYSQL': 'metadata_service.proxy.mysql_proxy.MySQLProxy'
-}
-
-PROXY_CLIS = {
-    'MYSQL': 'metadata_service.cli.rds_command.rds_cli'
 }
 
 IS_STATSD_ON = 'IS_STATSD_ON'
@@ -72,7 +65,7 @@ class Config:
     # whitelist badges
     WHITELIST_BADGES: List[Badge] = []
 
-    SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', False)
+    SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', True)
 
     USER_DETAIL_METHOD = None  # type: Optional[function]
 
@@ -99,9 +92,14 @@ class Config:
     SWAGGER_TEMPLATE_PATH = os.path.join('api', 'swagger_doc', 'template.yml')
     SWAGGER = {
         'openapi': '3.0.2',
-        'title': 'Metadata Service',
+        'title': 'CMD+RVL Metadata API',
         'uiversion': 3
     }
+    SWAGGER_URL_PREFIX = os.getenv('SWAGGER_URL_PREFIX', None)
+    if SWAGGER_URL_PREFIX:
+        SWAGGER['specs_route'] = SWAGGER_URL_PREFIX
+
+
 
     METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']      # e.g., your-domain.auth0.com
     METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']  # e.g., neo4j-api or https://neo4j-api.example.com
@@ -109,6 +107,8 @@ class Config:
     METADATA_API_AUTH0_ALGORITHMS = os.environ['METADATA_API_AUTH0_ALGORITHMS']
     if METADATA_API_AUTH0_ALGORITHMS:
         METADATA_API_AUTH0_ALGORITHMS = ast.literal_eval(METADATA_API_AUTH0_ALGORITHMS)
+
+    LOG_REQUESTS = os.environ['METADATA_API_LOG_REQUESTS']
 
 
 class LocalConfig(Config):
@@ -133,60 +133,3 @@ class LocalConfig(Config):
 class LocalFederatedConfig(LocalConfig):
     PROXY_DATABASE_NAME = os.environ.get('PROXY_DATABASE_NAME', neo4j.DEFAULT_DATABASE)
 
-
-class AtlasConfig(LocalConfig):
-    PROXY_HOST = os.environ.get('PROXY_HOST', 'localhost')
-    PROXY_PORT = os.environ.get('PROXY_PORT', '21000')
-    PROXY_CLIENT = PROXY_CLIENTS['ATLAS']
-
-    # List of accepted date formats for AtlasProxy Watermarks. With this we allow more than one datetime partition
-    # format to be used in tables
-    WATERMARK_DATE_FORMATS = ['%Y%m%d']
-
-
-class MySQLConfig(LocalConfig):
-    PROXY_CLIENT = PROXY_CLIENTS['MYSQL']
-    PROXY_CLI = PROXY_CLIS['MYSQL']
-
-    PROXY_HOST = None  # type: ignore
-    PROXY_PORT = None  # type: ignore
-    PROXY_USER = None  # type: ignore
-    PROXY_PASSWORD = None  # type: ignore
-
-    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI', 'mysql://user:password@127.0.0.1:3306/amundsen')
-    PROXY_CLIENT_KWARGS: Dict[str, Any] = {
-        'echo': bool(distutils.util.strtobool(os.environ.get('ECHO', 'False'))),
-        'pool_size': os.environ.get('POOL_SIZE', 5),
-        'max_overflow': os.environ.get('MAX_OVERFLOW', 10),
-        'connect_args': dict()
-    }
-
-
-try:
-    from amundsen_gremlin.config import LocalGremlinConfig
-
-    class GremlinConfig(LocalGremlinConfig, LocalConfig):
-        JANUS_GRAPH_URL = None
-
-    class NeptuneConfig(LocalGremlinConfig, LocalConfig):
-        DEBUG = False
-        LOG_LEVEL = 'INFO'
-
-        # PROXY_HOST FORMAT: wss://<NEPTUNE_URL>:<NEPTUNE_PORT>/gremlin
-        PROXY_HOST = os.environ.get('PROXY_HOST', 'localhost')
-        PROXY_PORT = None  # type: ignore
-
-        PROXY_CLIENT = PROXY_CLIENTS['NEPTUNE']
-        PROXY_PASSWORD = boto3.session.Session(region_name=os.environ.get('AWS_REGION', 'us-east-1'))
-
-        PROXY_CLIENT_KWARGS = {
-            'neptune_bulk_loader_s3_bucket_name': os.environ.get('S3_BUCKET_NAME'),
-            'ignore_neptune_shard': distutils.util.strtobool(os.environ.get('IGNORE_NEPTUNE_SHARD', 'True')),
-            'sts_endpoint': os.environ.get('STS_ENDPOINT')
-        }
-
-        JANUS_GRAPH_URL = None
-except ImportError:
-    logging.warning("""amundsen_gremlin not installed. GremlinConfig and NeptuneConfig classes won't be available!
-    Please install amundsen-metadata[gremlin] if you desire to use those classes.
-    """)

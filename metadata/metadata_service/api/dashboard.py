@@ -69,7 +69,7 @@ class DashboardDescriptionAPI(BaseAPI):
         try:
             description = json.loads(request.data).get('description')
             self.client.put_dashboard_description(id=id, description=description)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -83,7 +83,7 @@ class DashboardBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
         super(DashboardBadgeAPI, self).__init__()
 
         self._badge_common = BadgeCommon(client=self.client)
@@ -119,7 +119,7 @@ class DashboardTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
         super(DashboardTagAPI, self).__init__()
 
         self._tag_common = TagCommon(client=self.client)

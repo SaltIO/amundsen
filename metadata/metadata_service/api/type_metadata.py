@@ -38,7 +38,7 @@ class TypeMetadataDescriptionAPI(Resource):
             description = json.loads(request.data).get('description')
             self.client.put_type_metadata_description(type_metadata_key=type_metadata_key,
                                                       description=description)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             msg = f'type_metadata with key {type_metadata_key} does not exist'
@@ -69,7 +69,7 @@ class TypeMetadataBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
         super(TypeMetadataBadgeAPI, self).__init__()
 
         self._badge_common = BadgeCommon(client=self.client)

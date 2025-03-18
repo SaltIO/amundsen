@@ -1,8 +1,8 @@
 openapi: '3.0.2'
 info:
-  title: 'Metadata Service'
-  description: 'Used to provide and update metadata, such as table & column description, stored in either neo4j or apache atlas.'
-  version: '1.1.7'
+  title: 'Metadata API'
+  description: 'Used to provide and update metadata, such as table & column description.'
+  version: '4.0.0'
 
 components:
   schemas:
@@ -11,7 +11,7 @@ components:
       properties:
         status:
           type: string
-          description: The status of the service, values will be 'ok' or 'fail'
+          description: The status of the API, values will be 'ok' or 'fail'
         checks:
           type: object
           description: An arbitrary dictionary representing the healthchecks that have run
@@ -19,9 +19,24 @@ components:
             $ref: '#/detailedExamples/healthcheck'
     Description:
       type: object
+      required:
+        - description
       properties:
         description:
           type: string
+          example: "Metadata Rocks!"
+    DescriptionPut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Description'
+        - $ref: '#/components/schemas/Publisher'
+    Publisher:
+      type: object
+      properties:
+        published_tag:
+          type: string
+          description: "A meaningful tag to describe the publishing mechanism."
+          example: "api"
     PopularTables:
       type: object
       properties:
@@ -268,6 +283,18 @@ components:
         source:
           type: string
           description: 'Source name'
+    KeyStatus:
+      type: object
+      required:
+        - key
+        - status
+      properties:
+        key:
+          type: string
+          description: 'The key of the resource created or updated'
+        status:
+          type: string
+          description: 'The status of the resource action: created or updated'
     TableDetail:
       type: object
       properties:
@@ -620,7 +647,7 @@ components:
         share_name:
           type: string
           description: 'The name of the share'
-        
+
 
 detailedExamples:
   healthcheck:

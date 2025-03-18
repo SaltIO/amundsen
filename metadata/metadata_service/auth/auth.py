@@ -47,20 +47,12 @@ def requires_auth(f):
         try:
             # Extract token from "Bearer " prefix
             token = token.split("Bearer ")[1]
-            LOGGER.info(f"token={token}")
 
             # Get the signing key using PyJWKClient
             jwks_url = f"https://{current_app.config['METADATA_API_AUTH0_DOMAIN']}/.well-known/jwks.json"
             jwks_client = PyJWKClient(jwks_url)
             signing_key = jwks_client.get_signing_key_from_jwt(token)
             rsa_pem_key = signing_key.key  # Already in PEM format or key object
-            LOGGER.info(f"Retrieved key with kid={signing_key.key_id}")
-
-            unverified_payload = jwt.decode(token, options={"verify_signature": False})
-            LOGGER.info(f'unverified_payload={unverified_payload}')
-            LOGGER.info(f"iss={unverified_payload.get('iss')}")
-            LOGGER.info(f"METADATA_API_AUTH0_ISSUER={current_app.config['METADATA_API_AUTH0_ISSUER']}")
-
 
             # Decode the token
             payload = jwt.decode(
@@ -70,7 +62,6 @@ def requires_auth(f):
                 audience=current_app.config["METADATA_API_AUTH0_API_AUDIENCE"],
                 issuer=current_app.config["METADATA_API_AUTH0_ISSUER"]
             )
-            LOGGER.info(f"payload={payload}")
             request.auth_payload = payload
 
         except jwt.PyJWKClientError as e:

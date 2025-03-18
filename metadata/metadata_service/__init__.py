@@ -10,7 +10,7 @@ import sys
 from typing import Any, Dict  # noqa: F401
 
 from flasgger import Swagger
-from flask import Blueprint, Flask
+from flask import Blueprint, Flask, request
 from flask_cors import CORS
 from flask_restful import Api
 from werkzeug.utils import import_string
@@ -37,7 +37,8 @@ from metadata_service.api.system import Neo4jDetailAPI, StatisticsMetricsAPI
 from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
                                         TableDescriptionAPI, TableDetailAPI,
                                         TableLineageAPI, TableOwnerAPI,
-                                        TableTagAPI, TableUpdateFrequencyAPI)
+                                        TableTagAPI, TableUpdateFrequencyAPI,
+                                        TablePutAPI)
 from metadata_service.api.tag import TagAPI
 from metadata_service.api.type_metadata import (TypeMetadataBadgeAPI,
                                                 TypeMetadataDescriptionAPI)
@@ -133,7 +134,10 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(PopularResourcesAPI,
                      '/popular_resources/',
                      '/popular_resources/<path:user_id>')
-    api.add_resource(TableDetailAPI, '/table/<path:table_uri>')
+    api.add_resource(TableDetailAPI,
+                     '/table/<path:table_uri>')
+    api.add_resource(TablePutAPI,
+                     '/table/')
     api.add_resource(TableDescriptionAPI,
                      '/table/<path:id>/description')
     api.add_resource(TableTagAPI,
@@ -229,10 +233,29 @@ def create_app(*, config_module_class: str) -> Flask:
         logging.info('Using cli {}'.format(proxy_cli))
 
     if app.config.get('SWAGGER_ENABLED'):
-        Swagger(app, template_file=os.path.join(ROOT_DIR, app.config.get('SWAGGER_TEMPLATE_PATH')), parse=True)
+        Swagger(
+            app,
+            template_file=os.path.join(ROOT_DIR, app.config.get('SWAGGER_TEMPLATE_PATH')),
+            parse=True
+        )
 
     # handles the deprecation warnings
     # and process any config/environment variables accordingly
     process_deprecations(app)
+
+    if app.config.get('LOG_REQUESTS'):
+        logging.basicConfig(level=logging.DEBUG)
+        @app.before_request
+        def log_request_info():
+            app.logger.debug("Request URL: %s", request.url)
+            app.logger.debug("Request Method: %s", request.method)
+            app.logger.debug("Request Headers: %s", request.headers)
+            app.logger.debug("Request Body: %s", request.get_data())
+            # try:
+            #     json_data = request.get_json()  # This should fail if Flask is forcing JSON
+            #     app.logger.debug(f"Request Json: {json_data}")
+            # except Exception as e:
+            #     app.logger.error(f"Request Json ERROR: {e}")
+            return None
 
     return app

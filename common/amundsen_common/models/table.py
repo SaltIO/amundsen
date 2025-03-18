@@ -88,10 +88,10 @@ class Column:
     description: Optional[str] = None
     col_type: str
     sort_order: int
-    stats: List[Stat] = []
+    stats: Optional[List[Stat]] = []
     badges: Optional[List[Badge]] = []
     type_metadata: Optional[TypeMetadata] = None  # Used to support complex column types
-    programmatic_descriptions: List[ProgrammaticDescription] = []
+    programmatic_descriptions: Optional[List[ProgrammaticDescription]] = []
 
 
 class ColumnSchema(AttrsSchema):
@@ -194,24 +194,23 @@ class Table:
     schema: str
     name: str
     key: Optional[str] = None
-    tags: List[Tag] = []
-    badges: List[Badge] = []
-    table_readers: List[Reader] = []
+    tags: Optional[List[Tag]] = []
+    badges: Optional[List[Badge]] = []
+    table_readers: Optional[List[Reader]] = []
     description: Optional[str] = None
     columns: List[Column]
-    owners: List[User] = []
-    watermarks: List[Watermark] = []
+    owners: Optional[List[User]] = []
+    watermarks: Optional[List[Watermark]] = []
     table_writer: Optional[Application] = None
-    table_apps: Optional[List[Application]] = None
-    resource_reports: Optional[List[ResourceReport]] = None
+    table_apps: Optional[List[Application]] = []
+    resource_reports: Optional[List[ResourceReport]] = []
     last_updated_timestamp: Optional[int] = None
-    sources: Optional[List[Source]] = None
+    sources: Optional[List[Source]] = []
     is_view: Optional[bool] = attr.ib(default=None, converter=default_if_none)
-    programmatic_descriptions: List[ProgrammaticDescription] = []
+    programmatic_descriptions: Optional[List[ProgrammaticDescription]] = []
     update_frequency: Optional[str] = None
-    common_joins: Optional[List[SqlJoin]] = None
-    common_filters: Optional[List[SqlWhere]] = None
-
+    common_joins: Optional[List[SqlJoin]] = []
+    common_filters: Optional[List[SqlWhere]] = []
 
 class TableSchema(AttrsSchema):
     class Meta:

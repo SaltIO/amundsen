@@ -2,22 +2,28 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import logging
 from http import HTTPStatus
-from typing import Any, Iterable, Mapping, Optional, Union
+from typing import Any, Dict, Iterable, Mapping, Optional, Union
+
+from flasgger import swag_from
+from flask import request
+from flask_restful import Resource, reqparse
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.lineage import LineageSchema
 from amundsen_common.models.table import TableSchema
-from flasgger import swag_from
-from flask import request
-from flask_restful import Resource, reqparse
+from amundsen_common.models.key_status import KeyStatusSchema
 
 from metadata_service.api import BaseAPI
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.api.tag import TagCommon
 from metadata_service.entity.dashboard_summary import DashboardSummarySchema
 from metadata_service.exception import NotFoundException
-from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy import get_proxy_client, BaseProxy
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class TableDetailAPI(Resource):
@@ -38,13 +44,43 @@ class TableDetailAPI(Resource):
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
 
+class TablePutAPI(Resource):
+    """
+    TableDetail API
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+
+    @swag_from('swagger_doc/table/detail_put.yml')
+    def put(self) -> Iterable[Union[Mapping, int, None]]:
+        data = None
+        try:
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            table = TableSchema().loads(json.dumps(data))
+
+            table_key, status = self.client.create_update_table(table=table, published_tag=published_tag)
+
+            result = KeyStatusSchema().dump({
+                'key': table_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
+
+        except NotFoundException:
+            return {'message': f'Failed to update/create table: {data}'}, HTTPStatus.NOT_FOUND
+
 
 class TableLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('direction', type=str, required=False, default="both")
-        self.parser.add_argument('depth', type=int, required=False, default=1)
+        self.parser.add_argument('direction', type=str, location="args", required=False, default="both")
+        self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(TableLineageAPI, self).__init__()
 
     @swag_from('swagger_doc/table/lineage_get.yml')
@@ -74,7 +110,10 @@ class TableOwnerAPI(Resource):
     @swag_from('swagger_doc/table/owner_put.yml')
     def put(self, table_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            self.client.add_owner(table_uri=table_uri, owner=owner)
+            data = json.loads(request.data)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.add_owner(table_uri=table_uri, owner=owner, published_tag=published_tag)
             return {'message': 'The owner {} for table_uri {} '
                                'is added successfully'.format(owner,
                                                               table_uri)}, HTTPStatus.OK
@@ -128,9 +167,13 @@ class TableDescriptionAPI(Resource):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_table_description(table_uri=id, description=description)
-            return None, HTTPStatus.OK
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_table_description(table_uri=id, description=description, published_tag=published_tag)
+
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -152,9 +195,12 @@ class TableUpdateFrequencyAPI(Resource):
         :return:
         """
         try:
-            frequency = json.loads(request.data).get('frequency')
-            self.client.put_table_update_frequency(table_uri=table_uri, frequency=frequency)
-            return None, HTTPStatus.OK
+            data = json.loads(request.data)
+            frequency = data.get('frequency')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_table_update_frequency(table_uri=table_uri, frequency=frequency, published_tag=published_tag)
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -168,7 +214,7 @@ class TableUpdateFrequencyAPI(Resource):
         """
         try:
             self.client.delete_table_update_frequency(table_uri=table_uri)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -182,7 +228,7 @@ class TableTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
         super(TableTagAPI, self).__init__()
 
         self._tag_common = TagCommon(client=self.client)
@@ -199,11 +245,13 @@ class TableTagAPI(Resource):
         args = self.parser.parse_args()
         # use tag_type to distinguish between tag and badge
         tag_type = args.get('tag_type', 'default')
+        published_tag = args.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._tag_common.put(id=id,
                                     resource_type=ResourceType.Table,
                                     tag=tag,
-                                    tag_type=tag_type)
+                                    tag_type=tag_type,
+                                    published_tag=published_tag)
 
     @swag_from('swagger_doc/tag/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
@@ -227,7 +275,7 @@ class TableBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
         super(TableBadgeAPI, self).__init__()
 
         self._badge_common = BadgeCommon(client=self.client)
@@ -236,11 +284,13 @@ class TableBadgeAPI(Resource):
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
+        published_tag = args.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._badge_common.put(id=id,
                                       resource_type=ResourceType.Table,
                                       badge_name=badge,
-                                      category=category)
+                                      category=category,
+                                      published_tag=published_tag)
 
     @swag_from('swagger_doc/badge/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:

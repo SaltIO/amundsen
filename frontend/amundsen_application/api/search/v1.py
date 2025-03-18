@@ -135,11 +135,12 @@ def _search_resources(*, search_term: str,
         LOGGER.info(f"query_request={query_request}")
         request_json = json.dumps(SearchRequestSchema().dump(query_request))
         LOGGER.info(f"request_json={request_json}")
+
         url_base = app.config['SEARCHSERVICE_BASE'] + SEARCH_ENDPOINT
         response = request_search(url=url_base,
                                   headers={'Content-Type': 'application/json'},
                                   method='POST',
-                                  data=request_json)
+                                  json=request_json)
         status_code = response.status_code
         LOGGER.info(f"status_code={status_code}")
 
