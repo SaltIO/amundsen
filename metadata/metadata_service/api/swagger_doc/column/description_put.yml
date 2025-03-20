@@ -1,8 +1,11 @@
 Updates column description (passed as a request body)
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'column'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: table_uri
     in: path
     type: string
@@ -24,6 +27,12 @@ requestBody:
         $ref: '#/components/schemas/DescriptionPut'
         description: 'Column description'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Empty json response'
     content:

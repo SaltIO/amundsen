@@ -1,8 +1,11 @@
 Update the user owner information
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'user'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: user_id
     in: path
     example: 'roald9@example.org'
@@ -26,6 +29,12 @@ parameters:
       type: string
     required: true
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'User was added as owner successfully'
     content:

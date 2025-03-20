@@ -180,7 +180,7 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
         data = {}
         json = {}
 
-    LOGGER.info(f'Calling API: \n url={url}\n method={method}\n headers={headers}\n data={data}\n json={json}')
+    LOGGER.debug(f'Calling API: \n url={url}\n method={method}\n headers={headers}\n data={data}\n json={json}')
 
     attempts = 0
     while(attempts < 3):
@@ -209,7 +209,7 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
                 else:
                     raise Exception('Method not allowed: {}'.format(method))
 
-        LOGGER.info(f'Response: \n url={url}\n code={response.status_code}\n json={response.json()}')
+        LOGGER.debug(f'Response: \n url={url}\n code={response.status_code}\n json={response.json()}')
 
         if auth and response and response.status_code == 401:
             LOGGER.warning("Service Request Failed (401).  Retrieving new Auth Token")

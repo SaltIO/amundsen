@@ -1,5 +1,7 @@
 Create or update a user
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'user'
 requestBody:
@@ -8,8 +10,13 @@ requestBody:
       schema:
         $ref: '#/components/schemas/UserDetailFields'
         description: User attribute fields
-        required: true
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Existing user found and updated'
     content:

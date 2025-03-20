@@ -1,8 +1,11 @@
 Delete badges of a resource
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'column'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: table_uri
     in: path
     type: string
@@ -32,6 +35,12 @@ parameters:
     required: true
     example: 'beta'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'The badge was deleted successfully'
     content:

@@ -1,8 +1,11 @@
 Updates feature owner
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'feature'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: feature_uri
     in: path
     type: string
@@ -18,6 +21,12 @@ parameters:
     required: true
     example: 'roald9@example.org'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Owner updated'
     content:

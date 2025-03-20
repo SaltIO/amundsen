@@ -1,8 +1,11 @@
 Gets Dashboards that is using this table
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'table'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: id
     in: path
     type: string
@@ -11,6 +14,12 @@ parameters:
     required: true
     example: 'hive://gold.test_schema/test_table2'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'List of dashboards that table is used'
     content:

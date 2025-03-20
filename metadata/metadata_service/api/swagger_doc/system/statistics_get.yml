@@ -1,8 +1,16 @@
 Gets system statistics for database
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'system'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'System statistics metrics'
     content:

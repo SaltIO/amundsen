@@ -1,0 +1,22 @@
+Gets the description of a table resource
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'table'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/ResourceIdParameter'
+responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  200:
+    $ref: '#/components/responses/ResourceDescriptionResponse'
+  404:
+    $ref: '#/components/responses/ResourceNotFoundResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

@@ -1,8 +1,16 @@
 Gets system information for neo4j
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'neo4j'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Neo4j system information'
     content:

@@ -2139,10 +2139,15 @@ class Neo4jProxy(BaseProxy):
         """
         props = []
         for k, v in record_dict.items():
-            props.append(f'{identifier}.{k} = ${k}')
+            if v and isinstance(v, dict):
+                for _k, _v in v.items():
+                    props.append(f'{identifier}.{_k} = ${_k}')
+            else:
+                props.append(f'{identifier}.{k} = ${k}')
 
         props.append(f"{identifier}.{PUBLISHED_TAG_PROPERTY_NAME} = '{published_tag}'")
         props.append(f"{identifier}.{LAST_UPDATED_EPOCH_MS} = timestamp()")
+
         return ', '.join(props)
 
     def _get_users_query_statement(self) -> str:
@@ -3624,7 +3629,12 @@ class Neo4jProxy(BaseProxy):
         """
         params = {}
         for k, v in record_dict.items():
-            params[k] = v
+            if v and isinstance(v, dict):
+                for _k, _v in v.items():
+                    params[_k] = _v
+            else:
+                params[k] = v
+
         return params
 
     def _try_create_index(

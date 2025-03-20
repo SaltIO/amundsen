@@ -1,8 +1,16 @@
 Get badges
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'badge'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Badges with category'
     content:

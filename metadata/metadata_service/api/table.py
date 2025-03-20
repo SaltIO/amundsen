@@ -144,7 +144,7 @@ class TableDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(TableDescriptionAPI, self).__init__()
 
-    @swag_from('swagger_doc/common/description_get.yml')
+    @swag_from('swagger_doc/table/description_get.yml')
     def get(self, id: str) -> Iterable[Any]:
         """
         Returns description in Neo4j endpoint
@@ -159,7 +159,7 @@ class TableDescriptionAPI(Resource):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @swag_from('swagger_doc/common/description_put.yml')
+    @swag_from('swagger_doc/table/description_put.yml')
     def put(self, id: str) -> Iterable[Any]:
         """
         Updates table description (passed as a request body)
@@ -233,7 +233,7 @@ class TableTagAPI(Resource):
 
         self._tag_common = TagCommon(client=self.client)
 
-    @swag_from('swagger_doc/tag/tag_put.yml')
+    @swag_from('swagger_doc/table/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to add a tag to existing table uri.
@@ -253,7 +253,7 @@ class TableTagAPI(Resource):
                                     tag_type=tag_type,
                                     published_tag=published_tag)
 
-    @swag_from('swagger_doc/tag/tag_delete.yml')
+    @swag_from('swagger_doc/table/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to remove a association between a given tag and a table.
@@ -280,7 +280,7 @@ class TableBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @swag_from('swagger_doc/badge/badge_put.yml')
+    @swag_from('swagger_doc/table/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
@@ -292,7 +292,7 @@ class TableBadgeAPI(Resource):
                                       category=category,
                                       published_tag=published_tag)
 
-    @swag_from('swagger_doc/badge/badge_delete.yml')
+    @swag_from('swagger_doc/table/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')

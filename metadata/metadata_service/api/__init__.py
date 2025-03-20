@@ -7,6 +7,7 @@ from typing import Any, Iterable, List, Mapping, Optional, Union
 
 from flask_restful import Resource
 
+from metadata_service.exception import NotFoundException
 from metadata_service.proxy import BaseProxy
 
 LOGGER = logging.getLogger(__name__)
@@ -31,13 +32,30 @@ class BaseAPI(Resource):
             get_object = getattr(self.client, f'get_{self.str_type}')
             try:
                 actual_id: Union[str, int] = int(id) if id.isdigit() else id
+                LOGGER.info(f'Calling Client (id)')
                 object = get_object(id=actual_id, **kwargs)
-                if object is not None:
-                    return self.schema().dump(object), HTTPStatus.OK
-                return None, HTTPStatus.NOT_FOUND
+                LOGGER.info(f'object(id)={object}')
+                LOGGER.info(f'type(id)={type(object)}')
+                if object:
+                    if HTTPStatus.OK == object[1]:
+                        return self.schema().dump(object, many=True), HTTPStatus.OK
+                    return object
+                else:
+                    return None, HTTPStatus.NOT_FOUND
             except ValueError as e:
                 return {'message': f'exception:{e}'}, HTTPStatus.BAD_REQUEST
+            except NotFoundException as nfe:
+                return {'message': f'Not Found: {id}'}, HTTPStatus.NOT_FOUND
         else:
+            LOGGER.info(f'Calling Client')
             get_objects = getattr(self.client, f'get_{self.str_type}s')
-            objects: List[Any] = get_objects()
-            return self.schema().dump(objects, many=True), HTTPStatus.OK
+            # objects: List[Any] = get_objects()
+            objects = get_objects()
+            LOGGER.info(f'objects={objects}')
+            LOGGER.info(f'type={type(objects)}')
+            if objects:
+                if HTTPStatus.OK == objects[1]:
+                    return self.schema().dump(objects, many=True), HTTPStatus.OK
+                return objects
+            else:
+                return None, HTTPStatus.NOT_FOUND

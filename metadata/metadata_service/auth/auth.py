@@ -25,7 +25,7 @@ def get_token(client_id: str, client_secret: str) -> AuthToken:
     )
 
     if response.status_code != 200:
-        return jsonify({'message': 'Invalid credentials', 'error': response.text}), 401
+        return {'message': 'Invalid credentials', 'error': response.text}, 401
 
     token_data = response.json()
 
@@ -42,7 +42,7 @@ def requires_auth(f):
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization', None)
         if not token:
-            return jsonify({'message': 'Token is missing'}), 401
+            return {'message': 'Token is missing'}, 401
 
         try:
             # Extract token from "Bearer " prefix
@@ -66,13 +66,16 @@ def requires_auth(f):
 
         except jwt.PyJWKClientError as e:
             LOGGER.exception("Failed to fetch or match key from JWKS")
-            return jsonify({'message': 'Invalid token', 'error': 'No matching key found'}), 401
+            return {'message': 'Invalid token', 'error': 'No matching key found'}, 401
+        except jwt.exceptions.ExpiredSignatureError as e:
+            LOGGER.exception("Token Expired")
+            return {'message': 'Token Expired', 'error': str(e)}, 401
         except jwt.InvalidTokenError as e:
             LOGGER.exception("Token decoding failed")
-            return jsonify({'message': 'Invalid token', 'error': str(e)}), 401
+            return {'message': 'Invalid token', 'error': str(e)}, 401
         except Exception as e:
             LOGGER.exception("Failed to auth")
-            return jsonify({'message': 'Invalid token', 'error': str(e)}), 401
+            return {'message': 'Invalid token', 'error': str(e)}, 401
 
         LOGGER.info('TOKEN valid...calling function')
         return f(*args, **kwargs)

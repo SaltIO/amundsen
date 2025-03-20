@@ -1,0 +1,22 @@
+Upserts description of a dashboard resource
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'dashboard'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/ResourceIdParameter'
+requestBody:
+  $ref: '#/components/requestBodies/DescriptionPutRequest'
+responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    $ref: '#/components/responses/ResourceNotFoundResponse'

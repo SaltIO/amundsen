@@ -27,7 +27,7 @@ class AuthAPI(Resource):
     def __init__(self) -> None:
         pass
 
-    # @swag_from('swagger_doc/auth/detail_get.yml')
+    @swag_from('swagger_doc/auth/token_post.yml')
     def post(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             data = request.get_json(force=True)  # Force parsing regardless of Content-Type

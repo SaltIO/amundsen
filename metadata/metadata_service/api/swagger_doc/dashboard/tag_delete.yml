@@ -1,25 +1,14 @@
-Deletes an owner from a table
+Delete tags of a dashboard
 ---
 security:
   - BearerAuth: []
 tags:
-  - 'table'
+  - 'dashboard'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'dynamo://gold.test_schema/test_table2'
-  - name: owner
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'roald9@example.org'
+  - $ref: '#/components/parameters/ResourceIdParameter'
+  - $ref: '#/components/parameters/TagNameParameter'
+  - $ref: '#/components/parameters/TagTypeParameter'
 responses:
   401:
     description: 'Auth Token Missing, Invalid or Expired'
@@ -28,13 +17,13 @@ responses:
         schema:
           $ref: '#/components/schemas/ErrorResponse'
   200:
-    description: 'Owner deleted'
+    description: 'The tag was deleted successfully'
     content:
       application/json:
         schema:
           $ref: '#/components/schemas/MessageResponse'
-  500:
-    description: 'Owner was not deleted successfully'
+  404:
+    description: 'Dashboard or tag not found'
     content:
       application/json:
         schema:

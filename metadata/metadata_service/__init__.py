@@ -43,7 +43,7 @@ from metadata_service.api.tag import TagAPI
 from metadata_service.api.type_metadata import (TypeMetadataBadgeAPI,
                                                 TypeMetadataDescriptionAPI)
 from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
-                                       UserFollowsAPI, UserOwnAPI, UserOwnsAPI,
+                                       UserFollowsAPI, UserOwnAPI, UserOwnsAPI, UserPutAPI,
                                        UserReadsAPI)
 from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
 from metadata_service.api.data_source import (DataProviderDetailAPI,
@@ -171,8 +171,9 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(BadgeAPI,
                      '/badges/')
     api.add_resource(UserDetailAPI,
-                     '/user',
                      '/user/<path:id>')
+    api.add_resource(UserPutAPI,
+                     '/user/')
     api.add_resource(UserFollowsAPI,
                      '/user/<path:user_id>/follow/')
     api.add_resource(UserFollowAPI,
@@ -191,7 +192,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/dashboard/<path:id>/tag/<tag>')
     api.add_resource(DashboardBadgeAPI,
                      '/dashboard/<path:id>/badge/<badge>')
-    api.add_resource(FeatureDetailAPI, '/feature/<path:feature_uri>')
+    api.add_resource(FeatureDetailAPI,
+                     '/feature/<path:feature_uri>')
     api.add_resource(FeatureDescriptionAPI,
                      '/feature/<path:id>/description')
     api.add_resource(FeatureTagAPI,
@@ -257,5 +259,10 @@ def create_app(*, config_module_class: str) -> Flask:
             # except Exception as e:
             #     app.logger.error(f"Request Json ERROR: {e}")
             return None
+
+        @app.after_request
+        def log_response_info(response):
+            app.logger.debug("Response Data: %s", response.get_data(as_text=True))
+            return response
 
     return app

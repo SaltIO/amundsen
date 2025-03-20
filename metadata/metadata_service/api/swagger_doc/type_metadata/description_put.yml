@@ -1,8 +1,11 @@
 Updates type_metadata description (passed as a request body)
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'type_metadata'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: type_metadata_key
     in: path
     type: string
@@ -17,6 +20,12 @@ requestBody:
         $ref: '#/components/schemas/DescriptionPut'
         description: 'TypeMetadata description'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Empty json response'
     content:

@@ -5,6 +5,115 @@ info:
   version: '4.0.0'
 
 components:
+
+  parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+    AuthorizationHeaderParameter:
+      name: Authorization
+      in: header
+      description: "Bearer token"
+      required: true
+      schema:
+        type: string
+        example: "Bearer your_token_here"
+    ResourceIdParameter:
+      name: id
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'dynamo://gold.test_schema/test_table2'
+    BadgeNameParameter:
+      name: badge
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'beta'
+    BadgeCategoryParameter:
+      name: category
+      in: query
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'column'
+    TagNameParameter:
+      name: tag
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'tag3'
+    TagTypeParameter:
+      name: tag_type
+      in: query
+      type: string
+      schema:
+        type: string
+      required: false
+      default: 'default'
+      example: 'badge'
+
+  requestBodies:
+    DescriptionPutRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DescriptionPut'
+          description: Resource description
+    EmptyRequest:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object  # ✅ Allows an empty JSON body
+
+  responses:
+    AuthTokenResponse:
+      description: 'The auth token'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthToken'
+            description: 'Auth Token'
+    ResourceDescriptionResponse:
+      description: 'Resource description'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Description'
+            description: 'Resource description'
+    EmptyResponse:
+      description: 'Empty response'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EmptyResponse'
+
+    ResourceNotFoundResponse:
+      description: 'Resource not found'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerErrorResponse:
+      description: 'Internal server error'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthcheckResponse:
       type: object
@@ -17,6 +126,34 @@ components:
           description: An arbitrary dictionary representing the healthchecks that have run
           example:
             $ref: '#/detailedExamples/healthcheck'
+    AuthToken:
+      type: object
+      required:
+        - access_token
+        - expires_in
+        - token_type
+      properties:
+        access_token:
+          description: 'The Auth Token'
+          type: string
+        expires_in:
+          description: 'The Auth Token expiration in seconds'
+          type: integer
+        token_type:
+          description: 'The type of token (ie Bearer)'
+          type: string
+    AuthTokenClient:
+      type: object
+      required:
+        - client_id
+        - client_secret
+      properties:
+        client_id:
+          description: 'The Auth Client ID as provided by your Admin'
+          type: string
+        client_secret:
+          description: 'The Auth Client Secret as provided by your Admin'
+          type: string
     Description:
       type: object
       required:
@@ -125,6 +262,8 @@ components:
           description: 'User last name'
     UserDetailFields:
       type: object
+      required:
+        - email
       properties:
         email:
           type: string
@@ -531,13 +670,13 @@ components:
           type: string
           description: 'Dashboard description'
         created_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard created timestamp in epoch'
         updated_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard updated timestamp in epoch'
         last_run_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard last run timestamp in epoch'
         owners:
           type: array
@@ -575,7 +714,7 @@ components:
             items:
               $ref: '#/components/schemas/Badge'
         recent_view_count:
-          type: int
+          type: integer
           description: 'Dashboard recent view count. Not using explicit duration, as it is up to timely ingestion and timely removal of stale data'
           example: 1024
     DashboardSummary:
@@ -607,7 +746,7 @@ components:
           type: string
           description: 'Dashboard description'
         last_successful_run_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard last run timestamp in epoch'
     DashboardQuery:
       type: object
@@ -647,7 +786,6 @@ components:
         share_name:
           type: string
           description: 'The name of the share'
-
 
 detailedExamples:
   healthcheck:

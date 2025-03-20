@@ -18,6 +18,7 @@ from flask_restful import Resource
 from marshmallow.exceptions import ValidationError as SchemaValidationError
 
 from metadata_service.api import BaseAPI
+from metadata_service.auth.auth import requires_auth
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.util import UserResourceRel
@@ -45,6 +46,14 @@ class UserDetailAPI(BaseAPI):
                 return {'message': 'user_id {} fetch failed'.format(id)}, HTTPStatus.NOT_FOUND
         else:
             return super().get(id=id)
+
+class UserPutAPI(Resource):
+    """
+    User PUT API for people resources
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
 
     @swag_from('swagger_doc/user/detail_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:

@@ -45,7 +45,7 @@ class DashboardDescriptionAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DescriptionSchema, 'dashboard_description', self.client)
 
-    @swag_from('swagger_doc/common/description_get.yml')
+    @swag_from('swagger_doc/dashboard/description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
         Returns description
@@ -59,7 +59,7 @@ class DashboardDescriptionAPI(BaseAPI):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @swag_from('swagger_doc/common/description_put.yml')
+    @swag_from('swagger_doc/dashboard/description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
         Updates Dashboard description (passed as a request body)
@@ -88,7 +88,7 @@ class DashboardBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @swag_from('swagger_doc/badge/badge_put.yml')
+    @swag_from('swagger_doc/dashboard/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
 
@@ -99,7 +99,7 @@ class DashboardBadgeAPI(Resource):
                                       badge_name=badge,
                                       category=category)
 
-    @swag_from('swagger_doc/badge/badge_delete.yml')
+    @swag_from('swagger_doc/dashboard/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
@@ -124,7 +124,7 @@ class DashboardTagAPI(Resource):
 
         self._tag_common = TagCommon(client=self.client)
 
-    @swag_from('swagger_doc/tag/tag_put.yml')
+    @swag_from('swagger_doc/dashboard/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to add a tag to existing Dashboard.
@@ -141,7 +141,7 @@ class DashboardTagAPI(Resource):
                                     tag=tag,
                                     tag_type=tag_type)
 
-    @swag_from('swagger_doc/tag/tag_delete.yml')
+    @swag_from('swagger_doc/dashboard/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to remove a association between a given tag and a Dashboard.

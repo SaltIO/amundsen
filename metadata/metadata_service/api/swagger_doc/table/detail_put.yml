@@ -1,5 +1,8 @@
-Gets table descriptions
+Creates or Updates a Table.  This can include columns, decriptions, badges, tags, and many other related entities.
+This does a merge, if the entities exist.  It will overwrite what is provided, and leave what is not provided.
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'table'
 requestBody:
@@ -9,6 +12,12 @@ requestBody:
         $ref: '#/components/schemas/TableDetail'
         description: 'Table Details'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Existing table found and updated'
     content:

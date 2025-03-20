@@ -149,7 +149,7 @@ class FeatureDescriptionAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @swag_from('swagger_doc/common/description_get.yml')
+    @swag_from('swagger_doc/feature/description_get.yml')
     def get(self, id: str) -> Iterable[Any]:
         """
         Returns description from proxy
@@ -167,7 +167,7 @@ class FeatureDescriptionAPI(Resource):
             LOGGER.error(f'Internal server error occurred when getting description: {e}')
             return {'message': f'Internal server error: {e}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @swag_from('swagger_doc/common/description_put.yml')
+    @swag_from('swagger_doc/feature/description_put.yml')
     def put(self, id: str) -> Iterable[Any]:
         """
         Updates feature description (passed as a request body)
@@ -199,7 +199,7 @@ class FeatureTagAPI(Resource):
 
         self._tag_common = TagCommon(client=self.client)
 
-    @swag_from('swagger_doc/tag/tag_put.yml')
+    @swag_from('swagger_doc/feature/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         # use tag_type to distinguish between tag and badge
@@ -218,7 +218,7 @@ class FeatureTagAPI(Resource):
                                     tag=tag,
                                     tag_type=tag_type)
 
-    @swag_from('swagger_doc/tag/tag_delete.yml')
+    @swag_from('swagger_doc/feature/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         tag_type = args.get('tag_type', 'default')
@@ -245,7 +245,7 @@ class FeatureBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @swag_from('swagger_doc/badge/badge_put.yml')
+    @swag_from('swagger_doc/feature/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
@@ -255,7 +255,7 @@ class FeatureBadgeAPI(Resource):
                                       badge_name=badge,
                                       category=category)
 
-    @swag_from('swagger_doc/badge/badge_delete.yml')
+    @swag_from('swagger_doc/feature/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')

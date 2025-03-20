@@ -1,8 +1,11 @@
 Add badge to a resource
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'type_metadata'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: type_metadata_key
     in: path
     type: string
@@ -25,6 +28,12 @@ parameters:
     required: true
     example: 'table_status'
 responses:
+  401:
+    description: 'Auth Token Missing, Invalid or Expired'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'The badge was added successfully'
     content:
