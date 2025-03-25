@@ -4,13 +4,11 @@ security:
   - BearerAuth: []
 tags:
   - 'neo4j'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Neo4j system information'
     content:

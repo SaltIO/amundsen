@@ -6,13 +6,7 @@ tags:
   - 'column'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'hive://gold.test_schema/test_table1'
+  - $ref: '#/components/parameters/TableUriParameter'
   - name: badge
     in: path
     type: string
@@ -34,13 +28,13 @@ parameters:
       type: string
     required: true
     example: 'beta'
+requestBody:
+  $ref: '#/components/requestBodies/PublisherRequest'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'The badge was added successfully'
     content:

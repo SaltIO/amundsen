@@ -1,0 +1,44 @@
+Gets Cluster details by composite key
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'cluster'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: database
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'snowflake'
+  - name: cluster
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'client'
+responses:
+  200:
+    description: 'Cluster details'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Cluster'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  404:
+    description: 'Cluster not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

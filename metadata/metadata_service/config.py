@@ -63,7 +63,7 @@ class Config:
     STATISTICS_FORMAT_SPEC: Dict[str, Dict] = {}
 
     # whitelist badges
-    WHITELIST_BADGES: List[Badge] = []
+    # WHITELIST_BADGES: List[Badge] = []
 
     SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', True)
 
@@ -98,8 +98,7 @@ class Config:
     SWAGGER_URL_PREFIX = os.getenv('SWAGGER_URL_PREFIX', None)
     if SWAGGER_URL_PREFIX:
         SWAGGER['specs_route'] = SWAGGER_URL_PREFIX
-
-
+    SWAGGER_VALIDATION = os.getenv("SWAGGER_VALIDATION", "true").lower() in ("true", "1", "yes")
 
     METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']      # e.g., your-domain.auth0.com
     METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']  # e.g., neo4j-api or https://neo4j-api.example.com
@@ -110,6 +109,7 @@ class Config:
 
     LOG_REQUESTS = os.environ['METADATA_API_LOG_REQUESTS']
 
+    READ_ONLY_MODE = os.getenv('METADATA_SERVICE_READ_ONLY_MODE', 'false').lower() in ('1', 'true', 'yes')
 
 class LocalConfig(Config):
     DEBUG = True

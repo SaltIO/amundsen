@@ -1,4 +1,4 @@
-Gets table details
+Gets Table details by ID
 ---
 security:
   - BearerAuth: []
@@ -6,29 +6,26 @@ tags:
   - 'table'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'dynamo://gold.test_schema/test_table2'
+  - $ref: '#/components/parameters/ResourceIdQParameter'
 responses:
-  401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
   200:
     description: 'Table details'
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/TableDetail'
+          $ref: '#/components/schemas/Table'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
   404:
     description: 'Table not found'
     content:
       application/json:
         schema:
           $ref: '#/components/schemas/ErrorResponse'
+

@@ -112,12 +112,11 @@ def _get_auth_token():
         response = request_metadata(
             method="POST",
             url=url,
-            json=JSON.dumps(payload),
+            json=payload,
             auth=False)
         status_code = response.status_code
 
         if status_code == HTTPStatus.OK:
-            message = 'Success'
             AUTH_TOKEN = response.json().get('access_token')
             LOGGER.info("Successfully retreived Auth Token")
         else:
@@ -127,7 +126,15 @@ def _get_auth_token():
         raise e
 
 # TODO: Define an interface for envoy_client
-def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, data=None, json=None, auth: bool = False):  # type: ignore
+def request_wrapper(
+        method: str,
+        url: str,
+        client,
+        headers,
+        timeout_sec: int,
+        data=None,
+        json=None,
+        auth: bool = False):  # type: ignore
     """
     Wraps a request to use Envoy client and headers, if available
     :param method: DELETE | GET | POST | PUT
@@ -180,7 +187,17 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
         data = {}
         json = {}
 
-    LOGGER.debug(f'Calling API: \n url={url}\n method={method}\n headers={headers}\n data={data}\n json={json}')
+    if app.config['LOG_REQUESTS']:
+        msg = f"""
+            Calling API:
+                - url={url}
+                - method={method}
+                - auth={auth}
+                - headers={headers}
+                - data={data}
+                - json={json}
+        """
+        LOGGER.debug(msg)
 
     attempts = 0
     while(attempts < 3):
@@ -209,7 +226,8 @@ def request_wrapper(method: str, url: str, client, headers, timeout_sec: int, da
                 else:
                     raise Exception('Method not allowed: {}'.format(method))
 
-        LOGGER.debug(f'Response: \n url={url}\n code={response.status_code}\n json={response.json()}')
+        if app.config['LOG_REQUESTS']:
+            LOGGER.debug(f'API Response: \n url={url}\n auth={auth}\n code={response.status_code}\n json={response.json()}')
 
         if auth and response and response.status_code == 401:
             LOGGER.warning("Service Request Failed (401).  Retrieving new Auth Token")

@@ -8,7 +8,7 @@ import logging.config
 import os
 import sys
 
-from flask import Blueprint, Flask
+from flask import Blueprint, Flask, request
 from flask_restful import Api
 
 from amundsen_application.api import init_routes
@@ -105,5 +105,58 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
     # handles the deprecation warnings
     # and process any config/environment variables accordingly
     process_deprecations(app)
+
+    if app.config.get('LOG_REQUESTS'):
+        logging.basicConfig(level=logging.DEBUG)
+        @app.before_request
+        def log_request_info():
+            msg = f"""
+*******************
+*** Request URL ***
+*******************
+
+{request.url}
+
+**********************
+*** Request Method ***
+**********************
+
+{request.method}
+
+***********************
+*** Request Headers ***
+***********************
+
+{str(request.headers).strip()}
+
+********************
+*** Request Body ***
+********************
+
+{str(request.get_data()).strip()}
+            """
+            app.logger.debug(msg)
+            return None
+
+        @app.after_request
+        def log_response_info(response):
+            if response.direct_passthrough:
+                return response  # ✅ Skip logging body for static files
+
+            msg = f"""
+****************************
+*** Response Request URL ***
+****************************
+
+{request.url}
+
+*********************
+*** Response Data ***
+*********************
+
+{str(response.get_data(as_text=True)).strip()}
+            """
+            app.logger.debug(msg)
+            return response
 
     return app

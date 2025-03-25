@@ -14,6 +14,9 @@ from flask_restful import Resource, reqparse
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.auth import requires_auth
+from metadata_service.permissions import require_write_access
 
 
 class ColumnLineageAPI(Resource):
@@ -27,6 +30,7 @@ class ColumnLineageAPI(Resource):
         self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(ColumnLineageAPI, self).__init__()
 
+    @requires_auth
     @swag_from('swagger_doc/column/lineage_get.yml')
     def get(self, table_uri: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -53,6 +57,8 @@ class ColumnDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(ColumnDescriptionAPI, self).__init__()
 
+    @requires_auth
+    @require_write_access
     @swag_from('swagger_doc/column/description_put.yml')
     def put(self,
             table_uri: str,
@@ -64,16 +70,24 @@ class ColumnDescriptionAPI(Resource):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_column_description(table_uri=table_uri,
-                                               column_name=column_name,
-                                               description=description)
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_column_description(
+                table_uri=table_uri,
+                column_name=column_name,
+                description=description,
+                published_tag=published_tag
+            )
+
             return {}, HTTPStatus.OK
 
         except NotFoundException:
             msg = 'table_uri {} with column {} does not exist'.format(table_uri, column_name)
             return {'message': msg}, HTTPStatus.NOT_FOUND
 
+    @requires_auth
     @swag_from('swagger_doc/column/description_get.yml')
     def get(self, table_uri: str, column_name: str) -> Union[tuple, int, None]:
         """
@@ -102,16 +116,26 @@ class ColumnBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
+    @requires_auth
+    @require_write_access
     @swag_from('swagger_doc/column/badge_put.yml')
     def put(self, table_uri: str, badge: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        return self._badge_common.put(id=f"{table_uri}/{column_name}",
-                                      resource_type=ResourceType.Column,
-                                      badge_name=badge,
-                                      category=category)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
+        return self._badge_common.put(
+            id=f"{table_uri}/{column_name}",
+            resource_type=ResourceType.Column,
+            badge_name=badge,
+            category=category,
+            published_tag=published_tag
+        )
+
+    @requires_auth
+    @require_write_access
     @swag_from('swagger_doc/column/badge_delete.yml')
     def delete(self, table_uri: str, badge: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()

@@ -15,11 +15,7 @@ parameters:
     example: 'mode_dashboard://gold.abcdefg/1234567'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Dashboard details'
     content:

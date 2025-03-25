@@ -167,6 +167,8 @@ class Config:
     if SLACK_TOKEN:
         SLACK_CLIENT = SlackClient(token=SLACK_TOKEN)
 
+    LOG_REQUESTS = os.getenv('FRONTEND_API_LOG_REQUESTS', False)
+
 
 class LocalConfig(Config):
     DEBUG = False

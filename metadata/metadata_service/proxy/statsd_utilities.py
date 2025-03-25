@@ -1,6 +1,7 @@
 # Copyright Contributors to the Amundsen project.
 # SPDX-License-Identifier: Apache-2.0
 
+from functools import wraps
 import logging
 from threading import Lock
 from typing import Any, Callable, Dict  # noqa: F401
@@ -32,6 +33,7 @@ def timer_with_counter(f: Callable) -> Any:
     :param f:
     :return:
     """
+    @wraps(f)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         statsd_client = _get_statsd_client(prefix=f.__module__)
         if not statsd_client:

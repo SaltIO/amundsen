@@ -6,13 +6,7 @@ tags:
   - 'column'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'dynamo://gold.test_schema/test_table2'
+  - $ref: '#/components/parameters/TableUriParameter'
   - name: column_name
     in: path
     type: string
@@ -22,11 +16,7 @@ parameters:
     example: 'col2'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Column description'
     content:

@@ -1,0 +1,39 @@
+Gets a List of Schema details
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'schema'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: database
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'snowflake'
+  - name: cluster
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'client'
+responses:
+  200:
+    description: 'List of Schema details'
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Schema'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'

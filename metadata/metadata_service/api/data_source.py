@@ -18,7 +18,10 @@ from metadata_service.api.badge import BadgeCommon
 from metadata_service.entity.description import DescriptionSchema
 from metadata_service.api.tag import TagCommon
 from metadata_service.exception import NotFoundException
+from metadata_service.permissions.permissions import require_write_access
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.auth import requires_auth
 
 
 class DataProviderDetailAPI(Resource):
@@ -29,6 +32,7 @@ class DataProviderDetailAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth
     # @swag_from('swagger_doc/data_source/data_provider_get.yml')
     def get(self, data_provider_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -48,6 +52,7 @@ class DataProviderDescriptionAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DescriptionSchema, 'data_provider_description', self.client)
 
+    @requires_auth
     # @swag_from('swagger_doc/common/description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -62,6 +67,8 @@ class DataProviderDescriptionAPI(BaseAPI):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth
+    @require_write_access
     # @swag_from('swagger_doc/common/description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -70,8 +77,16 @@ class DataProviderDescriptionAPI(BaseAPI):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_data_provider_description(id=id, description=description)
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_data_provider_description(
+                id=id,
+                description=description,
+                published_tag=published_tag
+            )
+
             return {}, HTTPStatus.OK
 
         except NotFoundException:
@@ -85,6 +100,7 @@ class FileDetailAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth
     # @swag_from('swagger_doc/data_source/data_provider_get.yml')
     def get(self, file_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -109,6 +125,8 @@ class FileTagAPI(Resource):
 
         self._tag_common = TagCommon(client=self.client)
 
+    @requires_auth
+    @require_write_access
     # @swag_from('swagger_doc/tag/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -121,11 +139,18 @@ class FileTagAPI(Resource):
         args = self.parser.parse_args()
         tag_type = args.get('tag_type', 'default')
 
-        return self._tag_common.put(id=id,
-                                    resource_type=ResourceType.File,
-                                    tag=tag,
-                                    tag_type=tag_type)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
+        return self._tag_common.put(
+            id=id,
+            resource_type=ResourceType.File,
+            tag=tag,
+            tag_type=tag_type,
+            published_tag=published_tag
+        )
+
+    @requires_auth
     # @swag_from('swagger_doc/tag/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -152,6 +177,7 @@ class FileDescriptionAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DescriptionSchema, 'file_description', self.client)
 
+    @requires_auth
     # @swag_from('swagger_doc/common/description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -166,6 +192,8 @@ class FileDescriptionAPI(BaseAPI):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth
+    @require_write_access
     # @swag_from('swagger_doc/common/description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -174,8 +202,16 @@ class FileDescriptionAPI(BaseAPI):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_file_description(id=id, description=description)
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_file_description(
+                id=id,
+                description=description,
+                published_tag=published_tag
+            )
+
             return {}, HTTPStatus.OK
 
         except NotFoundException:
@@ -189,10 +225,21 @@ class FileOwnerAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth
+    @require_write_access
     # @swag_from('swagger_doc/file/owner_put.yml')
     def put(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            self.client.add_resource_owner(uri=file_uri, resource_type=ResourceType.File, owner=owner)
+            data = json.loads(request.data)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.add_resource_owner(
+                uri=file_uri,
+                resource_type=ResourceType.File,
+                owner=owner,
+                published_tag=published_tag
+            )
+
             return {'message': 'The owner {} for file_uri {} '
                                'is added successfully'.format(owner,
                                                               file_uri)}, HTTPStatus.OK
@@ -201,6 +248,7 @@ class FileOwnerAPI(Resource):
                                'is not added successfully'.format(owner,
                                                                   file_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth
     # @swag_from('swagger_doc/file/owner_delete.yml')
     def delete(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -221,6 +269,7 @@ class FileLineageAPI(Resource):
         self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(FileLineageAPI, self).__init__()
 
+    @requires_auth
     # @swag_from('swagger_doc/table/lineage_get.yml')
     def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()

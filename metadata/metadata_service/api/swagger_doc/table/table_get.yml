@@ -1,0 +1,58 @@
+Gets Table details by composite key
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'table'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: database
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'snowflake'
+  - name: cluster
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'client'
+  - name: schema
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'public'
+  - name: table
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'addresses'
+responses:
+  200:
+    description: 'Table details'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Table'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  404:
+    description: 'Table not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

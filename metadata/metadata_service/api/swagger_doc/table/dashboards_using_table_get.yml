@@ -15,11 +15,7 @@ parameters:
     example: 'hive://gold.test_schema/test_table2'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'List of dashboards that table is used'
     content:

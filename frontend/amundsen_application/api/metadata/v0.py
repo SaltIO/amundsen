@@ -170,7 +170,7 @@ def _get_table_metadata(*, table_key: str, index: int, source: str) -> Dict[str,
 
     try:
         table_endpoint = _get_table_endpoint()
-        url = '{0}/{1}'.format(table_endpoint, table_key)
+        url = '{0}?id={1}'.format(table_endpoint, table_key)
         response = request_metadata(url=url)
     except ValueError as e:
         # envoy client BadResponse is a subclass of ValueError

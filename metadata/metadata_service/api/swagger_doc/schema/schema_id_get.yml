@@ -1,0 +1,31 @@
+Gets Schema details by ID
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'schema'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/ResourceIdQParameter'
+responses:
+  200:
+    description: 'Schema details'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Schema'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  404:
+    description: 'Schema not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

@@ -35,11 +35,11 @@ from metadata_service.api.popular_resources import PopularResourcesAPI
 from metadata_service.api.popular_tables import PopularTablesAPI
 from metadata_service.api.system import Neo4jDetailAPI, StatisticsMetricsAPI
 from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
-                                        TableDescriptionAPI, TableDetailAPI,
+                                        TableDescriptionAPI, TableGET, TablesGET, TableIdGET,
                                         TableLineageAPI, TableOwnerAPI,
                                         TableTagAPI, TableUpdateFrequencyAPI,
                                         TablePutAPI)
-from metadata_service.api.tag import TagAPI
+from metadata_service.api.tag import TagAPI, TagPATCH
 from metadata_service.api.type_metadata import (TypeMetadataBadgeAPI,
                                                 TypeMetadataDescriptionAPI)
 from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
@@ -53,6 +53,9 @@ from metadata_service.api.data_source import (DataProviderDetailAPI,
                                               FileDescriptionAPI,
                                               FileOwnerAPI,
                                               FileLineageAPI)
+from metadata_service.api.database import (DatabaseIdGET, DatabaseGET, DatabasesGET)
+from metadata_service.api.cluster import (ClusterIdGET, ClusterGET, ClustersGET)
+from metadata_service.api.schema import (SchemaIdGET, SchemaGET, SchemasGET)
 from metadata_service.deprecations import process_deprecations
 
 
@@ -134,8 +137,15 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(PopularResourcesAPI,
                      '/popular_resources/',
                      '/popular_resources/<path:user_id>')
-    api.add_resource(TableDetailAPI,
-                     '/table/<path:table_uri>')
+    api.add_resource(TableIdGET,
+                     '/table')
+    api.add_resource(TableGET,
+                     '/table/<path:database>/<path:cluster>/<path:schema>/<path:table>')
+    api.add_resource(TablesGET,
+                     '/tables/',
+                     '/tables/<path:database>',
+                     '/tables/<path:database>/<path:cluster>',
+                     '/tables/<path:database>/<path:cluster>/<path:schema>')
     api.add_resource(TablePutAPI,
                      '/table/')
     api.add_resource(TableDescriptionAPI,
@@ -168,9 +178,12 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/system/statistics')
     api.add_resource(TagAPI,
                      '/tags/')
+    api.add_resource(TagPATCH,
+                     '/tag')
     api.add_resource(BadgeAPI,
                      '/badges/')
     api.add_resource(UserDetailAPI,
+                     '/user/',
                      '/user/<path:id>')
     api.add_resource(UserPutAPI,
                      '/user/')
@@ -226,6 +239,27 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/data_source/file/<path:file_uri>/owner/<owner>')
     api.add_resource(FileLineageAPI,
                      '/data_source/file/<path:id>/lineage')
+    api.add_resource(DatabaseIdGET,
+                     '/database')
+    api.add_resource(DatabaseGET,
+                    '/database/<path:database>')
+    api.add_resource(DatabasesGET,
+                    '/databases')
+    api.add_resource(ClusterIdGET,
+                     '/cluster')
+    api.add_resource(ClusterGET,
+                     '/cluster/<path:database>/<path:cluster>')
+    api.add_resource(ClustersGET,
+                     '/clusters/',
+                     '/clusters/<path:database>')
+    api.add_resource(SchemaIdGET,
+                     '/schema')
+    api.add_resource(SchemaGET,
+                     '/schema/<path:database>/<path:cluster>/<path:schema>')
+    api.add_resource(SchemasGET,
+                     '/schemas/',
+                     '/schemas/<path:database>',
+                     '/schemas/<path:database>/<path:cluster>')
     app.register_blueprint(api_bp)
 
     # cli registration
@@ -249,20 +283,53 @@ def create_app(*, config_module_class: str) -> Flask:
         logging.basicConfig(level=logging.DEBUG)
         @app.before_request
         def log_request_info():
-            app.logger.debug("Request URL: %s", request.url)
-            app.logger.debug("Request Method: %s", request.method)
-            app.logger.debug("Request Headers: %s", request.headers)
-            app.logger.debug("Request Body: %s", request.get_data())
-            # try:
-            #     json_data = request.get_json()  # This should fail if Flask is forcing JSON
-            #     app.logger.debug(f"Request Json: {json_data}")
-            # except Exception as e:
-            #     app.logger.error(f"Request Json ERROR: {e}")
+            msg = f"""
+*******************
+*** Request URL ***
+*******************
+
+{request.url}
+
+**********************
+*** Request Method ***
+**********************
+
+{request.method}
+
+***********************
+*** Request Headers ***
+***********************
+
+{str(request.headers).strip()}
+
+********************
+*** Request Body ***
+********************
+
+{str(request.get_data()).strip()}
+            """
+            app.logger.debug(msg)
             return None
 
         @app.after_request
         def log_response_info(response):
-            app.logger.debug("Response Data: %s", response.get_data(as_text=True))
+            if response.direct_passthrough:
+                return response  # ✅ Skip logging body for static files
+
+            msg = f"""
+****************************
+*** Response Request URL ***
+****************************
+
+{request.url}
+
+*********************
+*** Response Data ***
+*********************
+
+{str(response.get_data(as_text=True)).strip()}
+            """
+            app.logger.debug(msg)
             return response
 
     return app

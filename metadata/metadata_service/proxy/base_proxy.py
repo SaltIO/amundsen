@@ -1,6 +1,7 @@
 # Copyright Contributors to the Amundsen project.
 # SPDX-License-Identifier: Apache-2.0
 
+from flask import current_app as app
 from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -15,7 +16,8 @@ from amundsen_common.models.table import Table
 from amundsen_common.models.data_source import DataProvider, File
 from amundsen_common.models.user import User
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare
-from flask import current_app as app
+from amundsen_common.models.database import Database
+from amundsen_common.models.cluster import Cluster
 
 from metadata_service.entity.dashboard_detail import \
     DashboardDetail as DashboardDetailEntity
@@ -72,7 +74,11 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_table(self, *, table_uri: str) -> Table:
+    def get_table(self, *, id: str) -> Table:
+        pass
+
+    @abstractmethod
+    def get_tables(self, *, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> List[Table]:
         pass
 
     @abstractmethod
@@ -117,6 +123,10 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
 
     @abstractmethod
     def add_tag(self, *, id: str, tag: str, tag_type: str, resource_type: ResourceType, published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def update_tag(self, *, old_tag: str, old_tag_type: str, new_tag: str, new_tag_type: str) -> None:
         pass
 
     @abstractmethod
@@ -317,3 +327,33 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
                              published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
+    @abstractmethod
+    def put_data_provider_description(self, *,
+                                      id: str,
+                                      description: str,
+                                      published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def get_database(self, *, id: str = None) -> Union[Database, None]:
+        pass
+
+    @abstractmethod
+    def get_databases(self) -> List[Database]:
+        pass
+
+    @abstractmethod
+    def get_cluster(self, *, id: Optional[str] = None, database: Optional[str] = None, cluster: Optional[str] = None) -> Union[Cluster, None]:
+        pass
+
+    @abstractmethod
+    def get_clusters(self, *, database: Optional[str] = None) -> List[Cluster]:
+        pass
+
+    @abstractmethod
+    def get_schema(self, *, id: Optional[str] = None, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> Union[Cluster, None]:
+        pass
+
+    @abstractmethod
+    def get_schemas(self, *, database: Optional[str] = None, cluster: Optional[str] = None) -> List[Cluster]:
+        pass

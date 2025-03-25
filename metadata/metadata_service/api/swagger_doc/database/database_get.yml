@@ -1,0 +1,37 @@
+Gets Database details by composite key
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'database'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: database
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'snowflake'
+responses:
+  200:
+    description: 'Database details'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Database'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  404:
+    description: 'Database not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

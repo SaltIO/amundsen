@@ -13,12 +13,14 @@ from amundsen_common.models.table import (User, Reader)
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.dashboard import DashboardSummary
 from amundsen_common.models.popular_table import PopularTable
+from amundsen_common.models.table import Table
 
 
 from metadata_service.proxy.neo4j_proxy import Neo4jProxy, _CACHE, _GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC
 from metadata_service.proxy.statsd_utilities import timer_with_counter
 from metadata_service.util import UserResourceRel
 from metadata_service.entity.description import Description
+from metadata_service.proxy.base_proxy import BaseProxy
 
 
 LOGGER = logging.getLogger(__name__)
@@ -283,6 +285,30 @@ class Neo4jFabricProxy(Neo4jProxy):
         return self._get_fabric_query_statement(self._database_name,
             self._prepare_federated_query_statement(statement=super()._get_file_query_statement()))
 
+    def _get_database_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_database_query_statement()))
+
+    def _get_databases_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_databases_query_statement()))
+
+    def _get_cluster_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_cluster_query_statement()))
+
+    def _get_clusters_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_clusters_query_statement()))
+
+    def _get_schema_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_schema_query_statement()))
+
+    def _get_schemas_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_schemas_query_statement()))
+
     ########################## OVERRIDE ##########################
 
     @timer_with_counter
@@ -436,3 +462,11 @@ class Neo4jFabricProxy(Neo4jProxy):
                                          relation_type: UserResourceRel,
                                          resource_type: ResourceType) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_resource_relation_by_user() is not supported')
+
+    @timer_with_counter
+    def create_update_table(
+            self,
+            *,
+            table: Table,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_table() is not supported')

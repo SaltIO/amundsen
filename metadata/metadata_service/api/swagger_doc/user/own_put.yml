@@ -21,20 +21,14 @@ parameters:
     schema:
       type: string
     required: true
-  - name: table_uri
-    in: path
-    example: 'hive://gold.test_schema/test_table1'
-    type: string
-    schema:
-      type: string
-    required: true
+  - $ref: '#/components/parameters/TableUriParameter'
+requestBody:
+  $ref: '#/components/requestBodies/PublisherRequest'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'User was added as owner successfully'
     content:

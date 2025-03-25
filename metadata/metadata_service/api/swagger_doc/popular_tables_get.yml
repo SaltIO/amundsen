@@ -15,11 +15,7 @@ parameters:
       default: 10
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Popular tables'
     content:

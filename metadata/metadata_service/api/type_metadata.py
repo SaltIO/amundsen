@@ -13,7 +13,10 @@ from flask_restful import Resource, reqparse
 
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.exception import NotFoundException
+from metadata_service.permissions.permissions import require_write_access
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.auth import requires_auth
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +30,8 @@ class TypeMetadataDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(TypeMetadataDescriptionAPI, self).__init__()
 
+    @requires_auth
+    @require_write_access
     @swag_from('swagger_doc/type_metadata/description_put.yml')
     def put(self, type_metadata_key: str) -> Iterable[Union[dict, tuple, int, None]]:
         """
@@ -35,9 +40,16 @@ class TypeMetadataDescriptionAPI(Resource):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_type_metadata_description(type_metadata_key=type_metadata_key,
-                                                      description=description)
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_type_metadata_description(
+                type_metadata_key=type_metadata_key,
+                description=description,
+                published_tag=published_tag
+            )
+
             return {}, HTTPStatus.OK
 
         except NotFoundException:
@@ -45,6 +57,7 @@ class TypeMetadataDescriptionAPI(Resource):
             LOGGER.error(f'NotFoundException: {msg}')
             return {'message': msg}, HTTPStatus.NOT_FOUND
 
+    @requires_auth
     @swag_from('swagger_doc/type_metadata/description_get.yml')
     def get(self, type_metadata_key: str) -> Union[tuple, int, None]:
         """
@@ -74,16 +87,25 @@ class TypeMetadataBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
+    @requires_auth
+    @require_write_access
     @swag_from('swagger_doc/type_metadata/badge_put.yml')
     def put(self, type_metadata_key: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        return self._badge_common.put(id=type_metadata_key,
-                                      resource_type=ResourceType.Type_Metadata,
-                                      badge_name=badge,
-                                      category=category)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
+        return self._badge_common.put(
+            id=type_metadata_key,
+            resource_type=ResourceType.Type_Metadata,
+            badge_name=badge,
+            category=category,
+            published_tag=published_tag
+        )
+
+    @requires_auth
     @swag_from('swagger_doc/type_metadata/badge_delete.yml')
     def delete(self, type_metadata_key: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()

@@ -6,13 +6,7 @@ tags:
   - 'lineage'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'hive://gold.test_schema/test_table1'
+  - $ref: '#/components/parameters/TableUriParameter'
   - name: column_name
     in: path
     type: string
@@ -36,11 +30,7 @@ parameters:
     example: 0
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Lineage for requested direction and depth'
     content:

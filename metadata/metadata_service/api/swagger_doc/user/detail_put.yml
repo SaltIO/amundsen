@@ -4,31 +4,27 @@ security:
   - BearerAuth: []
 tags:
   - 'user'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
 requestBody:
-  content:
-    application/json:
-      schema:
-        $ref: '#/components/schemas/UserDetailFields'
-        description: User attribute fields
+  $ref: '#/components/requestBodies/UserDetailPutRequest'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'Existing user found and updated'
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/UserDetailFields'
+          $ref: '#/components/schemas/UserDetail'
   201:
     description: 'New user created'
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/UserDetailFields'
+          $ref: '#/components/schemas/UserDetail'
   400:
     description: 'Bad Request'
     content:

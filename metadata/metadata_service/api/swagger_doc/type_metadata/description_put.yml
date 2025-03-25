@@ -14,18 +14,12 @@ parameters:
     required: true
     example: 'dynamo://gold.test_schema/test_table2/col2/type/col2'
 requestBody:
-  content:
-    application/json:
-      schema:
-        $ref: '#/components/schemas/DescriptionPut'
-        description: 'TypeMetadata description'
+  $ref: '#/components/requestBodies/DescriptionPutRequest'
 responses:
   401:
-    description: 'Auth Token Missing, Invalid or Expired'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'Empty json response'
     content:
