@@ -1,0 +1,71 @@
+// Copyright Contributors to the Amundsen project.
+// SPDX-License-Identifier: Apache-2.0
+
+@import 'variables';
+
+$icon-size: 24px;
+$icon-small-size: 16px;
+
+// Icons
+// Lookout! When you update one of these, please update the enums on
+// ../js/interfaces/Enums.ts
+// Map of Database names and icon paths
+$data-stores-default: (
+  database: '../images/icons/Database.svg',
+  hive: '../images/icons/logo-hive.svg',
+  bigquery: '../images/icons/logo-bigquery.svg',
+  delta: '../images/icons/logo-delta.png',
+  dremio: '../images/icons/logo-dremio.svg',
+  druid: '../images/icons/logo-druid.svg',
+  oracle: '../images/icons/logo-oracle.svg',
+  presto: '../images/icons/logo-presto.svg',
+  trino: '../images/icons/logo-trino.svg',
+  postgres: '../images/icons/logo-postgres.svg',
+  redshift: '../images/icons/logo-redshift.svg',
+  snowflake: '../images/icons/logo-snowflake.svg',
+  mysql: '../images/icons/logo-mysql.svg',
+  mssql: '../images/icons/logo-mssql.svg',
+  elasticsearch: '../images/icons/logo-elasticsearch.svg',
+  teradata: '../images/icons/logo-teradata.svg',
+  salt: '../images/icons/logo-salt.svg',
+  crediq: '../images/icons/logo-crediq.png',
+  clickhouse: '../images/icons/logo-clickhouse.svg',
+);
+
+// Map of Dashboard names and icon paths
+$dashboards-default: (
+  dashboard: '../images/icons/dashboard.svg',
+  mode: '../images/icons/logo-mode.svg',
+  redash: '../images/icons/logo-redash.svg',
+  tableau: '../images/icons/logo-tableau.svg',
+  count: '../images/icons/logo-count.svg',
+  superset: '../images/icons/logo-superset.svg',
+  databricks_sql: '../images/icons/logo-databricks-sql.svg',
+);
+
+// Map of User names and icon paths
+$users: (
+  users: '../images/icons/users.svg',
+);
+
+$check: (
+  check: '../images/icons/check.svg',
+);
+
+// Map of File types and icon paths
+$files-default: (
+  file: '../images/icons/logo-file-text.png',
+  pdf: '../images/icons/logo-file-pdf.png',
+  csv: '../images/icons/logo-file-csv.png',
+  json: '../images/icons/logo-file-json.png',
+  excel: '../images/icons/logo-file-excel.png',
+  binary: '../images/icons/logo-file-binary.png',
+);
+
+// Map of Data Provider names and icon paths
+$dataproviders-default: (
+  provider: '../images/icons/logo-provider.png',
+  cmdrvl: '../images/icons/logo-provider-cmdrvl.svg',
+  secgov: '../images/icons/logo-provider-secgov.png',
+  eganjones: '../images/icons/logo-provider-eganjones.png',
+);

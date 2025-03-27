@@ -1,0 +1,3288 @@
+# Copyright Contributors to the Amundsen project.
+# SPDX-License-Identifier: Apache-2.0
+
+import logging
+import ast
+import re
+import textwrap
+import time
+import json
+from random import randint
+from typing import (Any, Dict, Iterable, List, Optional, Tuple,  # noqa: F401
+                    Union, no_type_check)
+
+import neo4j
+from amundsen_common.entity.resource_type import ResourceType, to_resource_type
+from amundsen_common.models.api import health_check
+from amundsen_common.models.dashboard import DashboardSummary
+from amundsen_common.models.feature import Feature, FeatureWatermark
+from amundsen_common.models.generation_code import GenerationCode
+from amundsen_common.models.lineage import Lineage, LineageItem
+from amundsen_common.models.popular_table import PopularTable
+from amundsen_common.models.table import (Application, Badge, Column,
+                                          ProgrammaticDescription, Reader,
+                                          ResourceReport, Source, SqlJoin,
+                                          SqlWhere, Stat, Table, TableSummary,
+                                          Tag, TypeMetadata, User, Watermark)
+from amundsen_common.models.user import User as UserEntity
+from amundsen_common.models.user import UserSchema
+from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare, SnowflakeListing
+from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable, ProspectusWaterfallScheme, ProspectusScheme)
+
+from beaker.cache import CacheManager
+from beaker.util import parse_cache_config_options
+from flask import current_app, has_app_context
+from neo4j import GraphDatabase, Record, Transaction  # noqa: F401
+from neo4j.api import (SECURITY_TYPE_SECURE,
+                       SECURITY_TYPE_SELF_SIGNED_CERTIFICATE, parse_neo4j_uri)
+from neo4j.exceptions import ClientError
+
+from metadata_service import config
+from metadata_service.entity.dashboard_detail import \
+    DashboardDetail as DashboardDetailEntity
+from metadata_service.entity.dashboard_query import \
+    DashboardQuery as DashboardQueryEntity
+from metadata_service.entity.description import Description
+from metadata_service.entity.tag_detail import TagDetail
+from metadata_service.exception import NotFoundException
+from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.proxy.statsd_utilities import timer_with_counter
+from metadata_service.util import UserResourceRel
+
+_CACHE = CacheManager(**parse_cache_config_options({'cache.type': 'memory'}))
+
+# Expire cache every 11 hours + jitter
+_GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC = 11 * 60 * 60 + randint(0, 3600)
+
+CREATED_EPOCH_MS = 'publisher_created_epoch_ms'
+LAST_UPDATED_EPOCH_MS = 'publisher_last_updated_epoch_ms'
+PUBLISHED_TAG_PROPERTY_NAME = 'published_tag'
+
+LOGGER = logging.getLogger(__name__)
+
+
+def execute_statement(tx: Transaction, stmt: str, params: dict = None) -> List[Record]:
+    """
+    Executes statement against Neo4j. If execution fails, it rollsback and raises exception.
+    """
+    LOGGER.debug('Executing statement: %s with params %s', stmt, params)
+
+    result = tx.run(stmt, parameters=params)
+    return [record for record in result]
+
+
+def get_single_record(records_list: List[Record]) -> Record:
+    """
+    Helper method to get single item from _execute_cypher_query return when only one item is expected.
+    Emulates neo4j's Result.single() behavior.
+    """
+    records_list_length = len(records_list)
+    if records_list_length > 1:
+        LOGGER.warning(f'There are {records_list_length} records in this result but only 1 was expected')
+    try:
+        return records_list[0]
+    except IndexError as e:
+        return None
+
+
+class Neo4jProxy(BaseProxy):
+    """
+    A proxy to Neo4j (Gateway to Neo4j)
+    """
+
+    def __init__(self, *,
+                 host: str,
+                 port: int = 7687,
+                 user: str = 'neo4j',
+                 password: str = '',
+                 num_conns: int = 50,
+                 max_connection_lifetime_sec: int = 100,
+                 encrypted: bool = False,
+                 validate_ssl: bool = False,
+                 database_name: str = neo4j.DEFAULT_DATABASE,
+                 **kwargs: dict) -> None:
+        """
+        There's currently no request timeout from client side where server
+        side can be enforced via "dbms.transaction.timeout"
+        :param endpoint: neo4j endpoint
+        :param num_conns: number of connections
+        :param max_connection_lifetime_sec: max lifetime the connection can have when it comes to reuse. In other
+        words, connection lifetime longer than this value won't be reused and closed on garbage collection. This
+        value needs to be smaller than surrounding network environment's timeout.
+        :param database_name: the neo4j database to be queried if different from the default
+        """
+        endpoint = f'{host}:{port}'
+
+        self._database_name = database_name
+
+        driver_args = {
+            'uri': endpoint,
+            'max_connection_lifetime': max_connection_lifetime_sec,
+            'auth': (user, password),
+            'connection_timeout': 10,
+            'max_connection_pool_size': num_conns,
+        }
+
+        # if URI scheme not secure set `trust`` and `encrypted` arguments for the driver
+        # https://neo4j.com/docs/api/python-driver/current/api.html#uri
+        _, security_type, _ = parse_neo4j_uri(uri=endpoint)
+        if security_type not in [SECURITY_TYPE_SELF_SIGNED_CERTIFICATE, SECURITY_TYPE_SECURE]:
+            trust = neo4j.TRUST_SYSTEM_CA_SIGNED_CERTIFICATES if validate_ssl else neo4j.TRUST_ALL_CERTIFICATES
+            default_security_conf = {'trust': trust, 'encrypted': encrypted}
+            driver_args.update(default_security_conf)
+
+        self._driver = GraphDatabase.driver(**driver_args)
+
+    def get_database_name(self):
+        if self._database_name is None or self._database_name == '':
+            self._database_name = None
+
+            try:
+                query = "SHOW DATABASES"
+                with self._driver.session(database="system") as session:
+                    result = session.run(query)
+                    for record in result:
+                        if record["default"]:
+                            self._database_name = record["name"]
+                            break
+            except Exception as e:
+                LOGGER.exception("Failed to lookup default database from neo4j: ")
+                self._database_name = None
+
+        return self._database_name
+
+    def health(self) -> health_check.HealthCheck:
+        """
+        Runs one or more series of checks on the service. Can also
+        optionally return additional metadata about each check (e.g.
+        latency to database, cpu utilization, etc.).
+        """
+        checks = {}
+        try:
+            # dbms.cluster.overview() is only available for enterprise neo4j users
+            # cluster_overview = self._execute_cypher_query(statement='CALL dbms.cluster.overview()', param_dict={})
+            cluster_overview = self._execute_cypher_query(statement=f"""
+                SHOW DATABASES YIELD name, currentStatus
+                WHERE name = '{self.get_database_name()}' and currentStatus = 'online'
+            """, param_dict={})
+            if cluster_overview is None or len(cluster_overview) == 0:
+                raise Exception(f"Database {self.get_database_name()} is not online!")
+            checks = dict(cluster_overview[0])
+            checks['overview_enabled'] = True
+            status = health_check.OK
+        except ClientError:
+            checks = {'overview_enabled': False}
+            status = health_check.OK  # Can connect to database but plugin is not available
+        except Exception:
+            status = health_check.FAIL
+        final_checks = {f'{type(self).__name__}:connection': checks}
+        return health_check.HealthCheck(status=status, checks=final_checks)
+
+    @timer_with_counter
+    def get_table(self, *, table_uri: str) -> Table:
+        """
+        :param table_uri: Table URI
+        :return:  A Table object
+        """
+        cols, last_neo4j_record = self._exec_col_query(table_uri)
+
+        readers = self._exec_usage_query(table_uri)
+        owners = self._exec_owners_query(table_uri)
+
+        wmk_results, table_writer, table_apps, timestamp_value, tags, sources, \
+            badges, prog_descs, update_frequency, resource_reports = self._exec_table_query(table_uri)
+
+        joins, filters = self._exec_table_query_query(table_uri)
+
+        LOGGER.info(f"sources={sources}")
+
+        table = Table(database=last_neo4j_record['db']['name'],
+                      cluster=last_neo4j_record['clstr']['name'],
+                      schema=last_neo4j_record['schema']['name'],
+                      name=last_neo4j_record['table']['name'],
+                      tags=tags,
+                      badges=badges,
+                      description=self._safe_get(last_neo4j_record, 'tbl_dscrpt', 'description'),
+                      columns=cols,
+                      owners=owners,
+                      table_readers=readers,
+                      watermarks=wmk_results,
+                      table_writer=table_writer,
+                      table_apps=table_apps,
+                      last_updated_timestamp=timestamp_value,
+                      sources=sources,
+                      is_view=self._safe_get(last_neo4j_record, 'table', 'is_view'),
+                      programmatic_descriptions=prog_descs,
+                      update_frequency=update_frequency,
+                      common_joins=joins,
+                      common_filters=filters,
+                      resource_reports=resource_reports
+                      )
+
+        return table
+
+    def _get_col_query_statement(self) -> str:
+        # column_level_query = textwrap.dedent("""
+        #     MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)
+        #     -[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+        #     OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_dscrpt:Description)
+        #     OPTIONAL MATCH (col:Column)-[:STAT]->(stat:Stat)
+        #     OPTIONAL MATCH (col:Column)-[:HAS_BADGE]->(badge:Badge)
+        #     OPTIONAL MATCH (col:Column)-[:TYPE_METADATA]->(Type_Metadata)-[:SUBTYPE *0..]->(tm:Type_Metadata)
+        #     OPTIONAL MATCH (tm:Type_Metadata)-[:DESCRIPTION]->(tm_dscrpt:Description)
+        #     OPTIONAL MATCH (tm:Type_Metadata)-[:HAS_BADGE]->(tm_badge:Badge)
+        #     WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, collect(distinct stat) as col_stats,
+        #     collect(distinct badge) as col_badges,
+        #     {node: tm, description: tm_dscrpt, badges: collect(distinct tm_badge)} as tm_results
+        #     RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_stats, col_badges,
+        #     collect(distinct tm_results) as col_type_metadata
+        #     ORDER BY col.sort_order;
+        # """)
+        column_level_query = textwrap.dedent("""
+            MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table {key: $table_key})-[:COLUMN]->(col:Column)
+            OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+            OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_dscrpt:Description)
+            OPTIONAL MATCH (col:Column)-[:DESCRIPTION]->(col_prog_descriptions:Programmatic_Description)
+            OPTIONAL MATCH (col:Column)-[:STAT]->(stat:Stat)
+            OPTIONAL MATCH (col:Column)-[:HAS_BADGE]->(badge:Badge)
+            OPTIONAL MATCH (col:Column)-[:TYPE_METADATA]->(Type_Metadata)-[:SUBTYPE *0..]->(tm:Type_Metadata)
+            OPTIONAL MATCH (tm:Type_Metadata)-[:DESCRIPTION]->(tm_dscrpt:Description)
+            OPTIONAL MATCH (tm:Type_Metadata)-[:HAS_BADGE]->(tm_badge:Badge)
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, collect(distinct col_prog_descriptions) as col_prog_descriptions,
+                collect(distinct stat) as col_stats,
+                collect(distinct badge) as col_badges,
+                tm, tm_dscrpt, tm_badge
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_prog_descriptions, col_stats, col_badges, tm,
+                tm_dscrpt, collect(distinct tm_badge) as tm_badges
+            WITH db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_prog_descriptions, col_stats, col_badges,
+                collect(distinct {node: tm, description: tm_dscrpt, badges: tm_badges}) as col_type_metadata
+            RETURN db, clstr, schema, table, tbl_dscrpt, col, col_dscrpt, col_prog_descriptions, col_stats, col_badges, col_type_metadata
+            ORDER BY col.sort_order;
+        """)
+        return column_level_query
+
+    @timer_with_counter
+    def _exec_col_query(self, table_uri: str) -> Tuple:
+
+        column_level_query = self._get_col_query_statement()
+        tbl_col_neo4j_records = self._execute_cypher_query(
+            statement=column_level_query, param_dict={'table_key': table_uri})
+
+        cols = []
+        last_neo4j_record = None
+        for tbl_col_neo4j_record in tbl_col_neo4j_records:
+            # Getting last record from this for loop as Neo4j's result's random access is O(n) operation.
+            col_stats = []
+            for stat in tbl_col_neo4j_record['col_stats']:
+                col_stat = Stat(
+                    stat_type=stat['stat_type'],
+                    stat_val=stat['stat_val'],
+                    start_epoch=int(float(stat['start_epoch'])),
+                    end_epoch=int(float(stat['end_epoch']))
+                )
+                col_stats.append(col_stat)
+
+            column_badges = self._make_badges(tbl_col_neo4j_record['col_badges'])
+
+            col_type_metadata = self._get_type_metadata(tbl_col_neo4j_record['col_type_metadata'])
+
+            col_prog_descriptions = self._extract_programmatic_descriptions_from_query(
+                tbl_col_neo4j_record.get('col_prog_descriptions', [])
+            )
+
+            last_neo4j_record = tbl_col_neo4j_record
+            col = Column(name=tbl_col_neo4j_record['col']['name'],
+                        description=self._safe_get(tbl_col_neo4j_record, 'col_dscrpt', 'description'),
+                        programmatic_descriptions=col_prog_descriptions,
+                        col_type=tbl_col_neo4j_record['col']['col_type'],
+                        sort_order=int(tbl_col_neo4j_record['col']['sort_order']),
+                        stats=col_stats,
+                        badges=column_badges,
+                        type_metadata=col_type_metadata)
+
+            cols.append(col)
+
+        if not cols:
+            raise NotFoundException('Table URI( {table_uri} ) does not exist'.format(table_uri=table_uri))
+
+        return sorted(cols, key=lambda item: item.sort_order), last_neo4j_record
+
+    def _get_type_metadata(self, type_metadata_results: List) -> Optional[TypeMetadata]:
+        """
+        Generates a TypeMetadata object for a column. All columns will have at least
+        one associated type metadata node if the ComplexTypeTransformer is configured
+        to transform table metadata. Otherwise, there will be no type metadata found
+        and this will return quickly.
+
+        :param type_metadata_results: A list of type metadata values for a column
+        :return: a TypeMetadata object
+        """
+        # If there are no Type_Metadata nodes, type_metadata_results will have
+        # one object with an empty node value
+        if len(type_metadata_results) > 0 and type_metadata_results[0]['node'] is not None:
+            sorted_type_metadata = sorted(type_metadata_results, key=lambda x: x['node']['key'])
+        else:
+            return None
+
+        type_metadata_nodes: Dict[str, TypeMetadata] = {}
+        type_metadata_children: Dict[str, Dict] = {}
+        for tm in sorted_type_metadata:
+            tm_node = tm['node']
+            description = self._safe_get(tm, 'description', 'description')
+            sort_order = self._safe_get(tm_node, 'sort_order') or 0
+            badges = self._safe_get(tm, 'badges')
+            # kind refers to the general type of the TypeMetadata, such as "array" or "map",
+            # while data_type refers to the entire type such as "array<int>" or "map<string, string>"
+            type_metadata = TypeMetadata(kind=tm_node['kind'], name=tm_node['name'], key=tm_node['key'],
+                                         description=description, data_type=tm_node['data_type'],
+                                         sort_order=sort_order, badges=self._make_badges(badges) if badges else [])
+
+            # type_metadata_nodes maps each type metadata path to its corresponding TypeMetadata object
+            tm_key_regex = re.compile(
+                r'(?P<db>\w+):\/\/(?P<cluster>\w+)\.(?P<schema>\w+)\/(?P<table>\w+)\/(?P<col>\w+)\/type\/(?P<tm_path>.*)'
+            )
+            tm_key_match = tm_key_regex.search(type_metadata.key)
+            if tm_key_match is None:
+                LOGGER.error(f'Could not retrieve the type metadata path from key {type_metadata.key}')
+                continue
+            tm_path = tm_key_match.group('tm_path')
+            type_metadata_nodes[tm_path] = type_metadata
+
+            # type_metadata_children is a nested dict where each type metadata node name
+            # maps to a dict of its children's names
+            split_key_list = tm_path.split('/')
+            tm_name = split_key_list.pop()
+            node_children = self._safe_get(type_metadata_children, *split_key_list)
+            if node_children is not None:
+                node_children[tm_name] = {}
+            else:
+                LOGGER.error(f'Could not construct the dict of children for type metadata key {type_metadata.key}')
+
+        # Iterate over the temporary children dict to create the proper TypeMetadata structure
+        result = self._build_type_metadata_structure('', type_metadata_children, type_metadata_nodes)
+        return result[0] if len(result) > 0 else None
+
+    def _build_type_metadata_structure(self, prev_path: str, tm_children: Dict, tm_nodes: Dict) -> List[TypeMetadata]:
+        type_metadata = []
+        for node_name, children in tm_children.items():
+            curr_path = f'{prev_path}/{node_name}' if prev_path else node_name
+            tm = tm_nodes.get(curr_path)
+            if tm is None:
+                LOGGER.error(f'Could not find expected type metadata object at type metadata path {curr_path}')
+                continue
+            if len(children) > 0:
+                tm.children = self._build_type_metadata_structure(curr_path, children, tm_nodes)
+            type_metadata.append(tm)
+
+        if len(type_metadata) > 1:
+            type_metadata.sort(key=lambda x: x.sort_order)
+
+        return type_metadata
+
+    def _get_usage_query_statement(self) -> str:
+        # usage_query = textwrap.dedent("""
+        #     MATCH (user:User)-[read:READ]->(table:Table {key: $table_key})
+        #     RETURN user.email as email, read.read_count as read_count, table.name as table_name
+        #     ORDER BY read.read_count DESC LIMIT 5;
+        # """)
+        usage_query = textwrap.dedent("""
+            MATCH (user:User)-[read:READ]->(table:Table {key: $table_key})
+            WITH user.email as email, read.read_count as read_count, table.name as table_name
+            ORDER BY read_count DESC
+            LIMIT 5
+            RETURN email, read_count, table_name;
+        """)
+        return usage_query
+
+    @timer_with_counter
+    def _exec_usage_query(self, table_uri: str) -> List[Reader]:
+
+        usage_query = self._get_usage_query_statement()
+        usage_neo4j_records = self._execute_cypher_query(statement=usage_query,
+                                                         param_dict={'table_key': table_uri})
+        readers = []  # type: List[Reader]
+        for usage_neo4j_record in usage_neo4j_records:
+            reader_data = self._get_user_details(user_id=usage_neo4j_record['email'])
+            reader = Reader(user=self._build_user_from_record(record=reader_data),
+                            read_count=usage_neo4j_record['read_count'])
+            readers.append(reader)
+
+        return readers
+
+    def _get_table_query_statement(self) -> str:
+        # table_level_query = textwrap.dedent("""\
+        #     MATCH (table:Table {key: $table_key})
+        #     OPTIONAL MATCH (wmk:Watermark)-[:BELONG_TO_TABLE]->(table)
+        #     OPTIONAL MATCH (app_producer:Application)-[:GENERATES]->(table)
+        #     OPTIONAL MATCH (app_consumer:Application)-[:CONSUMES]->(table)
+        #     OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(t:Timestamp)
+        #     OPTIONAL MATCH (owner:User)<-[:OWNER]-(table)
+        #     OPTIONAL MATCH (table)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
+        #     OPTIONAL MATCH (table)-[:HAS_BADGE]->(badge:Badge)
+        #     OPTIONAL MATCH (table)-[:SOURCE]->(src:Source)
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
+        #     OPTIONAL MATCH (table)-[:UPDATE_FREQUENCY]->(update_frequency:Update_Frequency)
+        #     OPTIONAL MATCH (table)-[:HAS_REPORT]->(resource_reports:Report)
+        #     RETURN collect(distinct wmk) as wmk_records,
+        #     collect(distinct app_producer) as producing_apps,
+        #     collect(distinct app_consumer) as consuming_apps,
+        #     t.last_updated_timestamp as last_updated_timestamp,
+        #     collect(distinct owner) as owner_records,
+        #     collect(distinct tag) as tag_records,
+        #     collect(distinct badge) as badge_records,
+        #     collect(distinct src) as sources,
+        #     collect(distinct prog_descriptions) as prog_descriptions,
+        #     update_frequency.frequency as update_frequency,
+        #     collect(distinct resource_reports) as resource_reports
+        # """)
+        table_level_query = textwrap.dedent("""
+            MATCH (table:Table {key: $table_key})
+            OPTIONAL MATCH (wmk:Watermark)-[:BELONG_TO_TABLE]->(table)
+            OPTIONAL MATCH (app_producer:Application)-[:GENERATES]->(table)
+            OPTIONAL MATCH (app_consumer:Application)-[:CONSUMES]->(table)
+            OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(t:Timestamp)
+            OPTIONAL MATCH (owner:User)<-[:OWNER]-(table)
+            OPTIONAL MATCH (table)-[:TAGGED_BY]->(tag:Tag {tag_type: $tag_normal_type})
+            OPTIONAL MATCH (table)-[:HAS_BADGE]->(badge:Badge)
+            OPTIONAL MATCH (table)-[:SOURCE]->(src:Source)
+            OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
+            OPTIONAL MATCH (table)-[:UPDATE_FREQUENCY]->(update_frequency:Update_Frequency)
+            OPTIONAL MATCH (table)-[:HAS_REPORT]->(resource_reports:Report)
+            WITH table, t, update_frequency,
+                collect(distinct wmk) as wmk_records,
+                collect(distinct app_producer) as producing_apps,
+                collect(distinct app_consumer) as consuming_apps,
+                collect(distinct owner) as owner_records,
+                collect(distinct tag) as tag_records,
+                collect(distinct badge) as badge_records,
+                collect(distinct src) as sources,
+                collect(distinct prog_descriptions) as prog_descriptions,
+                collect(distinct resource_reports) as resource_reports
+            RETURN wmk_records,
+                producing_apps,
+                consuming_apps,
+                t.last_updated_timestamp as last_updated_timestamp,
+                owner_records,
+                tag_records,
+                badge_records,
+                sources,
+                prog_descriptions,
+                update_frequency.frequency as update_frequency,
+                resource_reports;
+        """)
+        return table_level_query
+
+    def _get_owners_query_statement(self) -> str:
+        # owners_query = textwrap.dedent("""\
+        #     MATCH (owner:User)<-[:OWNER]-(tbl:Table {key: $tbl_key})
+        #     RETURN collect(distinct owner) as owner_records
+        # """)
+        owners_query = textwrap.dedent("""\
+            MATCH (owner:User)<-[:OWNER]-(tbl:Table {key: $tbl_key})
+            WITH collect(distinct owner) as owner_records
+            RETURN owner_records;
+        """)
+        return owners_query
+
+
+    @timer_with_counter
+    def _exec_owners_query(self, table_uri: str) -> List[User]:
+        owners_query = self._get_owners_query_statement();
+        owners_neo4j_records = self._execute_cypher_query(statement=owners_query,
+                                                          param_dict={'tbl_key': table_uri})
+
+        owners_neo4j_records = get_single_record(owners_neo4j_records)
+
+        owners = []  # type: List[User]
+        for owner_neo4j_record in owners_neo4j_records.get('owner_records', []):
+            owner_data = self._get_user_details(user_id=owner_neo4j_record['email'])
+            owner = self._build_user_from_record(record=owner_data)
+            owners.append(owner)
+
+        return owners
+
+    @timer_with_counter
+    def _exec_table_query(self, table_uri: str) -> Tuple:
+        """
+        Queries one Cypher record with watermark list, Application,
+        ,timestamp, and tag records.
+        """
+
+        table_level_query = self._get_table_query_statement()
+        table_records = self._execute_cypher_query(statement=table_level_query,
+                                                   param_dict={'table_key': table_uri,
+                                                               'tag_normal_type': 'default'})
+
+        table_records = get_single_record(table_records)
+
+        wmk_results = []
+        wmk_records = table_records['wmk_records']
+        for record in wmk_records:
+            if record['key'] is not None:
+                watermark_type = record['key'].split('/')[-2]
+                wmk_result = Watermark(watermark_type=watermark_type,
+                                       partition_key=record['partition_key'],
+                                       partition_value=record['partition_value'],
+                                       create_time=record['create_time'])
+                wmk_results.append(wmk_result)
+
+        tags = []
+        if table_records.get('tag_records'):
+            tag_records = table_records['tag_records']
+            for record in tag_records:
+                tag_result = Tag(tag_name=record['key'],
+                                 tag_type=record['tag_type'])
+                tags.append(tag_result)
+
+        # this is for any badges added with BadgeAPI instead of TagAPI
+        badges = self._make_badges(table_records.get('badge_records'))
+
+        table_writer, table_apps = self._create_apps(table_records['producing_apps'], table_records['consuming_apps'])
+
+        timestamp_value = table_records['last_updated_timestamp']
+
+        # The owners seem to have been replaced by a separate query.  I left the owners in this query,
+        # but we are not extracting it here.
+
+        # owner_record = []
+
+        # for owner in table_records.get('owner_records', []):
+        #     owner_data = self._get_user_details(user_id=owner['email'])
+        #     owner_record.append(self._build_user_from_record(record=owner_data))
+
+        sources = []
+        if table_records['sources']:
+            for record in table_records['sources']:
+                src = Source(source_type=record['source_type'],
+                            source=record['source'])
+                sources.append(src)
+
+        prog_descriptions = self._extract_programmatic_descriptions_from_query(
+            table_records.get('prog_descriptions', [])
+        )
+
+        update_frequency = table_records['update_frequency']
+
+        resource_reports = self._extract_resource_reports_from_query(table_records.get('resource_reports', []))
+
+        # This owners seem to have been replaced by a separate query.  I left the owners in this query,
+        # but we are not extracting it here.
+
+        # return wmk_results, table_writer, table_apps, timestamp_value, owner_record,\
+        #     tags, sources, badges, prog_descriptions, resource_reports
+
+        return wmk_results, table_writer, table_apps, timestamp_value,\
+            tags, sources, badges, prog_descriptions, update_frequency, resource_reports
+
+    def _get_table_query_query_statement(self) -> str:
+        # table_query_level_query = textwrap.dedent("""
+        #     MATCH (table:Table {key: $table_key})
+        #     OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
+        #     OPTIONAL MATCH (j)-[JOIN_OF_COLUMN]->(col2:Column)
+        #     OPTIONAL MATCH (j)-[JOIN_OF_QUERY]->(jq:Query)-[:HAS_EXECUTION]->(exec:Execution)
+        #     WITH table, j, col, col2,
+        #         sum(coalesce(exec.execution_count, 0)) as join_exec_cnt
+        #     ORDER BY join_exec_cnt desc
+        #     LIMIT 5
+        #     WITH table,
+        #         COLLECT(DISTINCT {
+        #         join: {
+        #             joined_on_table: {
+        #                 database: case when j.left_table_key = $table_key
+        #                         then j.right_database
+        #                         else j.left_database
+        #                         end,
+        #                 cluster: case when j.left_table_key = $table_key
+        #                         then j.right_cluster
+        #                         else j.left_cluster
+        #                         end,
+        #                 schema: case when j.left_table_key = $table_key
+        #                         then j.right_schema
+        #                         else j.left_schema
+        #                         end,
+        #                 name: case when j.left_table_key = $table_key
+        #                     then j.right_table
+        #                     else j.left_table
+        #                     end
+        #             },
+        #             joined_on_column: col2.name,
+        #             column: col.name,
+        #             join_type: j.join_type,
+        #             join_sql: j.join_sql
+        #         },
+        #         join_exec_cnt: join_exec_cnt
+        #     }) as joins
+        #     WITH table, joins
+        #     OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[USES_WHERE_CLAUSE]->(whr:Where)
+        #     OPTIONAL MATCH (whr)-[WHERE_CLAUSE_OF]->(wq:Query)-[:HAS_EXECUTION]->(whrexec:Execution)
+        #     WITH table, joins,
+        #         whr, sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
+        #     ORDER BY where_exec_cnt desc
+        #     LIMIT 5
+        #     RETURN table, joins,
+        #     COLLECT(DISTINCT {
+        #         where_clause: whr.where_clause,
+        #         where_exec_cnt: where_exec_cnt
+        #     }) as filters
+        # """)
+        table_query_level_query = textwrap.dedent("""
+            MATCH (table:Table {key: $table_key})
+            OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
+            OPTIONAL MATCH (j)-[JOIN_OF_COLUMN]->(col2:Column)
+            OPTIONAL MATCH (j)-[JOIN_OF_QUERY]->(jq:Query)-[:HAS_EXECUTION]->(exec:Execution)
+            WITH table, j, col, col2,
+                sum(coalesce(exec.execution_count, 0)) as join_exec_cnt
+            ORDER BY join_exec_cnt DESC
+            LIMIT 5
+            WITH table,
+                collect(distinct {
+                    join: {
+                        joined_on_table: {
+                            database: case when j.left_table_key = $table_key then j.right_database else j.left_database end,
+                            cluster: case when j.left_table_key = $table_key then j.right_cluster else j.left_cluster end,
+                            schema: case when j.left_table_key = $table_key then j.right_schema else j.left_schema end,
+                            name: case when j.left_table_key = $table_key then j.right_table else j.left_table end
+                        },
+                        joined_on_column: col2.name,
+                        column: col.name,
+                        join_type: j.join_type,
+                        join_sql: j.join_sql
+                    },
+                    join_exec_cnt: join_exec_cnt
+                }) as joins
+            WITH table, joins
+            OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[USES_WHERE_CLAUSE]->(whr:Where)
+            OPTIONAL MATCH (whr)-[WHERE_CLAUSE_OF]->(wq:Query)-[:HAS_EXECUTION]->(whrexec:Execution)
+            WITH table, joins, whr,
+                sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
+            ORDER BY where_exec_cnt DESC
+            LIMIT 5
+            RETURN table, joins,
+                collect(distinct {
+                    where_clause: whr.where_clause,
+                    where_exec_cnt: where_exec_cnt
+                }) as filters;
+        """)
+        return table_query_level_query
+
+    @timer_with_counter
+    def _exec_table_query_query(self, table_uri: str) -> Tuple:
+        """
+        Queries one Cypher record with results that contain information about queries
+        and entities (e.g. joins, where clauses, etc.) associated to queries that are executed
+        on the table.
+        """
+
+        table_query_level_query = self._get_table_query_query_statement()
+        query_records = self._execute_cypher_query(statement=table_query_level_query, param_dict={'table_key': table_uri})
+
+        table_query_records = get_single_record(query_records)
+
+        joins = self._extract_joins_from_query(table_query_records.get('joins', [{}]))
+        filters = self._extract_filters_from_query(table_query_records.get('filters', [{}]))
+
+        return joins, filters
+
+    def _extract_programmatic_descriptions_from_query(self, raw_prog_descriptions: dict) -> list:
+        prog_descriptions = []
+        for prog_description in raw_prog_descriptions:
+            source = prog_description['description_source']
+            if source is None:
+                LOGGER.error("A programmatic description with no source was found... skipping.")
+            else:
+                prog_descriptions.append(ProgrammaticDescription(source=source, text=prog_description['description']))
+        prog_descriptions.sort(key=lambda x: x.source)
+        return prog_descriptions
+
+    def _extract_resource_reports_from_query(self, raw_resource_reports: dict) -> list:
+        resource_reports = []
+        for resource_report in raw_resource_reports:
+            name = resource_report.get('name')
+            if name is None:
+                LOGGER.error("A report with no name found... skipping.")
+            else:
+                resource_reports.append(ResourceReport(name=name, url=resource_report['url']))
+
+        parsed_reports = current_app.config['RESOURCE_REPORT_CLIENT'](resource_reports) \
+            if current_app.config['RESOURCE_REPORT_CLIENT'] else resource_reports
+
+        parsed_reports.sort(key=lambda x: x.name)
+
+        return parsed_reports
+
+    def _extract_joins_from_query(self, joins: List[Dict]) -> List[Dict]:
+        valid_joins = []
+        for join in joins:
+            join_data = join['join']
+            if all(join_data.values()):
+                new_sql_join = SqlJoin(join_sql=join_data['join_sql'],
+                                       join_type=join_data['join_type'],
+                                       joined_on_column=join_data['joined_on_column'],
+                                       joined_on_table=TableSummary(**join_data['joined_on_table']),
+                                       column=join_data['column'])
+                valid_joins.append(new_sql_join)
+        return valid_joins
+
+    def _extract_filters_from_query(self, filters: List[Dict]) -> List[Dict]:
+        return_filters = []
+        for filt in filters:
+            filter_where = filt.get('where_clause')
+            if filter_where:
+                return_filters.append(SqlWhere(where_clause=filter_where))
+        return return_filters
+
+    @no_type_check
+    def _safe_get(self, dct, *keys):
+        """
+        Helper method for getting value from nested dict. This also works either key does not exist or value is None.
+        :param dct:
+        :param keys:
+        :return:
+        """
+        for key in keys:
+            dct = dct.get(key)
+            if dct is None:
+                return None
+        return dct
+
+    @timer_with_counter
+    def _execute_cypher_query(self, *,
+                              statement: str,
+                              param_dict: Dict[str, Any]) -> List[Record]:
+        """
+        Execute Cypher queries using managed read transactions
+        """
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug('Executing Cypher query: {statement} with params {params}: '.format(statement=statement,
+                                                                                             params=param_dict))
+        start = time.time()
+        try:
+            with self._driver.session(database=self.get_database_name()) as session:
+                return session.read_transaction(execute_statement, statement, param_dict)
+
+        finally:
+            # TODO: Add support on statsd
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Cypher query execution elapsed for {} seconds'.format(time.time() - start))
+
+    # noinspection PyMethodMayBeStatic
+    def _make_badges(self, badges: Iterable) -> List[Badge]:
+        """
+        Generates a list of Badges objects
+
+        :param badges: A list of badges of a table, column, or type_metadata
+        :return: a list of Badge objects
+        """
+        _badges = []
+        for badge in badges:
+            _badges.append(Badge(badge_name=badge["key"], category=badge["category"]))
+        return _badges
+
+    def _get_description_query_statement(self, resource_type: ResourceType) -> str:
+        # description_query = textwrap.dedent("""
+        #     MATCH ({node_name}:{node_label} {{key: $key}})-[:DESCRIPTION]->(d:Description)
+        #     RETURN d.description AS description;
+        # """.format(node_name=resource_type.name.lower(), node_label=resource_type.name))
+        description_query = textwrap.dedent("""
+            MATCH ({node_name}:{node_label} {{key: $key}})-[:DESCRIPTION]->(d:Description)
+            RETURN d.description AS description;
+        """.format(node_name=resource_type.name.lower(), node_label=resource_type.name))
+        return description_query
+
+    @timer_with_counter
+    def get_resource_description(self, *,
+                                 resource_type: ResourceType,
+                                 uri: str) -> Description:
+        """
+        Get the resource description based on the uri. Any exception will propagate back to api server.
+
+        :param resource_type:
+        :param id:
+        :return:
+        """
+
+        description_query = self._get_description_query_statement(resource_type=resource_type)
+
+        result = self._execute_cypher_query(statement=description_query,
+                                            param_dict={'key': uri})
+
+        result = get_single_record(result)
+        return Description(description=result['description'] if result else None)
+
+    @timer_with_counter
+    def get_table_description(self, *,
+                              table_uri: str) -> Union[str, None]:
+        """
+        Get the table description based on table uri. Any exception will propagate back to api server.
+
+        :param table_uri:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.Table, uri=table_uri).description
+
+    @timer_with_counter
+    def get_type_metadata_description(self, *,
+                                      type_metadata_key: str) -> Union[str, None]:
+        """
+        Get the type_metadata description based on its key. Any exception will propagate back to api server.
+
+        :param type_metadata_key:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.Type_Metadata,
+                                             uri=type_metadata_key).description
+
+    @timer_with_counter
+    def put_resource_description(self, *,
+                                 resource_type: ResourceType,
+                                 uri: str,
+                                 description: str) -> None:
+        """
+        Update resource description with one from user
+        :param uri: Resource uri (key in Neo4j)
+        :param description: new value for resource description
+        """
+        # start neo4j transaction
+        desc_key = uri + '/_description'
+
+        current_time_milliseconds = int(time.time() * 1000)
+        published_tag = "edited"
+
+        upsert_desc_query = textwrap.dedent("""
+        MERGE (u:Description {key: toLower($desc_key)})
+        on CREATE SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        """)
+
+        upsert_desc_tab_relation_query = textwrap.dedent("""
+        MATCH (n1:Description {{key: toLower($desc_key)}}), (n2:{node_label} {{key: toLower($desc_key)}})
+        MERGE (n2)-[r1:DESCRIPTION]->(n1)
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r1.published_tag = $published_tag
+        MERGE (n1)-[r2:DESCRIPTION_OF]->(n2)
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r2.published_tag = $published_tag
+        RETURN n1.key, n2.key
+        """.format(node_label=resource_type.name))
+
+        start = time.time()
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            tx.run(upsert_desc_query, {
+                'description': description,
+                'desc_key': desc_key,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            result = tx.run(upsert_desc_tab_relation_query, {
+                'desc_key': desc_key,
+                'key': uri,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            if not result.single():
+                raise NotFoundException(f'Failed to update the description as resource {uri} does not exist')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+            LOGGER.exception('Failed to execute update process')
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate exception back to api
+            raise e
+
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def put_table_description(self, *,
+                              table_uri: str,
+                              description: str) -> None:
+        """
+        Update table description with one from user
+        :param table_uri: Table uri (key in Neo4j)
+        :param description: new value for table description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.Table,
+                                      uri=table_uri,
+                                      description=description)
+
+    @timer_with_counter
+    def put_table_update_frequency(self, *,
+                                   table_uri: str,
+                                   frequency: str) -> None:
+        """
+        Update table update frequency with one from user
+        :param table_uri: Table uri (key in Neo4j)
+        :param frequency: new value for table update frequency
+        """
+        # start neo4j transaction
+        uf_key = table_uri + '/updatefrequency'
+
+        current_time_milliseconds = int(time.time() * 1000)
+        published_tag = "edited"
+
+        upsert_update_frequency_query = textwrap.dedent("""
+        MERGE (u:Update_Frequency {key: toLower($uf_key)})
+        on CREATE SET u={frequency: $frequency, key: toLower($uf_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={frequency: $frequency, key: toLower($uf_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        """)
+
+        upsert_update_frequency_table_relation_query = textwrap.dedent("""
+        MATCH (n1:Update_Frequency {key: toLower($uf_key)}), (n2:Table {key: toLower($table_key)})
+        MERGE (n2)-[r1:UPDATE_FREQUENCY]->(n1)
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r1.published_tag = $published_tag
+        MERGE (n1)-[r2:UPDATE_FREQUENCY_OF]->(n2)
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r2.published_tag = $published_tag
+        RETURN n1.key, n2.key
+        """)
+
+        start = time.time()
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            tx.run(upsert_update_frequency_query, {
+                'frequency': frequency,
+                'uf_key': uf_key,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            result = tx.run(upsert_update_frequency_table_relation_query, {
+                'uf_key': uf_key,
+                'table_key': table_uri,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            if not result.single():
+                raise NotFoundException(f'Failed to update the update frequency of table {table_uri} does not exist')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+            LOGGER.exception('Failed to execute update process')
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate exception back to api
+            raise e
+
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def delete_table_update_frequency(self, *,
+                                      table_uri: str) -> None:
+        """
+        Delete table update frequency with one from user
+        :param table_uri: Table uri (key in Neo4j)
+        """
+        # start neo4j transaction
+        uf_key = table_uri + '/updatefrequency'
+
+        delete_update_frequency_query = textwrap.dedent("""
+        MATCH (u:Update_Frequency {key: $uf_key})
+        DETACH DELETE u
+        RETURN u
+        """)
+
+        start = time.time()
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_update_frequency_query, {'uf_key': uf_key})
+
+            if not result.single():
+                raise NotFoundException(f'Failed to delete the update frequency of table {table_uri} does not exist')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+            LOGGER.exception('Failed to execute update process')
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate exception back to api
+            raise e
+
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def put_type_metadata_description(self, *,
+                                      type_metadata_key: str,
+                                      description: str) -> None:
+        """
+        Update type_metadata description with one from user
+        :param type_metadata_key:
+        :param description:
+        """
+
+        self.put_resource_description(resource_type=ResourceType.Type_Metadata,
+                                      uri=type_metadata_key,
+                                      description=description)
+
+    def _get_column_description_query_statement(self) -> str:
+        # column_description_query = textwrap.dedent("""
+        #     MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+        #     RETURN d.description AS description;
+        # """)
+        column_description_query = textwrap.dedent("""
+            MATCH (table:Table {key: $table_key})-[:COLUMN]->(c:Column {name: $column_name})-[:DESCRIPTION]->(d:Description)
+            RETURN d.description AS description;
+        """)
+        return column_description_query
+
+    @timer_with_counter
+    def get_column_description(self, *,
+                               table_uri: str,
+                               column_name: str) -> Union[str, None]:
+        """
+        Get the column description based on table uri. Any exception will propagate back to api server.
+
+        :param table_uri:
+        :param column_name:
+        :return:
+        """
+        column_description_query = self._get_column_description_query_statement()
+        result = self._execute_cypher_query(statement=column_description_query,
+                                            param_dict={'table_key': table_uri, 'column_name': column_name})
+
+        column_descrpt = get_single_record(result)
+
+        column_description = column_descrpt['description'] if column_descrpt else None
+
+        return column_description
+
+    @timer_with_counter
+    def put_column_description(self, *,
+                               table_uri: str,
+                               column_name: str,
+                               description: str) -> None:
+        """
+        Update column description with input from user
+        :param table_uri:
+        :param column_name:
+        :param description:
+        :return:
+        """
+
+        column_uri = table_uri + '/' + column_name  # type: str
+        desc_key = column_uri + '/_description'
+
+        current_time_milliseconds = int(time.time() * 1000)
+        published_tag = "edited"
+
+        upsert_desc_query = textwrap.dedent("""
+            MERGE (u:Description {key: toLower($desc_key)})
+            on CREATE SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+            on MATCH SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+            """)
+
+        upsert_desc_col_relation_query = textwrap.dedent("""
+            MATCH (n1:Description {key: toLower($desc_key)}), (n2:Column {key: toLower($column_key)})
+            MERGE (n2)-[r1:DESCRIPTION]->(n1)
+            SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+            SET r1.published_tag = $published_tag
+            MERGE (n1)-[r2:DESCRIPTION_OF]->(n2)
+            SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+            SET r2.published_tag = $published_tag
+            RETURN n1.key, n2.key
+            """)
+
+        start = time.time()
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            tx.run(upsert_desc_query, {
+                'description': description,
+                'desc_key': desc_key,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            result = tx.run(upsert_desc_col_relation_query, {
+                'desc_key': desc_key,
+                'column_key': column_uri,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            if not result.single():
+                raise NotFoundException(f'Failed to update the table {table_uri} column '
+                                        f'{column_uri} description as either table or column does not exist')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+
+            LOGGER.exception('Failed to execute update process')
+
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate error to api
+            raise e
+
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def add_owner(self, *,
+                  table_uri: str,
+                  owner: str) -> None:
+        """
+        Update table owner informations.
+        1. Do a create if not exists query of the owner(user) node.
+        2. Do a upsert of the owner/owned_by relation.
+        :param table_uri:
+        :param owner:
+        :return:
+        """
+
+        self.add_resource_owner(uri=table_uri,
+                                resource_type=ResourceType.Table,
+                                owner=owner)
+
+    @timer_with_counter
+    def add_resource_owner(self, *,
+                           uri: str,
+                           resource_type: ResourceType,
+                           owner: str) -> None:
+        """
+        Update table owner informations.
+        1. Do a create if not exists query of the owner(user) node.
+        2. Do a upsert of the owner/owned_by relation.
+
+        :param table_uri:
+        :param owner:
+        :return:
+        """
+
+        current_time_milliseconds = int(time.time() * 1000)
+        published_tag = "edited"
+
+        create_owner_query = textwrap.dedent("""
+        MERGE (u:User {key: toLower($user_email)})
+        on CREATE SET u={email: $user_email, key: toLower($user_email), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        """)
+
+        upsert_owner_relation_query = textwrap.dedent("""
+        MATCH (n1:User {{key: toLower($user_email)}}), (n2:{resource_type} {{key: toLower($res_key)}})
+        MERGE (n1)-[r1:OWNER_OF]->(n2)-[r2:OWNER]->(n1)
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r1.published_tag = $published_tag
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r2.published_tag = $published_tag
+        RETURN n1.key, n2.key
+        """.format(resource_type=resource_type.name))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            # upsert the node
+            tx.run(create_owner_query, {
+                'user_email': owner,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            result = tx.run(upsert_owner_relation_query, {
+                'user_email': owner,
+                'res_key': uri,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            if not result.single():
+                raise RuntimeError('Failed to create relation between '
+                                   'owner {owner} and resource {uri}'.format(owner=owner,
+                                                                             uri=uri))
+            tx.commit()
+        except Exception as e:
+            if not tx.closed():
+                tx.rollback()
+            # propagate the exception back to api
+            raise e
+
+    @timer_with_counter
+    def delete_owner(self, *,
+                     table_uri: str,
+                     owner: str) -> None:
+        """
+        Delete the owner / owned_by relationship.
+        :param table_uri:
+        :param owner:
+        :return:
+        """
+        self.delete_resource_owner(uri=table_uri,
+                                   resource_type=ResourceType.Table,
+                                   owner=owner)
+
+    @timer_with_counter
+    def delete_resource_owner(self, *,
+                              uri: str,
+                              resource_type: ResourceType,
+                              owner: str) -> None:
+        """
+        Delete the owner / owned_by relationship.
+        :param table_uri:
+        :param owner:
+        :return:
+        """
+        delete_query = textwrap.dedent("""
+        MATCH (n1:User{{key: $user_email}}), (n2:{resource_type} {{key: $res_key}})
+        OPTIONAL MATCH (n1)-[r1:OWNER_OF]->(n2)
+        OPTIONAL MATCH (n2)-[r2:OWNER]->(n1)
+        DELETE r1,r2
+        """.format(resource_type=resource_type.name))
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            tx.run(delete_query, {'user_email': owner,
+                                  'res_key': uri})
+        except Exception as e:
+            # propagate the exception back to api
+            if not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            tx.commit()
+
+    @timer_with_counter
+    def add_badge(self, *,
+                  id: str,
+                  badge_name: str,
+                  category: str = '',
+                  resource_type: ResourceType) -> None:
+
+        LOGGER.info('New badge {} for id {} with category {} '
+                    'and resource type {}'.format(badge_name, id, category, resource_type.name))
+
+        current_time_milliseconds = int(time.time() * 1000)
+        published_tag = "edited"
+
+        validation_query = \
+            'MATCH (n:{resource_type} {{key: $key}}) return n'.format(resource_type=resource_type.name)
+
+        upsert_badge_query = textwrap.dedent("""
+        MERGE (u:Badge {key: $badge_name})
+        on CREATE SET u={key: $badge_name, category: $category, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={key: $badge_name, category: $category, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        """)
+
+        upsert_badge_relation_query = textwrap.dedent("""
+        MATCH(n1:Badge {{key: $badge_name, category: $category}}),
+        (n2:{resource_type} {{key: toLower($key)}})
+        MERGE (n1)-[r1:BADGE_FOR]->(n2)-[r2:HAS_BADGE]->(n1)
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r1.published_tag = $published_tag
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r2.published_tag = $published_tag
+        RETURN n1.key, n2.key
+        """.format(resource_type=resource_type.name))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            tbl_result = tx.run(validation_query, {'key': id})
+
+            if not tbl_result.single():
+                raise NotFoundException('id {} does not exist'.format(id))
+
+            tx.run(upsert_badge_query, {
+                'badge_name': badge_name,
+                'category': category,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            result = tx.run(upsert_badge_relation_query, {
+                'badge_name': badge_name,
+                'key': id,
+                'category': category,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            if not result.single():
+                raise RuntimeError('failed to create relation between '
+                                   'badge {badge} and resource {resource} of resource type '
+                                   '{resource_type} MORE {q}'.format(badge=badge_name,
+                                                                     resource=id,
+                                                                     resource_type=resource_type,
+                                                                     q=upsert_badge_relation_query))
+            tx.commit()
+        except Exception as e:
+            LOGGER.error(e)
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    @timer_with_counter
+    def delete_badge(self, id: str,
+                     badge_name: str,
+                     category: str,
+                     resource_type: ResourceType) -> None:
+
+        # TODO for some reason when deleting it will say it was successful
+        # even when the badge never existed to begin with
+        LOGGER.info('Delete badge {} for id {} with category {}'.format(badge_name, id, category))
+
+        # only deletes relationshop between badge and resource
+        delete_query = textwrap.dedent("""
+        MATCH (b:Badge {{key:$badge_name, category:$category}})-[r1:BADGE_FOR]->(n:{resource_type} {{key: $key}})-[r2:HAS_BADGE]->(b)
+        DELETE r1,r2
+        """.format(resource_type=resource_type.name))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            tx.run(delete_query, {'badge_name': badge_name,
+                                  'key': id,
+                                  'category': category})
+            tx.commit()
+        except Exception as e:
+            # propagate the exception back to api
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    def _get_badge_query_statement(self) -> str:
+        query = textwrap.dedent("""
+            MATCH (badge:Badge) RETURN badge;
+        """)
+        return query
+
+    @timer_with_counter
+    def get_badges(self) -> List:
+        query = self._get_badge_query_statement()
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={})
+        results = []
+        for record in records:
+            results.append(Badge(badge_name=record['badge']['key'],
+                                 category=record['badge']['category']))
+
+        return results
+
+    @timer_with_counter
+    def add_tag(self, *,
+                id: str,
+                tag: str,
+                tag_type: str = 'default',
+                resource_type: ResourceType = ResourceType.Table) -> None:
+        """
+        Add new tag
+        1. Create the node with type Tag if the node doesn't exist.
+        2. Create the relation between tag and table if the relation doesn't exist.
+
+        :param id:
+        :param tag:
+        :param tag_type:
+        :param resource_type:
+        :return: None
+        """
+        LOGGER.info('New tag {} for id {} with type {} and resource type {}'.format(tag, id, tag_type,
+                                                                                    resource_type.name))
+
+        current_time_milliseconds = int(time.time() * 1000)
+        published_tag = "edited"
+
+        validation_query = \
+            'MATCH (n:{resource_type} {{key: $key}}) return n'.format(resource_type=resource_type.name)
+
+        upsert_tag_query = textwrap.dedent("""
+        MERGE (u:Tag {key: $tag})
+        on CREATE SET u={tag_type: $tag_type, key: $tag, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={tag_type: $tag_type, key: $tag, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        """)
+
+        upsert_tag_relation_query = textwrap.dedent("""
+        MATCH (n1:Tag {{key: $tag, tag_type: $tag_type}}), (n2:{resource_type} {{key: toLower($key)}})
+        MERGE (n1)-[r1:TAG]->(n2)-[r2:TAGGED_BY]->(n1)
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r1.published_tag = $published_tag
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r2.published_tag = $published_tag
+        RETURN n1.key, n2.key
+        """.format(resource_type=resource_type.name))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            tbl_result = tx.run(validation_query, {'key': id})
+            if not tbl_result.single():
+                raise NotFoundException('id {} does not exist'.format(id))
+
+            # upsert the node
+            tx.run(upsert_tag_query, {
+                'tag': tag,
+                'tag_type': tag_type,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            result = tx.run(upsert_tag_relation_query, {
+                'tag': tag,
+                'key': id,
+                'tag_type': tag_type,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag})
+
+            if not result.single():
+                raise RuntimeError('Failed to create relation between '
+                                   'tag {tag} and resource {resource} of resource type: {resource_type}'
+                                   .format(tag=tag,
+                                           resource=id,
+                                           resource_type=resource_type.name))
+            tx.commit()
+        except Exception as e:
+            if not tx.closed():
+                tx.rollback()
+            # propagate the exception back to api
+            raise e
+
+    @timer_with_counter
+    def delete_tag(self, *,
+                   id: str,
+                   tag: str,
+                   tag_type: str = 'default',
+                   resource_type: ResourceType = ResourceType.Table) -> None:
+        """
+        Deletes tag
+        1. Delete the relation between resource and the tag
+        2. todo(Tao): need to think about whether we should delete the tag if it is an orphan tag.
+
+        :param id:
+        :param tag:
+        :param tag_type: {default-> normal tag, badge->non writable tag from UI}
+        :param resource_type:
+        :return:
+        """
+
+        LOGGER.info('Delete tag {} for id {} with type {} and resource type: {}'.format(tag, id,
+                                                                                        tag_type, resource_type.name))
+        delete_query = textwrap.dedent("""
+        MATCH (n1:Tag{{key: $tag, tag_type: $tag_type}})-
+        [r1:TAG]->(n2:{resource_type} {{key: $key}})-[r2:TAGGED_BY]->(n1) DELETE r1,r2
+        """.format(resource_type=resource_type.name))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            tx.run(delete_query, {'tag': tag,
+                                  'key': id,
+                                  'tag_type': tag_type})
+            tx.commit()
+        except Exception as e:
+            # propagate the exception back to api
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    def _get_tags_query_statement(self, optional_resource: bool = True) -> str:
+        # query = textwrap.dedent(f"""
+        #     MATCH (t:Tag{{tag_type: 'default'}})
+        #     {'OPTIONAL' if optional_resource is True else '' } MATCH (resource)-[:TAGGED_BY]->(t)
+        #     WITH t as tag_name, count(distinct resource.key) as tag_count
+        #     WHERE tag_count > 0
+        #     RETURN tag_name, tag_count
+        # """)
+        query = textwrap.dedent(f"""
+            MATCH (t:Tag{{tag_type: 'default'}})
+            {'OPTIONAL' if optional_resource is True else '' } MATCH (resource)-[:TAGGED_BY]->(t)
+            WITH t as tag_name, count(distinct resource.key) as tag_count
+            WHERE tag_count > 0
+            RETURN tag_name, tag_count
+        """)
+        return query
+
+    @timer_with_counter
+    def get_tags(self) -> List:
+        """
+        Get all existing tags from neo4j
+
+        :return:
+        """
+        query = self._get_tags_query_statement()
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={})
+        results = []
+        for record in records:
+            results.append(TagDetail(tag_name=record['tag_name']['key'],
+                                     tag_count=record['tag_count']))
+        return results
+
+    def _get_latest_updated_ts_query_statement(self) -> str:
+        query = textwrap.dedent("""
+            MATCH (n:Updatedtimestamp{key: 'amundsen_updated_timestamp'})
+            RETURN n as ts
+        """)
+        return query
+
+    @timer_with_counter
+    def get_latest_updated_ts(self) -> Optional[int]:
+        """
+        API method to fetch last updated / index timestamp for neo4j, es
+
+        :return:
+        """
+        query = self._get_latest_updated_ts_query_statement()
+        record = self._execute_cypher_query(statement=query,
+                                            param_dict={})
+        # None means we don't have record for neo4j, es last updated / index ts
+        record = get_single_record(record)
+        if record:
+            return record.get('ts', {}).get('latest_timestamp', 0)
+        else:
+            return None
+
+    def _get_statistics_query_statement(self) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH (table:Table) with count(table) as number_of_tables
+        #     MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
+        #     WHERE size(description_node.description)>2 and exists(item_node.is_view)
+        #     with count(item_node) as number_of_documented_tables, number_of_tables
+        #     MATCH p=(item_node)-[r:DESCRIPTION]->(description_node)
+        #     WHERE  size(description_node.description)>2 and exists(item_node.sort_order)
+        #     with count(item_node) as number_of_documented_cols, number_of_documented_tables, number_of_tables
+        #     MATCH p=(table)-[r:OWNER]->(user_node) with count(distinct table) as number_of_tables_with_owners,
+        #     count(distinct user_node) as number_of_owners, number_of_documented_cols,
+        #     number_of_documented_tables, number_of_tables
+        #     MATCH (item_node)-[:DESCRIPTION]->(description_node)
+        #     WHERE  size(description_node.description)>2 and exists(item_node.is_view)
+        #     MATCH  (item_node)-[:OWNER]->(user_node)
+        #     with count(item_node) as number_of_documented_and_owned_tables,
+        #     number_of_tables_with_owners, number_of_owners, number_of_documented_cols,
+        #     number_of_documented_tables, number_of_tables
+        #     Return number_of_tables, number_of_documented_tables, number_of_documented_cols,
+        #     number_of_owners, number_of_tables_with_owners, number_of_documented_and_owned_tables
+        # """)
+        query = textwrap.dedent("""
+            // Count the total number of tables
+            MATCH (table:Table)
+            WITH count(table) as number_of_tables
+
+            // Count the number of documented tables
+            MATCH (item_node)-[:DESCRIPTION]->(description_node)
+            WHERE size(description_node.description) > 2 AND exists(item_node.is_view)
+            WITH count(item_node) as number_of_documented_tables, number_of_tables
+
+            // Count the number of documented columns
+            MATCH (item_node)-[:DESCRIPTION]->(description_node)
+            WHERE size(description_node.description) > 2 AND exists(item_node.sort_order)
+            WITH count(item_node) as number_of_documented_cols, number_of_documented_tables, number_of_tables
+
+            // Count the number of tables with owners and the number of distinct owners
+            MATCH (table)-[:OWNER]->(user_node)
+            WITH count(distinct table) as number_of_tables_with_owners,
+                count(distinct user_node) as number_of_owners,
+                number_of_documented_cols, number_of_documented_tables, number_of_tables
+
+            // Count the number of documented and owned tables
+            MATCH (item_node)-[:DESCRIPTION]->(description_node)
+            WHERE size(description_node.description) > 2 AND exists(item_node.is_view)
+            MATCH (item_node)-[:OWNER]->(user_node)
+            WITH count(item_node) as number_of_documented_and_owned_tables,
+                number_of_tables_with_owners, number_of_owners,
+                number_of_documented_cols, number_of_documented_tables, number_of_tables
+
+            // Return the final counts
+            RETURN number_of_tables, number_of_documented_tables, number_of_documented_cols,
+                number_of_owners, number_of_tables_with_owners, number_of_documented_and_owned_tables;
+        """)
+        return query
+
+    @timer_with_counter
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        API method to fetch statistics metrics for neo4j
+        :return: dictionary of statistics
+        """
+        query = self._get_statistics_query_statement()
+        LOGGER.info('Getting Neo4j Statistics')
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={})
+        for record in records:
+            neo4j_statistics = {'number_of_tables': record['number_of_tables'],
+                                'number_of_documented_tables': record['number_of_documented_tables'],
+                                'number_of_documented_cols': record['number_of_documented_cols'],
+                                'number_of_owners': record['number_of_owners'],
+                                'number_of_tables_with_owners': record['number_of_tables_with_owners'],
+                                'number_of_documented_and_owned_tables': record['number_of_documented_and_owned_tables']
+                                }
+            return neo4j_statistics
+        return {}
+
+    def _get_global_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH ({node_name}:{node_label})-[r:READ_BY]->(u:User)
+        #     WITH {node_name}.key as resource_key, count(distinct u) as readers, sum(r.read_count) as total_reads
+        #     WHERE readers >= $num_readers
+        #     RETURN resource_key, readers, total_reads, (readers * log(total_reads)) as score
+        #     ORDER BY score DESC
+        #     LIMIT $num_entries;
+        # """).format(node_name=resource_type.name.lower(), node_label=resource_type.name)
+        query = textwrap.dedent("""
+            MATCH ({node_name}:{node_label})-[r:READ_BY]->(u:User)
+            WITH {node_name}.key as resource_key, count(distinct u) as readers, sum(r.read_count) as total_reads
+            WHERE readers >= $num_readers
+            WITH resource_key, readers, total_reads, (readers * log(total_reads)) as score
+            ORDER BY score DESC
+            LIMIT $num_entries
+            RETURN resource_key, readers, total_reads, score;
+        """).format(node_name=resource_type.name.lower(), node_label=resource_type.name)
+        return query
+
+    @_CACHE.cache('_get_global_popular_resources_uris', expire=_GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC)
+    def _get_global_popular_resources_uris(self, num_entries: int,
+                                           resource_type: ResourceType = ResourceType.Table) -> List[str]:
+        """
+        Retrieve popular table uris. Will provide tables with top x popularity score.
+        Popularity score = number of distinct readers * log(total number of reads)
+        The result of this method will be cached based on the key (num_entries), and the cache will be expired based on
+        _GET_POPULAR_TABLE_CACHE_EXPIRY_SEC
+
+        For score computation, it uses logarithm on total number of reads so that score won't be affected by small
+        number of users reading a lot of times.
+        :return: Iterable of table uri
+        """
+        query = self._get_global_popular_resources_uris_query_statement(resource_type)
+        LOGGER.info('Querying popular tables URIs')
+        num_readers = current_app.config['POPULAR_RESOURCES_MINIMUM_READER_COUNT']
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={'num_readers': num_readers,
+                                                         'num_entries': num_entries})
+
+        return [record['resource_key'] for record in records]
+
+    def _get_personal_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
+        # statement = textwrap.dedent("""
+        #     MATCH (:User {{key:$user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->
+        #         (coUser:User)<-[coRead:READ_BY]-(resource:{resource_type})
+        #     WITH resource.key AS resource_key, count(DISTINCT coUser) AS co_readers,
+        #         sum(coRead.read_count) AS total_co_reads
+        #     WHERE co_readers >= $num_readers
+        #     RETURN resource_key, (co_readers * log(total_co_reads)) AS score
+        #     ORDER BY score DESC LIMIT $num_entries;
+        # """).format(resource_type=resource_type.name)
+        statement = textwrap.dedent("""
+            MATCH (:User {{key: $user_id}})<-[:READ_BY]-(:{resource_type})-[:READ_BY]->(coUser:User)
+            MATCH (coUser)<-[coRead:READ_BY]-(resource:{resource_type})
+            WITH resource.key AS resource_key, count(DISTINCT coUser) AS co_readers, sum(coRead.read_count) AS total_co_reads
+            WHERE co_readers >= $num_readers
+            WITH resource_key, co_readers, total_co_reads, (co_readers * log(total_co_reads)) AS score
+            ORDER BY score DESC
+            LIMIT $num_entries
+            RETURN resource_key, score;
+        """).format(resource_type=resource_type.name)
+        return statement
+
+    @timer_with_counter
+    @_CACHE.cache('_get_personal_popular_tables_uris', _GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC)
+    def _get_personal_popular_resources_uris(self, num_entries: int,
+                                             user_id: str,
+                                             resource_type: ResourceType = ResourceType.Table) -> List[str]:
+        """
+        Retrieve personalized popular resources uris. Will provide resources with top
+        popularity score that have been read by a peer of the user_id provided.
+        The popularity score is defined in the same way as `_get_global_popular_resources_uris`
+
+        The result of this method will be cached based on the key (num_entries, user_id),
+        and the cache will be expired based on _GET_POPULAR_TABLE_CACHE_EXPIRY_SEC
+
+        :return: Iterable of table uri
+        """
+        statement = self._get_personal_popular_resources_uris_query_statement(resource_type)
+        LOGGER.info('Querying popular tables URIs')
+        num_readers = current_app.config['POPULAR_RESOURCES_MINIMUM_READER_COUNT']
+        records = self._execute_cypher_query(statement=statement,
+                                             param_dict={'user_id': user_id,
+                                                         'num_readers': num_readers,
+                                                         'num_entries': num_entries})
+
+        return [record['resource_key'] for record in records]
+
+    def _get_popular_tables_query_statement(self) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
+        #     WHERE table.key IN $table_uris
+        #     WITH db.name as database_name, clstr.name as cluster_name, schema.name as schema_name, table
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(dscrpt:Description)
+        #     RETURN database_name, cluster_name, schema_name, table.name as table_name,
+        #     dscrpt.description as table_description;
+        # """)
+        query = textwrap.dedent("""
+            MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
+            WHERE table.key IN $table_uris
+            WITH db.name as database_name, clstr.name as cluster_name, schema.name as schema_name, table
+            OPTIONAL MATCH (table)-[:DESCRIPTION]->(dscrpt:Description)
+            RETURN database_name, cluster_name, schema_name, table.name as table_name, dscrpt.description as table_description;
+        """)
+        return query
+
+    @timer_with_counter
+    def get_popular_tables(self, *,
+                           num_entries: int,
+                           user_id: Optional[str] = None) -> List[PopularTable]:
+        """
+
+        Retrieve popular tables. As popular table computation requires full scan of table and user relationship,
+        it will utilize cached method _get_popular_tables_uris.
+
+        :param num_entries:
+        :return: Iterable of PopularTable
+        """
+        if user_id is None:
+            # Get global popular table URIs
+            table_uris = self._get_global_popular_resources_uris(num_entries)
+        else:
+            # Get personalized popular table URIs
+            table_uris = self._get_personal_popular_resources_uris(num_entries, user_id)
+
+        if not table_uris:
+            return []
+
+        query = self._get_popular_tables_query_statement()
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={'table_uris': table_uris})
+
+        popular_tables = []
+        for record in records:
+            popular_table = PopularTable(database=record['database_name'],
+                                         cluster=record['cluster_name'],
+                                         schema=record['schema_name'],
+                                         name=record['table_name'],
+                                         description=self._safe_get(record, 'table_description'))
+            popular_tables.append(popular_table)
+        return popular_tables
+
+    def _get_popular_tables(self, *, resource_uris: List[str]) -> List[TableSummary]:
+        """
+
+        """
+        if not resource_uris:
+            return []
+
+        # query = textwrap.dedent("""
+        # MATCH (db:Database)-[:CLUSTER]->(clstr:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
+        # WHERE table.key IN $table_uris
+        # WITH db.name as database_name, clstr.name as cluster_name, schema.name as schema_name, table
+        # OPTIONAL MATCH (table)-[:DESCRIPTION]->(dscrpt:Description)
+        # RETURN database_name, cluster_name, schema_name, table.name as table_name,
+        # dscrpt.description as table_description;
+        # """)
+        query = self._get_popular_tables_query_statement()
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={'table_uris': resource_uris})
+
+        popular_tables = []
+        for record in records:
+            popular_table = TableSummary(database=record['database_name'],
+                                         cluster=record['cluster_name'],
+                                         schema=record['schema_name'],
+                                         name=record['table_name'],
+                                         description=self._safe_get(record, 'table_description'))
+            popular_tables.append(popular_table)
+        return popular_tables
+
+    def _get_popular_dashboards_query_statement(self) -> str:
+        # query = textwrap.dedent(f"""
+        #     MATCH (dashboard:Dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+        #     WHERE dashboard.key IN $dashboards_uris
+        #     OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(dscrpt:Description)
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution)
+        #     WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
+        #     RETURN c.name as cluster_name, dg.name as dg_name, dg.dashboard_group_url as dg_url,
+        #     dashboard.key as uri, dashboard.name as name, dashboard.dashboard_url as url,
+        #     split(dashboard.key, '_')[0] as product,
+        #     dscrpt.description as description, last_exec.timestamp as last_successful_run_timestamp
+        # """)
+        query = textwrap.dedent(f"""
+            MATCH (dashboard:Dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+            WHERE dashboard.key IN $dashboards_uris
+            OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(dscrpt:Description)
+            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution)
+            WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
+            RETURN c.name as cluster_name,
+                dg.name as dg_name,
+                dg.dashboard_group_url as dg_url,
+                dashboard.key as uri,
+                dashboard.name as name,
+                dashboard.dashboard_url as url,
+                split(dashboard.key, '_')[0] as product,
+                dscrpt.description as description,
+                last_exec.timestamp as last_successful_run_timestamp;
+        """)
+        return query
+
+    def _get_popular_dashboards(self, *, resource_uris: List[str]) -> List[DashboardSummary]:
+        """
+
+        """
+        if not resource_uris:
+            return []
+
+        query = self._get_popular_dashboards_query_statement()
+        records = self._execute_cypher_query(statement=query,
+                                             param_dict={'dashboards_uris': resource_uris})
+
+        popular_dashboards = []
+        for record in records:
+            popular_dashboards.append(DashboardSummary(
+                uri=record['uri'],
+                cluster=record['cluster_name'],
+                group_name=record['dg_name'],
+                group_url=record['dg_url'],
+                product=record['product'],
+                name=record['name'],
+                url=record['url'],
+                description=record['description'],
+                last_successful_run_timestamp=record['last_successful_run_timestamp'],
+            ))
+
+        return popular_dashboards
+
+    @timer_with_counter
+    def get_popular_resources(self, *,
+                              num_entries: int,
+                              resource_types: List[str],
+                              user_id: Optional[str] = None) -> Dict[str, List]:
+        popular_resources: Dict[str, List] = dict()
+        for resource in resource_types:
+            resource_type = to_resource_type(label=resource)
+            popular_resources[resource_type.name] = list()
+            if user_id is None:
+                # Get global popular Table/Dashboard URIs
+                resource_uris = self._get_global_popular_resources_uris(num_entries,
+                                                                        resource_type=resource_type)
+            else:
+                # Get personalized popular Table/Dashboard URIs
+                resource_uris = self._get_personal_popular_resources_uris(num_entries,
+                                                                          user_id,
+                                                                          resource_type=resource_type)
+
+            if resource_type == ResourceType.Table:
+                popular_resources[resource_type.name] = self._get_popular_tables(
+                    resource_uris=resource_uris
+                )
+            elif resource_type == ResourceType.Dashboard:
+                popular_resources[resource_type.name] = self._get_popular_dashboards(
+                    resource_uris=resource_uris
+                )
+
+        return popular_resources
+
+    def _get_user_query_statement(self) -> str:
+        query = textwrap.dedent("""
+            MATCH (user:User {key: $user_id})
+            OPTIONAL MATCH (user)-[:MANAGE_BY]->(manager:User)
+            RETURN user as user_record, manager as manager_record
+        """)
+        return query
+
+    @timer_with_counter
+    def get_user(self, *, id: str) -> Union[UserEntity, None]:
+        """
+        Retrieve user detail based on user_id(email).
+
+        :param user_id: the email for the given user
+        :return:
+        """
+
+        query = self._get_user_query_statement()
+        record = self._execute_cypher_query(statement=query,
+                                            param_dict={'user_id': id})
+        single_result = get_single_record(record)
+
+        if not single_result:
+            raise NotFoundException('User {user_id} '
+                                    'not found in the graph'.format(user_id=id))
+
+        record = single_result.get('user_record', {})
+        manager_record = single_result.get('manager_record', {})
+        if manager_record:
+            manager_name = manager_record.get('full_name', '')
+        else:
+            manager_name = ''
+
+        return self._build_user_from_record(record=record, manager_name=manager_name)
+
+    def create_update_user(self, *, user: User) -> Tuple[User, bool]:
+        """
+        Create a user if it does not exist, otherwise update the user. Required
+        fields for creating / updating a user are validated upstream to this when
+        the User object is created.
+
+        :param user:
+        :return:
+        """
+        user_data = UserSchema().dump(user)
+        user_props = self._create_props_body(user_data, 'usr')
+
+        create_update_user_query = textwrap.dedent("""
+        MERGE (usr:User {key: toLower($user_id)})
+        on CREATE SET %s, usr.%s=timestamp()
+        on MATCH SET %s
+        RETURN usr, usr.%s = timestamp() as created
+        """ % (user_props, CREATED_EPOCH_MS, user_props, CREATED_EPOCH_MS))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            result = tx.run(create_update_user_query, user_data)
+
+            user_result = result.single()
+            if not user_result:
+                raise RuntimeError('Failed to create user with data %s' % user_data)
+            tx.commit()
+
+            new_user = self._build_user_from_record(user_result['usr'])
+            new_user_created = True if user_result['created'] is True else False
+
+        except Exception as e:
+            if not tx.closed():
+                tx.rollback()
+            # propagate the exception back to api
+            raise e
+
+        return new_user, new_user_created
+
+    def _create_props_body(self,
+                           record_dict: dict,
+                           identifier: str) -> str:
+        """
+        Creates a Neo4j property body by converting a dictionary into a comma
+        separated string of KEY = VALUE.
+        """
+        props = []
+        for k, v in record_dict.items():
+            if v:
+                props.append(f'{identifier}.{k} = ${k}')
+
+        props.append(f"{identifier}.{PUBLISHED_TAG_PROPERTY_NAME} = 'api_create_update_user'")
+        props.append(f"{identifier}.{LAST_UPDATED_EPOCH_MS} = timestamp()")
+        return ', '.join(props)
+
+    def _get_users_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH (usr:User)
+            WHERE usr.is_active = true
+            RETURN collect(usr) as users;
+        """)
+        return statement
+
+    def get_users(self) -> List[UserEntity]:
+        # statement = "MATCH (usr:User) WHERE usr.is_active = true RETURN collect(usr) as users"
+        statement = self._get_users_query_statement()
+        record = self._execute_cypher_query(statement=statement, param_dict={})
+        result = get_single_record(record)
+        if not result or not result.get('users'):
+            raise NotFoundException('Error getting users')
+
+        return [self._build_user_from_record(record=rec) for rec in result['users']]
+
+    @staticmethod
+    def _build_user_from_record(record: dict, manager_name: Optional[str] = None) -> UserEntity:
+        """
+        Builds user record from Cypher query result. Other than the one defined in amundsen_common.models.user.User,
+        you could add more fields from User node into the User model by specifying keys in config.USER_OTHER_KEYS
+        :param record:
+        :param manager_name:
+        :return:
+        """
+        other_key_values = {}
+        if has_app_context() and current_app.config[config.USER_OTHER_KEYS]:
+            for k in current_app.config[config.USER_OTHER_KEYS]:
+                if k in record:
+                    other_key_values[k] = record[k]
+
+        return UserEntity(email=record['email'],
+                          user_id=record.get('user_id', record['email']),
+                          first_name=record.get('first_name'),
+                          last_name=record.get('last_name'),
+                          full_name=record.get('full_name'),
+                          is_active=record.get('is_active', True),
+                          profile_url=record.get('profile_url'),
+                          github_username=record.get('github_username'),
+                          team_name=record.get('team_name'),
+                          slack_id=record.get('slack_id'),
+                          employee_type=record.get('employee_type'),
+                          role_name=record.get('role_name'),
+                          manager_fullname=record.get('manager_fullname', manager_name),
+                          other_key_values=other_key_values)
+
+    @staticmethod
+    def _get_user_resource_relationship_clause(relation_type: UserResourceRel, id: str = None,
+                                               user_key: str = None,
+                                               resource_type: ResourceType = ResourceType.Table) -> str:
+        """
+        Returns the relationship clause of a cypher query between users and tables
+        The User node is 'usr', the table node is 'table', and the relationship is 'rel'
+        e.g. (usr:User)-[rel:READ]->(table:Table), (usr)-[rel:READ]->(table)
+        """
+        resource_matcher: str = ''
+        user_matcher: str = ''
+
+        if id is not None:
+            resource_matcher += ':{}'.format(resource_type.name)
+            if id != '':
+                resource_matcher += ' {key: $resource_key}'
+
+        if user_key is not None:
+            user_matcher += ':User'
+            if user_key != '':
+                user_matcher += ' {key: $user_key}'
+
+        if relation_type == UserResourceRel.follow:
+            relation = f'(start_resource{resource_matcher})-[r1:FOLLOWED_BY]->(usr{user_matcher})-[r2:FOLLOW]->' \
+                       f'(resource{resource_matcher})'
+        elif relation_type == UserResourceRel.own:
+            relation = f'(start_resource{resource_matcher})-[r1:OWNER]->(usr{user_matcher})-[r2:OWNER_OF]->' \
+                       f'(resource{resource_matcher})'
+        elif relation_type == UserResourceRel.read:
+            relation = f'(start_resource{resource_matcher})-[r1:READ_BY]->(usr{user_matcher})-[r2:READ]->' \
+                       f'(resource{resource_matcher})'
+        else:
+            raise NotImplementedError(f'The relation type {relation_type} is not defined!')
+        return relation
+
+    def _get_dashboard_by_user_relation_query_statement(self, user_email: str, relation_type: UserResourceRel) -> str:
+        rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
+                                                                      id='',
+                                                                      resource_type=ResourceType.Dashboard,
+                                                                      user_key=user_email)
+
+        # FYI, to extract last_successful_execution, it searches for its execution ID which is always
+        # _last_successful_execution
+        # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L18
+        # https://github.com/amundsen-io/amundsendatabuilder/blob/master/databuilder/models/dashboard/dashboard_execution.py#L24
+
+        query = textwrap.dedent(f"""
+            MATCH {rel_clause}<-[:DASHBOARD]-(dg:Dashboardgroup)<-[:DASHBOARD_GROUP]-(clstr:Cluster)
+            OPTIONAL MATCH (resource)-[:DESCRIPTION]->(dscrpt:Description)
+            OPTIONAL MATCH (resource)-[:EXECUTED]->(last_exec:Execution)
+            WHERE split(last_exec.key, '/')[5] = '_last_successful_execution'
+            RETURN clstr.name as cluster_name,
+                dg.name as dg_name,
+                dg.dashboard_group_url as dg_url,
+                resource.key as uri,
+                resource.name as name,
+                resource.dashboard_url as url,
+                split(resource.key, '_')[0] as product,
+                dscrpt.description as description,
+                last_exec.timestamp as last_successful_run_timestamp;
+        """)
+        return query
+
+    @timer_with_counter
+    def get_dashboard_by_user_relation(self, *, user_email: str, relation_type: UserResourceRel) \
+            -> Dict[str, List[DashboardSummary]]:
+        """
+        Retrieve all follow the Dashboard per user based on the relation.
+
+        :param user_email: the email of the user
+        :param relation_type: the relation between the user and the resource
+        :return:
+        """
+        query = self._get_dashboard_by_user_relation_query_statement(user_email, relation_type)
+        records = self._execute_cypher_query(statement=query, param_dict={'user_key': user_email})
+
+        results = []
+        for record in records:
+            results.append(DashboardSummary(
+                uri=record['uri'],
+                cluster=record['cluster_name'],
+                group_name=record['dg_name'],
+                group_url=record['dg_url'],
+                product=record['product'],
+                name=record['name'],
+                url=record['url'],
+                description=record['description'],
+                last_successful_run_timestamp=record['last_successful_run_timestamp'],
+            ))
+
+        return {ResourceType.Dashboard.name.lower(): results}
+
+    def _get_table_by_user_relation_query_statement(self, user_email: str, relation_type: UserResourceRel) -> str:
+        rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
+                                                                      id='',
+                                                                      resource_type=ResourceType.Table,
+                                                                      user_key=user_email)
+
+        # query = textwrap.dedent(f"""
+        #     MATCH {rel_clause}<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+        #     WITH db, clstr, schema, resource
+        #     OPTIONAL MATCH (resource)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+        #     RETURN db, clstr, schema, resource, tbl_dscrpt
+        # """)
+        query = textwrap.dedent(f"""
+            MATCH {rel_clause}<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+            WITH db, clstr, schema, resource
+            OPTIONAL MATCH (resource)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+            RETURN db, clstr, schema, resource, tbl_dscrpt;
+        """)
+        return query
+
+    @timer_with_counter
+    def get_table_by_user_relation(self, *, user_email: str, relation_type: UserResourceRel) \
+            -> Dict[str, List[PopularTable]]:
+        """
+        Retrive all follow the Table per user based on the relation.
+
+        :param user_email: the email of the user
+        :param relation_type: the relation between the user and the resource
+        :return:
+        """
+        query = self._get_table_by_user_relation_query_statement(user_email, relation_type)
+
+        table_records = self._execute_cypher_query(statement=query, param_dict={'user_key': user_email})
+
+        results = []
+        for record in table_records:
+            results.append(PopularTable(
+                database=record['db']['name'],
+                cluster=record['clstr']['name'],
+                schema=record['schema']['name'],
+                name=record['resource']['name'],
+                description=self._safe_get(record, 'tbl_dscrpt', 'description')))
+        return {ResourceType.Table.name.lower(): results}
+
+    def _get_frequently_used_tables_query_statement(self) -> str:
+        # query = textwrap.dedent("""
+        #     MATCH (user:User {key: $query_key})-[r:READ]->(table:Table)
+        #     WHERE EXISTS(r.published_tag) AND r.published_tag IS NOT NULL
+        #     WITH user, r, table ORDER BY r.published_tag DESC, r.read_count DESC LIMIT 50
+        #     MATCH (table:Table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+        #     RETURN db, clstr, schema, table, tbl_dscrpt
+        # """)
+        query = textwrap.dedent("""
+            MATCH (user:User {key: $query_key})-[r:READ]->(table:Table)
+            WHERE EXISTS(r.published_tag) AND r.published_tag IS NOT NULL
+            WITH user, r, table
+            ORDER BY r.published_tag DESC, r.read_count DESC
+            LIMIT 50
+            MATCH (table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(clstr:Cluster)<-[:CLUSTER]-(db:Database)
+            OPTIONAL MATCH (table)-[:DESCRIPTION]->(tbl_dscrpt:Description)
+            RETURN db, clstr, schema, table, tbl_dscrpt;
+        """)
+        return query
+
+    @timer_with_counter
+    def get_frequently_used_tables(self, *, user_email: str) -> Dict[str, Any]:
+        """
+        Retrieves all Table the resources per user on READ relation.
+
+        :param user_email: the email of the user
+        :return:
+        """
+        query = self._get_frequently_used_tables_query_statement()
+        table_records = self._execute_cypher_query(statement=query, param_dict={'query_key': user_email})
+
+        results = []
+
+        for record in table_records:
+            results.append(PopularTable(
+                database=record['db']['name'],
+                cluster=record['clstr']['name'],
+                schema=record['schema']['name'],
+                name=record['table']['name'],
+                description=self._safe_get(record, 'tbl_dscrpt', 'description')))
+        return {'table': results}
+
+    @timer_with_counter
+    def add_resource_relation_by_user(self, *,
+                                      id: str,
+                                      user_id: str,
+                                      relation_type: UserResourceRel,
+                                      resource_type: ResourceType) -> None:
+        """
+        Update table user informations.
+        1. Do a upsert of the user node.
+        2. Do a upsert of the relation/reverse-relation edge.
+
+        :param table_uri:
+        :param user_id:
+        :param relation_type:
+        :return:
+        """
+
+        upsert_user_query = textwrap.dedent("""
+        MERGE (u:User {key: toLower($user_email)})
+        on CREATE SET u={email: $user_email, key: $user_email}
+        """)
+
+        rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
+                                                                      resource_type=resource_type)
+
+        upsert_user_relation_query = textwrap.dedent("""
+        MATCH (usr:User {{key: $user_key}}), (resource:{resource_type} {{key: toLower($resource_key)}})
+        MERGE {rel_clause}
+        RETURN usr.key, resource.key
+        """.format(resource_type=resource_type.name,
+                   rel_clause=rel_clause))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            # upsert the node
+            tx.run(upsert_user_query, {'user_email': user_id})
+            result = tx.run(upsert_user_relation_query, {'user_key': user_id, 'resource_key': id})
+
+            if not result.single():
+                raise RuntimeError('Failed to create relation between '
+                                   'user {user} and resource {id}'.format(user=user_id,
+                                                                          id=id))
+            tx.commit()
+        except Exception as e:
+            if not tx.closed():
+                tx.rollback()
+            # propagate the exception back to api
+            raise e
+
+    @timer_with_counter
+    def delete_resource_relation_by_user(self, *,
+                                         id: str,
+                                         user_id: str,
+                                         relation_type: UserResourceRel,
+                                         resource_type: ResourceType) -> None:
+        """
+        Delete the relationship between user and resources.
+
+        :param table_uri:
+        :param user_id:
+        :param relation_type:
+        :return:
+        """
+        rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
+                                                                      resource_type=resource_type,
+                                                                      user_key=user_id,
+                                                                      id=id
+                                                                      )
+
+        delete_query = textwrap.dedent("""
+                MATCH {rel_clause}
+                DELETE r1, r2
+                """.format(rel_clause=rel_clause))
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            tx.run(delete_query, {'user_key': user_id, 'resource_key': id})
+            tx.commit()
+        except Exception as e:
+            # propagate the exception back to api
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    def _get_dashboard_query_statement(self, table_where_clause: str = '') -> str:
+        # get_dashboard_detail_query = textwrap.dedent(f"""
+        #     MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+        #     OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution) WHERE split(last_exec.key, '/')[5] = '_last_execution'
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
+        #     WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
+        #     OPTIONAL MATCH (dashboard)-[:LAST_UPDATED_AT]->(t:Timestamp)
+        #     OPTIONAL MATCH (dashboard)-[:OWNER]->(owner:User)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, collect(owner) as owners
+        #     OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag{{tag_type: $tag_normal_type}})
+        #     OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badge:Badge)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, collect(tag) as tags,
+        #     collect(badge) as badges
+        #     OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     sum(read.read_count) as recent_view_count
+        #     OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     recent_view_count, collect({{name: query.name, url: query.url, query_text: query.query_text}}) as queries
+        #     OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)-[:HAS_CHART]->(chart:Chart)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     recent_view_count, queries, collect(chart) as charts
+        #     OPTIONAL MATCH (dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)
+        #     <-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database) {table_where_clause}
+        #     OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
+        #     WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges,
+        #     recent_view_count, queries, charts,
+        #     collect({{name: table.name, schema: schema.name, cluster: cluster.name, database: db.name,
+        #     description: table_description.description}}) as tables
+        #     RETURN
+        #     c.name as cluster_name,
+        #     dashboard.key as uri,
+        #     dashboard.dashboard_url as url,
+        #     dashboard.name as name,
+        #     split(dashboard.key, '_')[0] as product,
+        #     toInteger(dashboard.created_timestamp) as created_timestamp,
+        #     description.description as description,
+        #     dg.name as group_name,
+        #     dg.dashboard_group_url as group_url,
+        #     toInteger(last_success_exec.timestamp) as last_successful_run_timestamp,
+        #     toInteger(last_exec.timestamp) as last_run_timestamp,
+        #     last_exec.state as last_run_state,
+        #     toInteger(t.timestamp) as updated_timestamp,
+        #     owners,
+        #     tags,
+        #     badges,
+        #     recent_view_count,
+        #     queries,
+        #     charts,
+        #     tables;
+        # """)
+        get_dashboard_detail_query = textwrap.dedent(f"""
+            MATCH (dashboard:Dashboard {{key: $query_key}})-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+            OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
+            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_exec:Execution)
+            WHERE split(last_exec.key, '/')[5] = '_last_execution'
+            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
+            WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
+            OPTIONAL MATCH (dashboard)-[:LAST_UPDATED_AT]->(t:Timestamp)
+            OPTIONAL MATCH (dashboard)-[:OWNER]->(owner:User)
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, collect(owner) as owners
+            OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tag:Tag {{tag_type: $tag_normal_type}})
+            OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badge:Badge)
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, collect(tag) as tags, collect(badge) as badges
+            OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, sum(read.read_count) as recent_view_count
+            OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, recent_view_count, collect({{name: query.name, url: query.url, query_text: query.query_text}}) as queries
+            OPTIONAL MATCH (dashboard)-[:HAS_QUERY]->(query:Query)-[:HAS_CHART]->(chart:Chart)
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, recent_view_count, queries, collect(chart) as charts
+            OPTIONAL MATCH (dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table)<-[:TABLE]-(schema:Schema)<-[:SCHEMA]-(cluster:Cluster)<-[:CLUSTER]-(db:Database) {table_where_clause}
+            OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
+            WITH c, dg, dashboard, description, last_exec, last_success_exec, t, owners, tags, badges, recent_view_count, queries, charts, collect({{name: table.name, schema: schema.name, cluster: cluster.name, database: db.name, description: table_description.description}}) as tables
+            RETURN
+            c.name as cluster_name,
+            dashboard.key as uri,
+            dashboard.dashboard_url as url,
+            dashboard.name as name,
+            split(dashboard.key, '_')[0] as product,
+            toInteger(dashboard.created_timestamp) as created_timestamp,
+            description.description as description,
+            dg.name as group_name,
+            dg.dashboard_group_url as group_url,
+            toInteger(last_success_exec.timestamp) as last_successful_run_timestamp,
+            toInteger(last_exec.timestamp) as last_run_timestamp,
+            last_exec.state as last_run_state,
+            toInteger(t.timestamp) as updated_timestamp,
+            owners,
+            tags,
+            badges,
+            recent_view_count,
+            queries,
+            charts,
+            tables;
+        """)
+        return get_dashboard_detail_query
+
+    @timer_with_counter
+    def get_dashboard(self,
+                      id: str,
+                      ) -> DashboardDetailEntity:
+        get_dashboard_detail_query = self._get_dashboard_query_statement()
+        dashboard_records = self._execute_cypher_query(statement=get_dashboard_detail_query,
+                                                       param_dict={'query_key': id,
+                                                                   'tag_normal_type': 'default'})
+        dashboard_record = get_single_record(dashboard_records)
+
+        if not dashboard_record:
+            raise NotFoundException('No dashboard exist with URI: {}'.format(id))
+
+        owners = []
+
+        for owner in dashboard_record.get('owners', []):
+            owner_data = self._get_user_details(user_id=owner['email'], user_data=owner)
+            owners.append(self._build_user_from_record(record=owner_data))
+
+        tags = [Tag(tag_type=tag['tag_type'], tag_name=tag['key']) for tag in dashboard_record['tags']]
+
+        badges = self._make_badges(dashboard_record['badges'])
+
+        chart_names = [chart['name'] for chart in dashboard_record['charts'] if 'name' in chart and chart['name']]
+        # TODO Deprecate query_names in favor of queries after several releases from v2.5.0
+        query_names = [query['name'] for query in dashboard_record['queries'] if 'name' in query and query['name']]
+        queries = [DashboardQueryEntity(**query) for query in dashboard_record['queries']
+                   if query.get('name') or query.get('url') or query.get('text')]
+        tables = [PopularTable(**table) for table in dashboard_record['tables'] if 'name' in table and table['name']]
+
+        return DashboardDetailEntity(uri=dashboard_record['uri'],
+                                     cluster=dashboard_record['cluster_name'],
+                                     url=dashboard_record['url'],
+                                     name=dashboard_record['name'],
+                                     product=dashboard_record['product'],
+                                     created_timestamp=dashboard_record['created_timestamp'],
+                                     description=self._safe_get(dashboard_record, 'description'),
+                                     group_name=self._safe_get(dashboard_record, 'group_name'),
+                                     group_url=self._safe_get(dashboard_record, 'group_url'),
+                                     last_successful_run_timestamp=self._safe_get(dashboard_record,
+                                                                                  'last_successful_run_timestamp'),
+                                     last_run_timestamp=self._safe_get(dashboard_record, 'last_run_timestamp'),
+                                     last_run_state=self._safe_get(dashboard_record, 'last_run_state'),
+                                     updated_timestamp=self._safe_get(dashboard_record, 'updated_timestamp'),
+                                     owners=owners,
+                                     tags=tags,
+                                     badges=badges,
+                                     recent_view_count=dashboard_record['recent_view_count'],
+                                     chart_names=chart_names,
+                                     query_names=query_names,
+                                     queries=queries,
+                                     tables=tables
+                                     )
+
+    @timer_with_counter
+    def get_dashboard_description(self, *,
+                                  id: str) -> Description:
+        """
+        Get the dashboard description based on dashboard uri. Any exception will propagate back to api server.
+
+        :param id:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.Dashboard, uri=id)
+
+    @timer_with_counter
+    def put_dashboard_description(self, *,
+                                  id: str,
+                                  description: str) -> None:
+        """
+        Update Dashboard description
+        :param id: Dashboard URI
+        :param description: new value for Dashboard description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.Dashboard,
+                                      uri=id,
+                                      description=description)
+
+    def _get_resources_using_table_query_statement(self) -> str:
+        # get_dashboards_using_table_query = textwrap.dedent(u"""
+        #     MATCH (dashboard:Dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table {key: $query_key}),
+        #     (dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+        #     OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
+        #     OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
+        #     WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
+        #     OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
+        #     WITH c, dg, dashboard, description, last_success_exec, sum(read.read_count) as recent_view_count
+        #     RETURN
+        #     dashboard.key as uri,
+        #     c.name as cluster,
+        #     dg.name as group_name,
+        #     dg.dashboard_group_url as group_url,
+        #     dashboard.name as name,
+        #     dashboard.dashboard_url as url,
+        #     description.description as description,
+        #     split(dashboard.key, '_')[0] as product,
+        #     toInteger(last_success_exec.timestamp) as last_successful_run_timestamp
+        #     ORDER BY recent_view_count DESC;
+        # """)
+        get_dashboards_using_table_query = textwrap.dedent(u"""
+            MATCH (dashboard:Dashboard)-[:DASHBOARD_WITH_TABLE]->(table:Table {key: $query_key}),
+                (dashboard)-[:DASHBOARD_OF]->(dg:Dashboardgroup)-[:DASHBOARD_GROUP_OF]->(c:Cluster)
+            OPTIONAL MATCH (dashboard)-[:DESCRIPTION]->(description:Description)
+            OPTIONAL MATCH (dashboard)-[:EXECUTED]->(last_success_exec:Execution)
+            WHERE split(last_success_exec.key, '/')[5] = '_last_successful_execution'
+            OPTIONAL MATCH (dashboard)-[read:READ_BY]->(:User)
+            WITH c, dg, dashboard, description, last_success_exec, sum(read.read_count) as recent_view_count
+            RETURN
+            dashboard.key as uri,
+            c.name as cluster,
+            dg.name as group_name,
+            dg.dashboard_group_url as group_url,
+            dashboard.name as name,
+            dashboard.dashboard_url as url,
+            description.description as description,
+            split(dashboard.key, '_')[0] as product,
+            toInteger(last_success_exec.timestamp) as last_successful_run_timestamp,
+            recent_view_count
+            ORDER BY recent_view_count DESC;
+        """)
+        return get_dashboards_using_table_query
+
+    @timer_with_counter
+    def get_resources_using_table(self, *,
+                                  id: str,
+                                  resource_type: ResourceType) -> Dict[str, List[DashboardSummary]]:
+        """
+
+        :param id:
+        :param resource_type:
+        :return:
+        """
+        if resource_type != ResourceType.Dashboard:
+            raise NotImplementedError('{} is not supported'.format(resource_type))
+
+        get_dashboards_using_table_query = self._get_resources_using_table_query_statement()
+        records = self._execute_cypher_query(statement=get_dashboards_using_table_query,
+                                             param_dict={'query_key': id})
+
+        results = []
+
+        for record in records:
+            results.append(DashboardSummary(**record))
+        return {'dashboards': results}
+
+    def _get_both_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
+        get_both_lineage_query = textwrap.dedent(u"""
+            MATCH (source:{resource_label} {{key: $query_key}})
+            OPTIONAL MATCH dpath=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+            OPTIONAL MATCH upath=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath
+
+            OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+            OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath,
+                collect(distinct {{key:downstream_badge.key, category:downstream_badge.category}}) AS collected_downstream_badges,
+                collect(distinct {{key:upstream_badge.key, category:upstream_badge.category}}) AS collected_upstream_badges
+
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath,
+                CASE WHEN size(collected_downstream_badges) = 1 AND collected_downstream_badges[0].key IS NULL THEN [] ELSE collected_downstream_badges END AS downstream_badges,
+                CASE WHEN size(collected_upstream_badges) = 1 AND collected_upstream_badges[0].key IS NULL THEN [] ELSE collected_upstream_badges END AS upstream_badges
+
+            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len, upath, dpath,
+                downstream_badges, upstream_badges, sum(downstream_read.read_count) AS downstream_read_count
+
+            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+            WITH source, downstream_entity, upstream_entity, downstream_len, upstream_len,
+                downstream_badges, upstream_badges, downstream_read_count,
+                sum(upstream_read.read_count) AS upstream_read_count, upath, dpath
+
+            // Collect upstream entities first
+            WITH source, downstream_len, downstream_entity, dpath, downstream_badges, downstream_read_count, upstream_len,
+                collect(distinct {{
+                    level: SIZE(upstream_len),
+                    source: split(upstream_entity.key, '://')[0],
+                    key: upstream_entity.key,
+                    label: labels(upstream_entity)[0],
+                    badges: upstream_badges,
+                    usage: upstream_read_count,
+                    parent: CASE WHEN size(nodes(upath)) >= 2 THEN nodes(upath)[-2].key ELSE NULL END
+                }}) AS collected_upstream_entities
+
+            WITH source, downstream_len, downstream_entity, dpath, downstream_badges, downstream_read_count,
+                CASE WHEN size(collected_upstream_entities) = 0 THEN [] ELSE collected_upstream_entities END AS upstream_entities
+
+            // Collect downstream entities separately
+            WITH source, downstream_len, downstream_entity, dpath, downstream_badges, downstream_read_count, upstream_entities,
+                collect(distinct {{
+                    level: SIZE(downstream_len),
+                    source: split(downstream_entity.key, '://')[0],
+                    key: downstream_entity.key,
+                    label: labels(downstream_entity)[0],
+                    badges: downstream_badges,
+                    usage: downstream_read_count,
+                    parent: CASE WHEN size(nodes(dpath)) >= 2 THEN nodes(dpath)[-2].key ELSE NULL END
+                }}) AS collected_downstream_entities
+
+            WITH source, upstream_entities,
+                CASE WHEN size(collected_downstream_entities) = 0 THEN [] ELSE collected_downstream_entities END AS downstream_entities
+
+            WITH apoc.coll.flatten(collect(distinct downstream_entities)) as downstream_entities,
+                apoc.coll.flatten(collect(distinct upstream_entities)) as upstream_entities
+
+            RETURN downstream_entities, upstream_entities
+        """).format(depth=depth, resource_label=resource_type.name)
+        return get_both_lineage_query
+
+    def _get_upstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
+        # get_upstream_lineage_query = textwrap.dedent(u"""
+        #     MATCH (source:{resource_label} {{key: $query_key}})
+        #     OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+        #     WITH upstream_entity, upstream_len, path
+        #     OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+        #     WITH CASE WHEN upstream_badge IS NULL THEN []
+        #     ELSE collect(distinct {{key:upstream_badge.key,category:upstream_badge.category}})
+        #     END AS upstream_badges, upstream_entity, upstream_len, path
+        #     OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+        #     WITH upstream_entity, upstream_len, upstream_badges,
+        #     sum(upstream_read.read_count) as upstream_read_count, path
+        #     WITH CASE WHEN upstream_len IS NULL THEN []
+        #     ELSE COLLECT(distinct{{level:SIZE(upstream_len), source:split(upstream_entity.key,'://')[0],
+        #     key:upstream_entity.key, label:labels(upstream_entity)[0], badges:upstream_badges, usage:upstream_read_count, parent:nodes(path)[-2].key}})
+        #     END AS upstream_entities RETURN upstream_entities
+        # """).format(depth=depth, resource_label=resource_type.name)
+        get_upstream_lineage_query = textwrap.dedent(u"""
+            MATCH (source:{resource_label} {key: $query_key})
+            OPTIONAL MATCH path=(source)-[upstream_len:HAS_UPSTREAM*..{depth}]->(upstream_entity)
+            WITH upstream_entity, upstream_len, path
+            OPTIONAL MATCH (upstream_entity)-[:HAS_BADGE]->(upstream_badge:Badge)
+            WITH upstream_entity, upstream_len, path,
+                CASE WHEN upstream_badge IS NULL THEN []
+                    ELSE collect(distinct {{key: upstream_badge.key, category: upstream_badge.category}})
+                END AS upstream_badges
+            OPTIONAL MATCH (upstream_entity)-[upstream_read:READ_BY]->(:User)
+            WITH upstream_entity, upstream_len, path, upstream_badges,
+                sum(upstream_read.read_count) AS upstream_read_count
+            WITH CASE WHEN upstream_len IS NULL THEN []
+                    ELSE collect(distinct {{
+                        level: SIZE(upstream_len),
+                        source: split(upstream_entity.key, '://')[0],
+                        key: upstream_entity.key,
+                        label: labels(upstream_entity)[0],
+                        badges: upstream_badges,
+                        usage: upstream_read_count,
+                        parent: nodes(path)[-2].key
+                    }})
+                END AS upstream_entities
+            RETURN upstream_entities;
+        """).format(depth=depth, resource_label=resource_type.name)
+        return get_upstream_lineage_query
+
+    def _get_downstream_lineage_query_statement(self, resource_type: ResourceType, depth: int = 1) -> str:
+        # get_downstream_lineage_query = textwrap.dedent(u"""
+        #     MATCH (source:{resource_label} {{key: $query_key}})
+        #     OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+        #     WITH downstream_entity, downstream_len, path
+        #     OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+        #     WITH CASE WHEN downstream_badge IS NULL THEN []
+        #     ELSE collect(distinct {{key:downstream_badge.key,category:downstream_badge.category}})
+        #     END AS downstream_badges, downstream_entity, downstream_len, path
+        #     OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+        #     WITH downstream_entity, downstream_len, downstream_badges,
+        #     sum(downstream_read.read_count) as downstream_read_count, path
+        #     WITH CASE WHEN downstream_len IS NULL THEN []
+        #     ELSE COLLECT(distinct{{level:SIZE(downstream_len), source:split(downstream_entity.key,'://')[0],
+        #     key:downstream_entity.key, label:labels(downstream_entity)[0], badges:downstream_badges, usage:downstream_read_count, parent:nodes(path)[-2].key}})
+        #     END AS downstream_entities RETURN downstream_entities
+        # """).format(depth=depth, resource_label=resource_type.name)
+        get_downstream_lineage_query = textwrap.dedent(u"""
+            MATCH (source:{resource_label} {key: $query_key})
+            OPTIONAL MATCH path=(source)-[downstream_len:HAS_DOWNSTREAM*..{depth}]->(downstream_entity)
+            WITH downstream_entity, downstream_len, path
+            OPTIONAL MATCH (downstream_entity)-[:HAS_BADGE]->(downstream_badge:Badge)
+            WITH downstream_entity, downstream_len, path,
+                CASE WHEN downstream_badge IS NULL THEN []
+                    ELSE collect(distinct {{key: downstream_badge.key, category: downstream_badge.category}})
+                END AS downstream_badges
+            OPTIONAL MATCH (downstream_entity)-[downstream_read:READ_BY]->(:User)
+            WITH downstream_entity, downstream_len, path, downstream_badges,
+                sum(downstream_read.read_count) AS downstream_read_count
+            WITH CASE WHEN downstream_len IS NULL THEN []
+                    ELSE collect(distinct {{
+                        level: SIZE(downstream_len),
+                        source: split(downstream_entity.key, '://')[0],
+                        key: downstream_entity.key,
+                        label: labels(downstream_entity)[0],
+                        badges: downstream_badges,
+                        usage: downstream_read_count,
+                        parent: nodes(path)[-2].key
+                    }})
+                END AS downstream_entities
+            RETURN downstream_entities;
+        """).format(depth=depth, resource_label=resource_type.name)
+        return get_downstream_lineage_query
+
+    @timer_with_counter
+    def get_lineage(self, *,
+                    id: str, resource_type: ResourceType, direction: str, depth: int = 1) -> Lineage:
+        """
+        Retrieves the lineage information for the specified resource type.
+
+        :param id: key of a table or a column
+        :param resource_type: Type of the entity for which lineage is being retrieved
+        :param direction: Whether to get the upstream/downstream or both directions
+        :param depth: depth or level of lineage information
+        :return: The Lineage object with upstream & downstream lineage items
+        """
+
+        if direction == 'upstream':
+            lineage_query = self._get_upstream_lineage_query_statement(resource_type, depth)
+
+        elif direction == 'downstream':
+            lineage_query = self._get_downstream_lineage_query_statement(resource_type, depth)
+
+        else:
+            lineage_query = self._get_both_lineage_query_statement(resource_type, depth)
+
+        records = self._execute_cypher_query(statement=lineage_query,
+                                             param_dict={'query_key': id})
+
+        result = get_single_record(records)
+
+        downstream_entities = []
+        upstream_entities = []
+
+        for downstream in result.get("downstream_entities") or []:
+            if downstream["key"] is not None:
+                downstream_entities.append(LineageItem(**{"key": downstream["key"],
+                                                        "type": downstream["label"],
+                                                        "source": downstream["source"],
+                                                        "level": downstream["level"],
+                                                        "badges": self._make_badges(downstream["badges"]),
+                                                        "usage": downstream.get("usage", 0),
+                                                        "parent": downstream.get("parent", '')
+                                                        }))
+
+        for upstream in result.get("upstream_entities") or []:
+            if upstream["key"] is not None:
+                upstream_entities.append(LineageItem(**{"key": upstream["key"],
+                                                    "type": upstream["label"],
+                                                    "source": upstream["source"],
+                                                    "level": upstream["level"],
+                                                    "badges": self._make_badges(upstream["badges"]),
+                                                    "usage": upstream.get("usage", 0),
+                                                    "parent": upstream.get("parent", '')
+                                                    }))
+
+        # ToDo: Add a root_entity as an item, which will make it easier for lineage graph
+        return Lineage(**{"key": id,
+                          "upstream_entities": upstream_entities,
+                          "downstream_entities": downstream_entities,
+                          "direction": direction, "depth": depth})
+
+    def _create_watermarks(self, wmk_records: List) -> List[Watermark]:
+        watermarks = []
+        for record in wmk_records:
+            if record['key'] is not None:
+                watermark_type = record['key'].split('/')[-2]
+                watermarks.append(Watermark(watermark_type=watermark_type,
+                                            partition_key=record['partition_key'],
+                                            partition_value=record['partition_value'],
+                                            create_time=record['create_time']))
+        return watermarks
+
+    def _create_feature_watermarks(self, wmk_records: List) -> List[Watermark]:
+        watermarks = []
+        for record in wmk_records:
+            if record['key'] is not None:
+                watermark_type = record['key'].split('/')[-1]
+
+                watermarks.append(FeatureWatermark(key=record['key'],
+                                                   watermark_type=watermark_type,
+                                                   time=record['time']))
+        return watermarks
+
+    def _create_programmatic_descriptions(self, prog_desc_records: List) -> List[ProgrammaticDescription]:
+        programmatic_descriptions = []
+        for pg in prog_desc_records:
+            source = pg['description_source']
+            if source is None:
+                LOGGER.error("A programmatic description with no source was found... skipping.")
+            else:
+                programmatic_descriptions.append(ProgrammaticDescription(source=source,
+                                                                         text=pg['description']))
+        return programmatic_descriptions
+
+    def _create_owners(self, owner_records: List) -> List[User]:
+        owners = []
+        for owner in owner_records:
+            owners.append(User(email=owner['email']))
+        return owners
+
+    def _create_app(self, app_record: dict, kind: str) -> Application:
+        return Application(
+            name=app_record['name'],
+            id=app_record['id'],
+            application_url=app_record['application_url'],
+            description=app_record.get('description'),
+            kind=kind,
+        )
+
+    def _create_apps(self,
+                     producing_app_records: List,
+                     consuming_app_records: List) -> Tuple[Application, List[Application]]:
+
+        table_apps = []
+        for record in producing_app_records:
+            table_apps.append(self._create_app(record, kind='Producing'))
+
+        # for bw compatibility, we populate table_writer with one of the producing apps
+        table_writer = get_single_record(table_apps) if table_apps else None
+
+        _producing_app_ids = {app.id for app in table_apps}
+        for record in consuming_app_records:
+            # if an app has both a consuming and producing relationship with a table
+            # (e.g. an app that reads writes back to its input table), we call it a Producing app and
+            # do not add it again
+            if record['id'] not in _producing_app_ids:
+                table_apps.append(self._create_app(record, kind='Consuming'))
+
+        return table_writer, table_apps
+
+    def _get_exec_feature_query_statement(self) -> str:
+        # feature_query = textwrap.dedent("""\
+        #     MATCH (feature:Feature {key: $feature_key})
+        #     OPTIONAL MATCH (db:Database)-[:AVAILABLE_FEATURE]->(feature)
+        #     OPTIONAL MATCH (fg:Feature_Group)-[:GROUPS]->(feature)
+        #     OPTIONAL MATCH (feature)-[:OWNER]->(owner:User)
+        #     OPTIONAL MATCH (feature)-[:TAGGED_BY]->(tag:Tag)
+        #     OPTIONAL MATCH (feature)-[:HAS_BADGE]->(badge:Badge)
+        #     OPTIONAL MATCH (feature)-[:DESCRIPTION]->(desc:Description)
+        #     OPTIONAL MATCH (feature)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
+        #     OPTIONAL MATCH (wmk:Feature_Watermark)-[:BELONG_TO_FEATURE]->(feature)
+        #     RETURN feature, desc, fg,
+        #     collect(distinct wmk) as wmk_records,
+        #     collect(distinct db) as availability_records,
+        #     collect(distinct owner) as owner_records,
+        #     collect(distinct tag) as tag_records,
+        #     collect(distinct badge) as badge_records,
+        #     collect(distinct prog_descriptions) as prog_descriptions
+        # """)
+        feature_query = textwrap.dedent("""\
+            MATCH (feature:Feature {key: $feature_key})
+            OPTIONAL MATCH (db:Database)-[:AVAILABLE_FEATURE]->(feature)
+            OPTIONAL MATCH (fg:Feature_Group)-[:GROUPS]->(feature)
+            OPTIONAL MATCH (feature)-[:OWNER]->(owner:User)
+            OPTIONAL MATCH (feature)-[:TAGGED_BY]->(tag:Tag)
+            OPTIONAL MATCH (feature)-[:HAS_BADGE]->(badge:Badge)
+            OPTIONAL MATCH (feature)-[:DESCRIPTION]->(desc:Description)
+            OPTIONAL MATCH (feature)-[:DESCRIPTION]->(prog_descriptions:Programmatic_Description)
+            OPTIONAL MATCH (wmk:Feature_Watermark)-[:BELONG_TO_FEATURE]->(feature)
+            RETURN feature, desc, fg,
+                collect(distinct wmk) as wmk_records,
+                collect(distinct db) as availability_records,
+                collect(distinct owner) as owner_records,
+                collect(distinct tag) as tag_records,
+                collect(distinct badge) as badge_records,
+                collect(distinct prog_descriptions) as prog_descriptions;
+        """)
+        return feature_query
+
+    @timer_with_counter
+    def _exec_feature_query(self, *, feature_key: str) -> Dict:
+        """
+        Executes cypher query to get feature and related nodes
+        """
+
+        feature_query = self._get_exec_feature_query_statement()
+        results = self._execute_cypher_query(statement=feature_query,
+                                             param_dict={'feature_key': feature_key})
+
+        if results is None:
+            raise NotFoundException('Feature with key {} does not exist'.format(feature_key))
+
+        feature_records = get_single_record(results)
+        if feature_records is None:
+            raise NotFoundException('Feature with key {} does not exist'.format(feature_key))
+
+        watermarks = self._create_feature_watermarks(wmk_records=feature_records['wmk_records'])
+
+        availability_records = [db['name'] for db in feature_records.get('availability_records')]
+
+        description = None
+        if feature_records.get('desc'):
+            description = feature_records.get('desc')['description']
+
+        programmatic_descriptions = self._create_programmatic_descriptions(feature_records['prog_descriptions'])
+
+        owners = self._create_owners(feature_records['owner_records'])
+
+        tags = []
+        for record in feature_records.get('tag_records'):
+            tag_result = Tag(tag_name=record['key'],
+                             tag_type=record['tag_type'])
+            tags.append(tag_result)
+
+        feature_node = feature_records['feature']
+
+        feature_group = feature_records['fg']
+
+        return {
+            'key': feature_node.get('key'),
+            'name': feature_node.get('name'),
+            'version': feature_node.get('version'),
+            'feature_group': feature_group.get('name'),
+            'data_type': feature_node.get('data_type'),
+            'entity': feature_node.get('entity'),
+            'description': description,
+            'programmatic_descriptions': programmatic_descriptions,
+            'last_updated_timestamp': feature_node.get('last_updated_timestamp'),
+            'created_timestamp': feature_node.get('created_timestamp'),
+            'watermarks': watermarks,
+            'availability': availability_records,
+            'tags': tags,
+            'badges': self._make_badges(feature_records.get('badge_records')),
+            'owners': owners,
+            'status': feature_node.get('status')
+        }
+
+    def get_feature(self, *, feature_uri: str) -> Feature:
+        """
+        :param feature_uri: uniquely identifying key for a feature node
+        :return: a Feature object
+        """
+        feature_metadata = self._exec_feature_query(feature_key=feature_uri)
+
+        feature = Feature(
+            key=feature_metadata['key'],
+            name=feature_metadata['name'],
+            version=feature_metadata['version'],
+            status=feature_metadata['status'],
+            feature_group=feature_metadata['feature_group'],
+            entity=feature_metadata['entity'],
+            data_type=feature_metadata['data_type'],
+            availability=feature_metadata['availability'],
+            description=feature_metadata['description'],
+            owners=feature_metadata['owners'],
+            badges=feature_metadata['badges'],
+            tags=feature_metadata['tags'],
+            programmatic_descriptions=feature_metadata['programmatic_descriptions'],
+            last_updated_timestamp=feature_metadata['last_updated_timestamp'],
+            created_timestamp=feature_metadata['created_timestamp'],
+            watermarks=feature_metadata['watermarks'])
+        return feature
+
+    def _get_resource_generation_code_query_statement(self, resource_type: ResourceType) -> str:
+        # neo4j_query = textwrap.dedent("""\
+        #     MATCH ({resource_name}:{resource_label} {{key: $resource_key}})
+        #     OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->({resource_name})
+        #     RETURN q as query_records
+        # """.format(resource_name=resource_type.name.lower(), resource_label=resource_type.name))
+        neo4j_query = textwrap.dedent("""\
+            MATCH ({resource_name}:{resource_label} {key: $resource_key})
+            OPTIONAL MATCH (q:Feature_Generation_Code)-[:GENERATION_CODE_OF]->({resource_name})
+            RETURN q as query_records;
+        """.format(resource_name=resource_type.name.lower(), resource_label=resource_type.name))
+        return neo4j_query
+
+    def get_resource_generation_code(self, *, uri: str, resource_type: ResourceType) -> GenerationCode:
+        """
+        Executes cypher query to get query nodes associated with resource
+        """
+        neo4j_query = self._get_resource_generation_code_query_statement(resource_type)
+
+        records = self._execute_cypher_query(statement=neo4j_query,
+                                             param_dict={'resource_key': uri})
+        if not records:
+            raise NotFoundException('Generation code for id {} does not exist'.format(id))
+
+        query_result = get_single_record(records)['query_records']
+        if not query_result:
+            raise NotFoundException('Generation code for id {} does not exist'.format(id))
+
+        return GenerationCode(key=query_result['key'],
+                              text=query_result['text'],
+                              source=query_result['source'])
+
+
+    def _get_snowflake_table_shares_query_statement(self) -> str:
+        # snowflake_table_share_query = textwrap.dedent("""\
+        #     MATCH (table:Table {key: $table_key})
+        #     MATCH (share:Snowflakeshare)-[:SNOWFLAKE_SHARE_OF]->(table)
+        #     OPTIONAL MATCH (share)-[:SNOWFLAKE_LISTING]->(listing:Snowflakelisting)
+        #     RETURN listing.global_name as listing_global_name, listing.name as listing_name, listing.title as listing_title, listing.subtitle as listing_subtitle, listing.description as listing_description,share.owner_account as share_owner_account, share.name as share_name
+        # """)
+        snowflake_table_share_query = textwrap.dedent("""\
+            MATCH (table:Table {key: $table_key})
+            MATCH (share:Snowflakeshare)-[:SNOWFLAKE_SHARE_OF]->(table)
+            OPTIONAL MATCH (share)-[:SNOWFLAKE_LISTING]->(listing:Snowflakelisting)
+            RETURN
+                listing.global_name as listing_global_name,
+                listing.name as listing_name,
+                listing.title as listing_title,
+                listing.subtitle as listing_subtitle,
+                listing.description as listing_description,
+                share.owner_account as share_owner_account,
+                share.name as share_name;
+        """)
+        return snowflake_table_share_query
+
+    @timer_with_counter
+    def get_snowflake_table_shares(self, *, table_uri: str) -> Union[List[SnowflakeTableShare], None]:
+        snowflake_table_share_query = self._get_snowflake_table_shares_query_statement()
+        records = self._execute_cypher_query(statement=snowflake_table_share_query,
+                                             param_dict={'table_key': table_uri})
+
+        if records is None:
+            return None
+
+        snowflake_table_shares = []
+        for record in records:
+
+            listing_global_name = record.get('listing_global_name', None)
+            if listing_global_name:
+                snowflake_listing = SnowflakeListing(global_name=listing_global_name,
+                                                     name=record.get('listing_name', None),
+                                                     title=record.get('listing_title', None),
+                                                     subtitle=record.get('listing_subtitle', None),
+                                                     description=record.get('description', None))
+
+            snowflake_table_share = SnowflakeTableShare(owner_account=record['share_owner_account'],
+                                                        name=record['share_name'],
+                                                        listing=snowflake_listing)
+
+            snowflake_table_shares.append(snowflake_table_share)
+
+        return snowflake_table_shares
+
+
+    def _get_data_provider_query_statement(self) -> str:
+        # data_provider_query = textwrap.dedent("""
+        #     MATCH (data_provider:Data_Provider {key: $data_provider_key})
+        #     OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
+        #     OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider)
+        #     OPTIONAL MATCH (data_location:Data_Location)-[:DATA_LOCATION_OF]->(data_channel)
+        #     WITH data_provider, data_provider_desc, data_channel, collect(data_location) AS data_locations
+        #     WITH data_provider, data_provider_desc,
+        #         CASE WHEN data_channel IS NULL THEN NULL
+        #         ELSE collect({data_channel: data_channel, data_locations: data_locations})
+        #         END AS data_channels
+        #     RETURN data_provider AS data_provider, data_provider_desc, data_channels
+        # """)
+        data_provider_query = textwrap.dedent("""
+            MATCH (data_provider:Data_Provider {key: $data_provider_key})
+            OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
+            OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider)
+            OPTIONAL MATCH (data_location:Data_Location)-[:DATA_LOCATION_OF]->(data_channel)
+            WITH data_provider, data_provider_desc, data_channel, collect(data_location) AS data_locations
+            WITH data_provider, data_provider_desc,
+                CASE WHEN data_channel IS NULL THEN NULL
+                    ELSE collect({data_channel: data_channel, data_locations: data_locations})
+                END AS data_channels
+            RETURN data_provider, data_provider_desc, data_channels;
+        """)
+        return data_provider_query
+
+    def _get_data_location(self, data_location_rec: Dict[str,str]) -> DataLocation:
+        data_location: DataLocation = None
+
+        type = data_location_rec.get("type", None)
+        if "aws_s3" == type:
+            data_location = AwsS3DataLocation(name=data_location_rec["name"],
+                                                key=data_location_rec["key"],
+                                                type=type,
+                                                bucket=data_location_rec["bucket"])
+        elif "filesystem" == type:
+            data_location = FilesystemDataLocation(name=data_location_rec["name"],
+                                                    key=data_location_rec["key"],
+                                                    type=type,
+                                                    drive=data_location_rec["drive"])
+        else:
+            data_location = DataLocation(name=data_location_rec["name"],
+                                            key=data_location_rec["key"],
+                                            type=type)
+
+        return data_location
+
+    @timer_with_counter
+    def get_data_provider(self, *, data_provider_uri: str) -> DataProvider:
+        data_provider_query = self._get_data_provider_query_statement()
+        records = self._execute_cypher_query(statement=data_provider_query,
+                                             param_dict={'data_provider_key': data_provider_uri})
+
+        if records is None:
+            return None
+
+        LOGGER.info(f"records={records}")
+
+        record = get_single_record(records)
+
+        LOGGER.info(f"record={record}")
+
+        if record is None:
+            return None
+
+        data_channels = []
+        if "data_channels" in record and record.get("data_channels"):
+            for rec in record.get("data_channels"):
+                LOGGER.info(f"rec={rec}")
+                data_channel_rec = rec["data_channel"]
+                LOGGER.info(f"data_channel_rec={data_channel_rec}")
+                data_locations = []
+                if "data_locations" in record and record.get("data_locations"):
+                    for data_location_rec in rec.get("data_locations"):
+                        LOGGER.info(f"data_location_rec={data_location_rec}")
+                        data_locations.append(self._get_data_location(data_location_rec))
+
+                data_channel = DataChannel(name=data_channel_rec["name"],
+                                            key=data_channel_rec["key"],
+                                            description=data_channel_rec.get("description", None),
+                                            license=data_channel_rec.get("license", None),
+                                            type=data_channel_rec["type"],
+                                            url=data_channel_rec.get("url", None),
+                                            data_locations=data_locations)
+                data_channels.append(data_channel)
+
+        data_provider_rec = record["data_provider"]
+        data_provider = DataProvider(name=data_provider_rec["name"],
+                                     key=data_provider_rec["key"],
+                                     description=self._safe_get(record, "data_provider_desc", "description"),
+                                     website=data_provider_rec.get("website", None),
+                                     data_channels=data_channels)
+
+        return data_provider
+
+    def _get_file_query_statement(self) -> str:
+        # file_query = textwrap.dedent("""
+        #     MATCH (file:File {key: $file_key})
+        #     OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
+        #     OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
+        #     OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
+        #     OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
+        #     OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+        #     OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
+        #     OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
+        #     OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
+        #     WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+        #     RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
+        # """)
+        file_query = textwrap.dedent("""
+            MATCH (file:File {key: $file_key})
+            OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
+            OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
+            OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
+            OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+            OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
+            OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
+            OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
+            WITH file, file_desc, data_provider, data_channel, data_location,
+                collect(distinct tag) as tags,
+                collect(distinct owner) as owners,
+                collect(distinct file_table) as file_tables,
+                collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
+            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes;
+        """)
+        return file_query
+
+    @timer_with_counter
+    def get_file(self, *, file_uri: str) -> File:
+        file_query = self._get_file_query_statement()
+        records = self._execute_cypher_query(statement=file_query,
+                                             param_dict={'file_key': file_uri})
+
+        if records is None:
+            return None
+
+        record = get_single_record(records)
+
+        # LOGGER.info(f"record={record}")
+
+        data_location_rec = record.get("data_location", None)
+        data_location: DataLocation = None
+        if data_location_rec:
+            data_location = self._get_data_location(data_location_rec)
+
+        data_channel_rec = record.get("data_channel", None)
+        data_channel: DataChannel = None
+        if data_channel_rec:
+            data_channel = DataChannel(name=data_channel_rec["name"],
+                                        key=data_channel_rec["key"],
+                                        description=data_channel_rec.get("description", None),
+                                        license=data_channel_rec.get("license", None),
+                                        type=data_channel_rec["type"],
+                                        url=data_channel_rec.get("url", None))
+
+        data_provider_rec = record.get("data_provider", None)
+        data_provider: DataProvider = None
+        if data_provider_rec:
+            data_provider = DataProvider(name=data_provider_rec["name"],
+                                        key=data_provider_rec["key"],
+                                        description=data_provider_rec.get("desc", None),
+                                        website=data_provider_rec.get("website", None),
+                                        data_channels=[data_channel])
+
+        tags = []
+        tag_records = record['tags']
+        if tag_records:
+            for tag_record in tag_records:
+                tag = Tag(tag_name=tag_record['key'],
+                          tag_type=tag_record['tag_type'])
+                tags.append(tag)
+
+        file_tables_rec = record.get("file_tables", None)
+        file_tables: List[FileTable] = None
+        if file_tables_rec and len(file_tables_rec) > 0:
+            file_tables: List[FileTable] = []
+            for file_table_rec in file_tables_rec:
+                file_table = FileTable(name=file_table_rec["name"],
+                                       content=file_table_rec["content"])
+                file_tables.append(file_table)
+
+        prospectus_waterfall_schemes_rec = record.get("prospectus_waterfall_schemes", None)
+        prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = None
+        if prospectus_waterfall_schemes_rec and len(prospectus_waterfall_schemes_rec) > 0:
+            prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = []
+            for prospectus_waterfall_scheme_rec in prospectus_waterfall_schemes_rec:
+
+                schemes = prospectus_waterfall_scheme_rec["scheme"]
+                schemes = ast.literal_eval(schemes)
+
+                prospectus_schemes: List[ProspectusScheme] = None
+                if schemes and len(schemes) > 0:
+                    prospectus_schemes: List[ProspectusScheme] = []
+                    for scheme in schemes:
+                        short_name, details = next(iter(scheme.items()))
+                        prospectus_scheme = ProspectusScheme(shortName=short_name,
+                                                             details=details)
+                        prospectus_schemes.append(prospectus_scheme)
+
+                prospectus_waterfall_scheme = ProspectusWaterfallScheme(name=prospectus_waterfall_scheme_rec["name"],
+                                                                        scheme=prospectus_schemes)
+                prospectus_waterfall_schemes.append(prospectus_waterfall_scheme)
+
+        owners = self._create_owners(record['owners'])
+
+        file_rec = record["file"]
+        file = File(name=file_rec["name"],
+                    key=file_rec["key"],
+                    description=self._safe_get(record, "file_desc", "description"),
+                    type=file_rec.get("type", None),
+                    category=file_rec.get("category", None),
+                    path=file_rec.get("path", None),
+                    is_directory=file_rec.get("is_directory", None),
+                    dataLocation=data_location,
+                    dataProvider=data_provider,
+                    tags=tags,
+                    owners=owners,
+                    fileTables=file_tables,
+                    prospectusWaterfallSchemes=prospectus_waterfall_schemes)
+
+        return file
+
+    @timer_with_counter
+    def get_file_description(self, *,
+                             id: str) -> Description:
+        """
+        Get the file description. Any exception will propagate back to api server.
+
+        :param id:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.File, uri=id)
+
+    @timer_with_counter
+    def put_file_description(self, *,
+                             id: str,
+                             description: str) -> None:
+        """
+        Update File description
+        :param id: File URI
+        :param description: new value for File description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.File,
+                                      uri=id,
+                                      description=description)
+
+    @timer_with_counter
+    def get_data_provider_description(self, *,
+                             id: str) -> Description:
+        """
+        Get the Provider description. Any exception will propagate back to api server.
+
+        :param id:
+        :return:
+        """
+
+        return self.get_resource_description(resource_type=ResourceType.Data_Provider, uri=id)
+
+    @timer_with_counter
+    def put_data_provider_description(self, *,
+                                      id: str,
+                                      description: str) -> None:
+        """
+        Update Data Provider description
+        :param id: Data Provider URI
+        :param description: new value for Data Provider description
+        """
+
+        self.put_resource_description(resource_type=ResourceType.Data_Provider,
+                                      uri=id,
+                                      description=description)
