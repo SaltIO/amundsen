@@ -10,11 +10,12 @@ import sys
 from typing import Any, Dict  # noqa: F401
 
 from flasgger import Swagger
-from flask import Blueprint, Flask
+from flask import Blueprint, Flask, request
 from flask_cors import CORS
 from flask_restful import Api
 from werkzeug.utils import import_string
 
+from metadata_service.api.auth import AuthAPI
 from metadata_service.api.badge import BadgeAPI
 from metadata_service.api.column import (ColumnBadgeAPI, ColumnDescriptionAPI,
                                          ColumnLineageAPI)
@@ -34,14 +35,15 @@ from metadata_service.api.popular_resources import PopularResourcesAPI
 from metadata_service.api.popular_tables import PopularTablesAPI
 from metadata_service.api.system import Neo4jDetailAPI, StatisticsMetricsAPI
 from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
-                                        TableDescriptionAPI, TableDetailAPI,
+                                        TableDescriptionAPI, TableGET, TablesGET, TableIdGET,
                                         TableLineageAPI, TableOwnerAPI,
-                                        TableTagAPI, TableUpdateFrequencyAPI)
-from metadata_service.api.tag import TagAPI
+                                        TableTagAPI, TableUpdateFrequencyAPI,
+                                        TablePutAPI)
+from metadata_service.api.tag import TagAPI, TagPATCH
 from metadata_service.api.type_metadata import (TypeMetadataBadgeAPI,
                                                 TypeMetadataDescriptionAPI)
 from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
-                                       UserFollowsAPI, UserOwnAPI, UserOwnsAPI,
+                                       UserFollowsAPI, UserOwnAPI, UserOwnsAPI, UserPutAPI,
                                        UserReadsAPI)
 from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
 from metadata_service.api.data_source import (DataProviderDetailAPI,
@@ -51,6 +53,9 @@ from metadata_service.api.data_source import (DataProviderDetailAPI,
                                               FileDescriptionAPI,
                                               FileOwnerAPI,
                                               FileLineageAPI)
+from metadata_service.api.database import (DatabaseIdGET, DatabaseGET, DatabasesGET)
+from metadata_service.api.cluster import (ClusterIdGET, ClusterGET, ClustersGET)
+from metadata_service.api.schema import (SchemaIdGET, SchemaGET, SchemasGET)
 from metadata_service.deprecations import process_deprecations
 
 
@@ -114,10 +119,16 @@ def create_app(*, config_module_class: str) -> Flask:
     if init_custom_ext_routes:
         init_custom_ext_routes(app)
 
-    api_bp = Blueprint('api', __name__)
+    api_bp = Blueprint(
+        name='api',
+        import_name=__name__,
+        url_prefix="/metadata-api"
+    )
     api = Api(api_bp)
 
     api.add_resource(HealthcheckAPI, '/healthcheck')
+
+    api.add_resource(AuthAPI, '/auth/token')
 
     # `PopularTablesAPI` is deprecated, and will be removed in version 4.
     api.add_resource(PopularTablesAPI,
@@ -126,7 +137,17 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(PopularResourcesAPI,
                      '/popular_resources/',
                      '/popular_resources/<path:user_id>')
-    api.add_resource(TableDetailAPI, '/table/<path:table_uri>')
+    api.add_resource(TableIdGET,
+                     '/table')
+    api.add_resource(TableGET,
+                     '/table/<path:database>/<path:cluster>/<path:schema>/<path:table>')
+    api.add_resource(TablesGET,
+                     '/tables/',
+                     '/tables/<path:database>',
+                     '/tables/<path:database>/<path:cluster>',
+                     '/tables/<path:database>/<path:cluster>/<path:schema>')
+    api.add_resource(TablePutAPI,
+                     '/table/')
     api.add_resource(TableDescriptionAPI,
                      '/table/<path:id>/description')
     api.add_resource(TableTagAPI,
@@ -157,11 +178,15 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/system/statistics')
     api.add_resource(TagAPI,
                      '/tags/')
+    api.add_resource(TagPATCH,
+                     '/tag')
     api.add_resource(BadgeAPI,
                      '/badges/')
     api.add_resource(UserDetailAPI,
-                     '/user',
+                     '/user/',
                      '/user/<path:id>')
+    api.add_resource(UserPutAPI,
+                     '/user/')
     api.add_resource(UserFollowsAPI,
                      '/user/<path:user_id>/follow/')
     api.add_resource(UserFollowAPI,
@@ -180,7 +205,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/dashboard/<path:id>/tag/<tag>')
     api.add_resource(DashboardBadgeAPI,
                      '/dashboard/<path:id>/badge/<badge>')
-    api.add_resource(FeatureDetailAPI, '/feature/<path:feature_uri>')
+    api.add_resource(FeatureDetailAPI,
+                     '/feature/<path:feature_uri>')
     api.add_resource(FeatureDescriptionAPI,
                      '/feature/<path:id>/description')
     api.add_resource(FeatureTagAPI,
@@ -213,6 +239,27 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/data_source/file/<path:file_uri>/owner/<owner>')
     api.add_resource(FileLineageAPI,
                      '/data_source/file/<path:id>/lineage')
+    api.add_resource(DatabaseIdGET,
+                     '/database')
+    api.add_resource(DatabaseGET,
+                    '/database/<path:database>')
+    api.add_resource(DatabasesGET,
+                    '/databases')
+    api.add_resource(ClusterIdGET,
+                     '/cluster')
+    api.add_resource(ClusterGET,
+                     '/cluster/<path:database>/<path:cluster>')
+    api.add_resource(ClustersGET,
+                     '/clusters/',
+                     '/clusters/<path:database>')
+    api.add_resource(SchemaIdGET,
+                     '/schema')
+    api.add_resource(SchemaGET,
+                     '/schema/<path:database>/<path:cluster>/<path:schema>')
+    api.add_resource(SchemasGET,
+                     '/schemas/',
+                     '/schemas/<path:database>',
+                     '/schemas/<path:database>/<path:cluster>')
     app.register_blueprint(api_bp)
 
     # cli registration
@@ -222,10 +269,67 @@ def create_app(*, config_module_class: str) -> Flask:
         logging.info('Using cli {}'.format(proxy_cli))
 
     if app.config.get('SWAGGER_ENABLED'):
-        Swagger(app, template_file=os.path.join(ROOT_DIR, app.config.get('SWAGGER_TEMPLATE_PATH')), parse=True)
+        Swagger(
+            app,
+            template_file=os.path.join(ROOT_DIR, app.config.get('SWAGGER_TEMPLATE_PATH')),
+            parse=True
+        )
 
     # handles the deprecation warnings
     # and process any config/environment variables accordingly
     process_deprecations(app)
+
+    if app.config.get('LOG_REQUESTS'):
+        logging.basicConfig(level=logging.DEBUG)
+        @app.before_request
+        def log_request_info():
+            msg = f"""
+*******************
+*** Request URL ***
+*******************
+
+{request.url}
+
+**********************
+*** Request Method ***
+**********************
+
+{request.method}
+
+***********************
+*** Request Headers ***
+***********************
+
+{str(request.headers).strip()}
+
+********************
+*** Request Body ***
+********************
+
+{str(request.get_data()).strip()}
+            """
+            app.logger.debug(msg)
+            return None
+
+        @app.after_request
+        def log_response_info(response):
+            if response.direct_passthrough:
+                return response  # ✅ Skip logging body for static files
+
+            msg = f"""
+****************************
+*** Response Request URL ***
+****************************
+
+{request.url}
+
+*********************
+*** Response Data ***
+*********************
+
+{str(response.get_data(as_text=True)).strip()}
+            """
+            app.logger.debug(msg)
+            return response
 
     return app

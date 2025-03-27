@@ -1,8 +1,11 @@
 Delete the user following information
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'user'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: user_id
     in: path
     example: 'roald9@example.org'
@@ -26,6 +29,10 @@ parameters:
       type: string
     required: true
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'User following for table removed'
     content:

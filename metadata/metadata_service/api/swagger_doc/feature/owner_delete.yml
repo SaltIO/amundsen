@@ -1,8 +1,11 @@
 Deletes an owner from a feature
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'feature'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: feature_uri
     in: path
     type: string
@@ -18,6 +21,10 @@ parameters:
     required: true
     example: 'roald9@example.org'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'Owner deleted'
     content:

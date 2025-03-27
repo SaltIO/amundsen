@@ -5,9 +5,7 @@ import os
 
 from setuptools import find_packages, setup
 
-__version__ = '4.1.1'
-
-oidc = ['flaskoidc>=1.0.0']
+__version__ = '4.0.0'
 
 requirements_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'requirements.txt')
 with open(requirements_path) as requirements_file:
@@ -21,7 +19,9 @@ requirements_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'r
 with open(requirements_path) as requirements_file:
     requirements_dev = requirements_file.readlines()
 
-all_deps = requirements + requirements_common + requirements_dev + oidc
+# oidc = ['flaskoidc>=1.0.0']
+# all_deps = requirements + requirements_common + requirements_dev + oidc
+all_deps = requirements + requirements_common + requirements_dev
 
 setup(
     name='amundsen-search',
@@ -36,9 +36,9 @@ setup(
     dependency_links=[],
     install_requires=requirements + requirements_common,
     extras_require={
-        'all': all_deps,
+    #     'all': all_deps,
         'dev': requirements_dev,
-        'oidc': oidc
+    #     'oidc': oidc
     },
     python_requires=">=3.7"
 )

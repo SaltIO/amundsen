@@ -1,20 +1,13 @@
-import json
 from http import HTTPStatus
-from typing import Any, Iterable, Mapping, Optional, Union
+from typing import Iterable, Mapping, Union
 import logging
 
-from amundsen_common.entity.resource_type import ResourceType
-from amundsen_common.models.lineage import LineageSchema
-from amundsen_common.models.snowflake.snowflake import SnowflakeTableSharesSchema
 from flasgger import swag_from
 from flask_restful import Resource, fields, marshal
 
-from metadata_service.api import BaseAPI
-from metadata_service.api.badge import BadgeCommon
-from metadata_service.api.tag import TagCommon
-from metadata_service.entity.dashboard_summary import DashboardSummarySchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
+from metadata_service.auth import requires_auth
 
 
 LOGGER = logging.getLogger(__name__)
@@ -45,6 +38,7 @@ class SnowflakeTableShareAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('../swagger_doc/snowflake/snowflake_table_share_get.yml')
     def get(self, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:

@@ -1,8 +1,11 @@
 Delete the user owner information
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'user'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: user_id
     in: path
     example: 'roald9@example.org'
@@ -18,14 +21,12 @@ parameters:
     schema:
       type: string
     required: true
-  - name: table_uri
-    in: path
-    example: 'hive://gold.test_schema/test_table1'
-    type: string
-    schema:
-      type: string
-    required: true
+  - $ref: '#/components/parameters/TableUriParameter'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'User following information deleted successfully'
     content:

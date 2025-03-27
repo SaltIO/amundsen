@@ -1,0 +1,28 @@
+Delete badges of a feature
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'feature'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/ResourceIdParameter'
+  - $ref: '#/components/parameters/BadgeNameParameter'
+  - $ref: '#/components/parameters/BadgeCategoryParameter'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'The badge was deleted successfully'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/MessageResponse'
+  404:
+    description: 'Feature or badge not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

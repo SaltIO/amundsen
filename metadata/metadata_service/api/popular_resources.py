@@ -13,6 +13,7 @@ from flask_restful import Resource
 
 from metadata_service.deprecations import print_deprecation_warning
 from metadata_service.proxy import get_proxy_client
+from metadata_service.auth import requires_auth
 
 
 class PopularResourcesAPI(Resource):
@@ -23,6 +24,7 @@ class PopularResourcesAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/popular_resources_get.yml')
     def get(self, user_id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         limit = request.args.get('limit', 10, type=int)

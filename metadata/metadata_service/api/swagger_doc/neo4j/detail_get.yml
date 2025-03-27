@@ -1,8 +1,14 @@
 Gets system information for neo4j
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'neo4j'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Neo4j system information'
     content:

@@ -1,5 +1,3 @@
-# Copyright Contributors to the Amundsen project.
-# SPDX-License-Identifier: Apache-2.0
 
 import logging
 import os
@@ -45,14 +43,16 @@ requirements_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'r
 with open(requirements_path) as requirements_file:
     requirements_dev = requirements_file.readlines()
 
-__version__ = '4.2.0'
+__version__ = '4.0.0'
 
-jira = ['jira==3.0.1']
-asana = ['asana==0.10.3']
-oidc = ['flaskoidc>=1.0.0']
-pyarrrow = ['pyarrow==3.0.0']
-bigquery_preview = ['google-cloud-bigquery>=2.13.1,<3.0.0', 'flatten-dict==0.3.0']
-all_deps = requirements + requirements_common + requirements_dev + oidc + pyarrrow + bigquery_preview + jira + asana
+# jira = ['jira==3.0.1']
+# asana = ['asana==0.10.3']
+# oidc = ['flaskoidc>=1.0.0']
+# pyarrrow = ['pyarrow==3.0.0']
+# bigquery_preview = ['google-cloud-bigquery>=2.13.1,<3.0.0', 'flatten-dict==0.3.0']
+
+# all_deps = requirements + requirements_common + requirements_dev + oidc + pyarrrow + bigquery_preview + jira + asana
+all_deps = requirements + requirements_common + requirements_dev
 
 setup(
     name='amundsen-frontend',
@@ -67,13 +67,13 @@ setup(
     setup_requires=['cython >= 0.29'],
     install_requires=requirements + requirements_common,
     extras_require={
-        'oidc': oidc,
+    #     'oidc': oidc,
         'dev': requirements_dev,
-        'pyarrow': pyarrrow,
-        'bigquery_preview': bigquery_preview,
-        'jira': jira,
-        'asana': asana,
-        'all': all_deps,
+    #     'pyarrow': pyarrrow,
+    #     'bigquery_preview': bigquery_preview,
+    #     'jira': jira,
+    #     'asana': asana,
+    #     'all': all_deps,
     },
     python_requires=">=3.7",
     entry_points="""

@@ -1,0 +1,20 @@
+Upserts description of a feature resource
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'feature'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/ResourceIdParameter'
+requestBody:
+  $ref: '#/components/requestBodies/DescriptionPutRequest'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    $ref: '#/components/responses/ResourceNotFoundResponse'

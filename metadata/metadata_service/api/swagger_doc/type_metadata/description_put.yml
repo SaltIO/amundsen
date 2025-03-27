@@ -1,8 +1,11 @@
 Updates type_metadata description (passed as a request body)
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'type_metadata'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: type_metadata_key
     in: path
     type: string
@@ -11,13 +14,12 @@ parameters:
     required: true
     example: 'dynamo://gold.test_schema/test_table2/col2/type/col2'
 requestBody:
-  content:
-    application/json:
-      schema:
-        $ref: '#/components/schemas/Description'
-        description: 'TypeMetadata description'
-        required: true
+  $ref: '#/components/requestBodies/DescriptionPutRequest'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'Empty json response'
     content:

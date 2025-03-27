@@ -1,8 +1,14 @@
 Gets system statistics for database
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'system'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'System statistics metrics'
     content:
