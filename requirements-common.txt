@@ -5,7 +5,8 @@
 
 # It is recommended to always pin the exact version (not range) - otherwise common upgrade won't trigger unit tests
 # on all repositories reyling on this file and any issues that arise from common upgrade might be missed.
-amundsen-common>=0.27.0
+amundsen-common==0.31.0+foodtruck.7
+# amundsen-common>=0.27.0
 attrs>=19.1.0
 boto3==1.17.23
 click==7.0
@@ -25,3 +26,35 @@ statsd==3.2.1
 typing==3.6.4
 werkzeug==2.0.3
 wheel==0.36.2
+
+### Other ###
+simplejson==3.17.6
+
+### Preview ###
+SQLAlchemy==1.4.52
+
+### Snowflake Preview
+snowflake-connector-python
+snowflake-sqlalchemy
+
+
+### Dremio Preview ###
+# sqlalchemy-dremio==2.0.2 # Flight only
+sqlalchemy-dremio
+# This version is required due to some issue with the Dremio ODBC Driver
+# https://support.dremio.com/hc/en-us/articles/7524094752667-pyodbc-4-0-34-breaks-connectivity-with-Dremio-ODBC
+#pyodbc#==4.0.32
+pyodbc
+
+### Postgres preview ###
+psycopg2-binary
+
+### MySQL preview ###
+mysql-connector-python
+
+### MSSQL preview ###
+mssql
+
+### AI - GPT ###
+openai
+###

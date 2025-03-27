@@ -4,23 +4,25 @@
 import json
 import logging
 from typing import (
-    Any, Dict, List,
+    Any, Dict, List, Union
 )
 
+from amundsen_common.models.api import health_check
 from amundsen_common.models.search import (
     Filter, HighlightOptions, SearchResponse,
 )
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, TransportError, ApiError
 from elasticsearch_dsl import (
     MultiSearch, Q, Search,
 )
 from elasticsearch_dsl.query import Match, RankFeature
 from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.utils import AttrList
 from flask import current_app
+from werkzeug.exceptions import InternalServerError
 
 from search_service import config
 from search_service.proxy.es_proxy_utils import Resource, create_search_response
-from search_service.proxy.es_proxy_v2 import BOOL_QUERY, ElasticsearchProxyV2
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,8 +33,13 @@ DEFAULT_FUZZINESS = "AUTO"
 # using fvh as the default highlighter because it supports very large documents
 DEFAULT_HIGHLIGHTER = 'fvh'
 
+BOOL_QUERY = 'bool'
+WILDCARD_QUERY = 'wildcard'
+TERM_QUERY = 'term'
+TERMS_QUERY = 'terms'
 
-class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
+
+class ElasticsearchProxyV2_1():
 
     # map the field name in FE to the field used to filter in ES
     # note: ES needs keyword field types to filter
@@ -49,7 +56,7 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
         'tag': 'tags.keyword',
         'schema': 'schema.keyword',
         'table': 'name.keyword',
-        'column': 'columns.keyword',
+        'column': 'column_names.keyword',
         'database': 'database.keyword',
         'cluster': 'cluster.keyword',
     }
@@ -64,6 +71,7 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
         'query_names': 'query_names.keyword',
         'name': 'name.keyword',
         'tag': 'tags.keyword',
+        'product': 'product.keyword',
     }
 
     FEATURE_MAPPING = {
@@ -86,58 +94,136 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
         'resource_type': 'resource_type',
     }
 
+    DATA_PROVIDER_MAPPING = {
+        **GENERAL_MAPPING,
+        # 'badges': 'badges.keyword',
+        'tag': 'tags.keyword',
+        'name': 'name.keyword',
+        'type': 'type.keyword',
+        'category': 'category.keyword',
+        'data_location_type': 'data_location_type.keyword',
+        'data_location_name': 'data_location_name.keyword',
+    }
+
+    FILE_MAPPING = {
+        **GENERAL_MAPPING,
+        # 'badges': 'badges.keyword',
+        'tag': 'tags.keyword',
+        'name': 'name.keyword',
+        'type': 'type.keyword',
+        'category': 'category.keyword',
+        'path': 'path.keyword',
+        'is_directory': 'is_directory.keyword',
+        'data_location_type': 'data_location_type.keyword',
+        'data_location_name': 'data_location_name.keyword',
+        'data_channel_type': 'data_channel_type.keyword',
+        'data_channel_name': 'data_channel_name.keyword',
+        'data_channel_license': 'data_channel_license.keyword',
+        'data_provider_name': 'data_provider_name.keyword',
+    }
+
     RESOURCE_TO_MAPPING = {
         Resource.TABLE: TABLE_MAPPING,
         Resource.DASHBOARD: DASHBOARD_MAPPING,
         Resource.FEATURE: FEATURE_MAPPING,
         Resource.USER: USER_MAPPING,
+        Resource.FILE: FILE_MAPPING,
+        Resource.DATA_PROVIDER: DATA_PROVIDER_MAPPING,
     }
 
-    # The overriding of __new__ here is a temporary solution to provide backwards compatiblity
-    # until most of the community has moved to using the new Elasticsearch mappings and it will
-    # be removed once ElasticsearchProxyV2 id deprecated
-    def __new__(cls: Any,
-                host: str,
-                user: str,
-                password: str,
-                client: Elasticsearch,
-                page_size: int, *args: str, **kwargs: int) -> Any:
-        elasticsearch_client = None
+    MUST_FIELDS_TABLE = ['name^3',
+                         'name.raw^3',
+                         'schema^2',
+                         'description',
+                         'column_names',
+                         'badges']
+
+    MUST_FIELDS_DASHBOARD = ['name.raw^75',
+                             'name^7',
+                             'group_name.raw^15',
+                             'group_name^7',
+                             'description^3',
+                             'query_names^3',
+                             'chart_names^2']
+
+    MUST_FIELDS_FEATURE = ['feature_name.raw^25',
+                           'feature_name^7',
+                           'feature_group.raw^15',
+                           'feature_group^7',
+                           'version^7',
+                           'description^3',
+                           'status',
+                           'entity',
+                           'tags',
+                           'badges']
+
+    MUST_FIELDS_USER = ['full_name.raw^30',
+                        'full_name^5',
+                        'first_name.raw^5',
+                        'last_name.raw^5',
+                        'first_name^3',
+                        'last_name^3',
+                        'email^3']
+
+    MUST_FIELDS_DATA_PROVIDER = ['name.raw^30',
+                                 'name^5']
+
+    MUST_FIELDS_FILE = ['name.raw^30',
+                        'name^5']
+
+
+    def __init__(self, *,
+                 host: str = None,
+                 user: str = '',
+                 password: str = '',
+                 client: Elasticsearch = None,
+                 page_size: int = 10) -> None:
+
         if client:
-            elasticsearch_client = client
+            self.elasticsearch = client
         else:
             http_auth = (user, password) if user else None
-            elasticsearch_client = Elasticsearch(host, http_auth=http_auth)
+            self.elasticsearch = Elasticsearch(host, http_auth=http_auth)
+        self.page_size = page_size
 
-        # check if any index uses the most up to date mappings (version == 2)
-        indices = elasticsearch_client.indices.get_alias(index='*')
-        mappings_up_to_date = False
-        for index in indices:
-            index_mapping = elasticsearch_client.indices.get_mapping(index=index).get(index)
-            mapping_meta_field = index_mapping.get('mappings').get('_meta')
-            if mapping_meta_field is not None and mapping_meta_field.get('version') == 2:
-                mappings_up_to_date = True
-                break
+    def health(self) -> health_check.HealthCheck:
+        """
+        Returns the health of the Elastic search cluster
+        """
+        try:
 
-        if mappings_up_to_date:
-            # Use ElasticsearchProxyV2_1 if indexes are up to date with mappings
-            obj = super(ElasticsearchProxyV2_1, cls).__new__(cls)
-            return obj
+            if self.elasticsearch.ping():
+                health_response = self.elasticsearch.cluster.health()
+                health = health_response.body
+                # ES status vaues: green, yellow, red
+                status = health_check.OK if health['status'] != 'red' else health_check.FAIL
+            else:
+                health = {'status': 'Unable to connect'}
+                status = health_check.FAIL
+            checks = {f'{type(self).__name__}:connection': health}
+        except (TransportError, ApiError) as err:
+            status = health_check.FAIL
+            checks = {f'{type(self).__name__}:connection': {'status': 'Unable to connect'}}
+        return health_check.HealthCheck(status=status, checks=checks)
 
-        # If old mappings are used proxy client should be ElasticsearchProxyV2
-        obj = super(ElasticsearchProxyV2_1, cls).__new__(ElasticsearchProxyV2)
-        obj.__init__(host=host,
-                     user=user,
-                     password=password,
-                     client=elasticsearch_client,
-                     page_size=page_size)
-        return obj
+    def _get_must_fields(self, resource: Resource) -> List[str]:
+        must_fields_mapping = {
+            Resource.TABLE: self.MUST_FIELDS_TABLE,
+            Resource.DASHBOARD: self.MUST_FIELDS_DASHBOARD,
+            Resource.FEATURE: self.MUST_FIELDS_FEATURE,
+            Resource.USER: self.MUST_FIELDS_USER,
+            Resource.DATA_PROVIDER: self.MUST_FIELDS_DATA_PROVIDER,
+            Resource.FILE: self.MUST_FIELDS_FILE
+        }
+
+        return must_fields_mapping[resource]
 
     def get_index_alias_for_resource(self, resource_type: Resource) -> str:
         resource_str = resource_type.name.lower()
         alias_config = current_app.config.get(
             config.ES_INDEX_ALIAS_TEMPLATE
         )
+
         if alias_config is None:
             return f'{resource_str}_search_index_v2_1'
 
@@ -178,7 +264,7 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
         ]
 
         if resource == Resource.TABLE:
-            columns_subfield = 'columns.general'
+            columns_subfield = 'column_names.general'
             should_clauses.extend([
                 Match(schema={
                     "query": query_term,
@@ -265,6 +351,22 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
                     "boost": 4
                 }),
             ]
+        elif resource == Resource.DATA_PROVIDER:
+            should_clauses.extend([
+                Match(name={
+                    "query": query_term,
+                    "fuzziness": DEFAULT_FUZZINESS,
+                    "boost": 3
+                }),
+            ])
+        elif resource == Resource.FILE:
+            should_clauses.extend([
+                Match(name={
+                    "query": query_term,
+                    "fuzziness": DEFAULT_FUZZINESS,
+                    "boost": 3
+                }),
+            ])
 
         must_clauses: List[Q] = [Q(BOOL_QUERY, should=should_clauses)]
 
@@ -304,6 +406,82 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
 
         return rank_feature_queries
 
+    def _build_filters(self, resource: Resource, filters: List[Filter]) -> List:
+        """
+        Builds the query object for all of the filters given in the search request
+        """
+        mapping = type(self).RESOURCE_TO_MAPPING.get(resource)
+
+        filter_queries: List = []
+
+        for filter in filters:
+            if mapping is not None and mapping.get(filter.name) is not None:
+                # only apply filter to query if field exists for the given resource
+                filter_name = mapping.get(filter.name)
+
+                queries_per_term = [Q(WILDCARD_QUERY, **{filter_name: term}) for term in filter.values]
+
+                if filter.operation == 'OR':
+                    filter_queries.append(Q(BOOL_QUERY, should=queries_per_term, minimum_should_match=1))
+
+                elif filter.operation == 'AND':
+                    for q in queries_per_term:
+                        filter_queries.append(q)
+
+                else:
+                    msg = f'Invalid operation {filter.operation} for filter {filter_name} with values {filter.values}'
+                    raise ValueError(msg)
+            else:
+                LOGGER.info(f'Filter {filter.name} does not apply to {resource}')
+
+        return filter_queries
+
+    def _build_elasticsearch_query(self, *,
+                                   resource: Resource,
+                                   query_term: str,
+                                   filters: List[Filter]) -> Q:
+
+        must_query = self._build_must_query(resource=resource,
+                                            query_term=query_term)
+
+        should_query = self._build_should_query(resource=resource,
+                                                query_term=query_term)
+
+        filters = self._build_filters(resource=resource, filters=filters)
+
+        es_query = Q(BOOL_QUERY, must=must_query, should=should_query, filter=filters)
+
+        return es_query
+
+    def execute_queries(self, queries: Dict[Resource, Q],
+                        page_index: int,
+                        results_per_page: int) -> List[Response]:
+        multisearch = MultiSearch(using=self.elasticsearch)
+
+        for resource in queries.keys():
+            query_for_resource = queries.get(resource)
+
+            res_index = self.get_index_alias_for_resource(resource_type=resource)
+            if self.elasticsearch.indices.exists(index=res_index):
+                search = Search(index=res_index).query(query_for_resource)
+                LOGGER.info(json.dumps(search.to_dict()))
+
+                # pagination
+                start_from = page_index * results_per_page
+                end = results_per_page * (page_index + 1)
+
+                search = search[start_from:end]
+
+                multisearch = multisearch.add(search)
+            else:
+                LOGGER.warn(f"Indice for resource {resource} does not exist.  Not including in MultiSearch")
+        try:
+            response = multisearch.execute()
+            return response
+        except Exception as e:
+            LOGGER.error(f'Failed to execute ES search queries. {e}')
+            return []
+
     def _search_highlight(self,
                           resource: Resource,
                           search: Search,
@@ -321,7 +499,7 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
                                       type=DEFAULT_HIGHLIGHTER,
                                       number_of_fragments=0)
             if resource == Resource.TABLE:
-                search = search.highlight('columns.general',
+                search = search.highlight('column_names.general',
                                           type=DEFAULT_HIGHLIGHTER,
                                           number_of_fragments=10,
                                           order='score')
@@ -363,28 +541,34 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
         multisearch = MultiSearch(using=self.elasticsearch)
 
         for resource in resource_types:
-            # build a query for each resource to search
-            query_for_resource = self._build_elasticsearch_query(resource=resource,
-                                                                 query_term=query_term,
-                                                                 filters=filters)
-            # wrap the query in a search object
-            search = Search(index=self.get_index_alias_for_resource(resource_type=resource)).query(query_for_resource)
 
-            # highlighting
-            if highlight_options:
-                search = self._search_highlight(resource=resource,
-                                                search=search,
-                                                highlight_options=highlight_options)
+            res_index = self.get_index_alias_for_resource(resource_type=resource)
+            if self.elasticsearch.indices.exists(index=res_index):
+                # build a query for each resource to search
+                query_for_resource = self._build_elasticsearch_query(resource=resource,
+                                                                    query_term=query_term,
+                                                                    filters=filters)
+                # wrap the query in a search object
+                search = Search(index=res_index).query(query_for_resource)
 
-            # pagination
-            start_from = page_index * results_per_page
-            end = results_per_page * (page_index + 1)
-            search = search[start_from:end]
+                # highlighting
+                if highlight_options:
+                    search = self._search_highlight(resource=resource,
+                                                    search=search,
+                                                    highlight_options=highlight_options)
 
-            # add search object to multisearch
-            LOGGER.info(json.dumps(search.to_dict()))
-            multisearch = multisearch.add(search)
+                # pagination
+                start_from = page_index * results_per_page
+                end = results_per_page * (page_index + 1)
+                search = search[start_from:end]
 
+                # add search object to multisearch
+                LOGGER.info(f"resource={resource};search={json.dumps(search.to_dict())}")
+                multisearch = multisearch.add(search)
+            else:
+                LOGGER.warn(f"Indice for resource {resource} does not exist.  Not including in MultiSearch")
+
+        LOGGER.info(f"multisearch={json.dumps(multisearch.to_dict())}")
         responses = self.execute_multisearch_query(multisearch=multisearch)
 
         formatted_response = create_search_response(page_index=page_index,
@@ -394,3 +578,149 @@ class ElasticsearchProxyV2_1(ElasticsearchProxyV2):
                                                     resource_to_field_mapping=self.RESOURCE_TO_MAPPING)
 
         return formatted_response
+
+    def get_document_json_by_key(self,
+                                 resource_key: str,
+                                 resource_type: Resource) -> Any:
+        key_query = {
+            resource_type: Q(TERM_QUERY, key=resource_key),
+        }
+        response: Response = self.execute_queries(queries=key_query,
+                                                  page_index=0,
+                                                  results_per_page=1)
+        if len(response) < 1:
+            msg = f'No response from ES for key query {key_query[resource_type]}'
+            LOGGER.error(msg)
+            raise ApiError(msg)
+
+        response = response[0]
+        if response.success():
+            results_count = response.hits.total.value
+            if results_count == 1:
+                es_result = response.hits.hits[0]
+                return es_result
+
+            if results_count > 1:
+                msg = f'Key {key_query[resource_type]} is not unique to a single ES resource'
+                LOGGER.error(msg)
+                raise ValueError(msg)
+
+            else:
+                # no doc exists with given key in ES
+                msg = f'Requested key {resource_key} query returned no results in ES'
+                LOGGER.error(msg)
+                raise ValueError(msg)
+        else:
+            msg = f'Request to Elasticsearch failed: {response.failures}'
+            LOGGER.error(msg)
+            raise InternalServerError(msg)
+
+    def update_document_by_id(self, *,
+                              resource_type: Resource,
+                              field: str,
+                              new_value: Union[List, str, None],
+                              document_id: str) -> None:
+
+        partial_document = {
+            'doc': {
+                field: new_value
+            }
+        }
+        self.elasticsearch.update(index=self.get_index_alias_for_resource(resource_type=resource_type),
+                                  id=document_id,
+                                  body=partial_document)
+
+    def update_document_by_key(self, *,
+                               resource_key: str,
+                               resource_type: Resource,
+                               field: str,
+                               value: str = None,
+                               operation: str = 'add') -> str:
+
+        mapped_field = self.RESOURCE_TO_MAPPING[resource_type].get(field)
+        if not mapped_field:
+            mapped_field = field
+
+        try:
+            es_hit = self.get_document_json_by_key(resource_key=resource_key,
+                                                   resource_type=resource_type)
+            document_id = es_hit._id
+            current_value = getattr(es_hit._source, mapped_field)
+
+        except Exception as e:
+            msg = f'Failed to get ES document id and current value for key {resource_key}. {e}'
+            LOGGER.error(msg)
+            return msg
+
+        new_value = current_value
+
+        if operation == 'overwrite':
+            if type(current_value) is AttrList:
+                new_value = [value]
+            else:
+                new_value = value
+        else:
+            # operation is add
+            if type(current_value) is AttrList:
+                curr_list = list(current_value)
+                curr_list.append(value)
+                new_value = curr_list
+            else:
+                new_value = [current_value, value]
+
+        try:
+            self.update_document_by_id(resource_type=resource_type,
+                                       field=mapped_field,
+                                       new_value=new_value,
+                                       document_id=document_id)
+        except Exception as e:
+            msg = f'Failed to update field {field} with value {new_value} for {resource_key}. {e}'
+            LOGGER.error(msg)
+            return msg
+
+        return f'ES document field {field} for {resource_key} with value {value} was updated successfully'
+
+    def delete_document_by_key(self, *,
+                               resource_key: str,
+                               resource_type: Resource,
+                               field: str,
+                               value: str = None) -> str:
+        mapped_field = self.RESOURCE_TO_MAPPING[resource_type].get(field)
+        if not mapped_field:
+            mapped_field = field
+
+        try:
+            es_hit = self.get_document_json_by_key(resource_key=resource_key,
+                                                   resource_type=resource_type)
+            document_id = es_hit._id
+            current_value = getattr(es_hit._source, mapped_field)
+
+        except Exception as e:
+            msg = f'Failed to get ES document id and current value for key {resource_key}. {e}'
+            LOGGER.error(msg)
+            return msg
+
+        new_value = current_value
+
+        if type(current_value) is AttrList:
+            if value:
+                curr_list = list(current_value)
+                curr_list.remove(value)
+                new_value = curr_list
+            else:
+                new_value = []
+        else:
+            # no value given when deleting implies
+            # delete is happening on a single value field
+            new_value = ''
+        try:
+            self.update_document_by_id(resource_type=resource_type,
+                                       field=mapped_field,
+                                       new_value=new_value,
+                                       document_id=document_id)
+        except Exception as e:
+            msg = f'Failed to delete field {field} with value {new_value} for {resource_key}. {e}'
+            LOGGER.error(msg)
+            return msg
+
+        return f'ES document field {field} for {resource_key} with value {value} was deleted successfully'

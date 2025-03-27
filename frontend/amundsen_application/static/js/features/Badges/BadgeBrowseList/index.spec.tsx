@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { shallow } from 'enzyme';
 
-import { BadgeStyle } from 'config/config-types';
+import { DefaultBadgeStyle } from 'config/config-types';
 import * as ConfigUtils from 'config/config-utils';
 import { Badge } from 'interfaces/Badges';
 
@@ -44,7 +44,7 @@ describe('BadgeBrowseList', () => {
 
   getBadgeConfigSpy.mockImplementation((badgeName: string) => ({
     displayName: badgeName + ' test name',
-    style: BadgeStyle.PRIMARY,
+    style: DefaultBadgeStyle.PRIMARY,
   }));
 
   describe('render', () => {

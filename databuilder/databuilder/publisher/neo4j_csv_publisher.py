@@ -300,9 +300,10 @@ class Neo4jCsvPublisher(Publisher):
         with open(node_file, 'r', encoding='utf8') as node_csv:
             for node_record in pandas.read_csv(node_csv,
                                                na_filter=False).to_dict(orient="records"):
+                # LOGGER.info(f'Executing Neo4J MERGE: \n{node_record}')
                 stmt = self.create_node_merge_statement(node_record=node_record)
                 params = self._create_props_param(node_record)
-                tx = self._execute_statement(stmt, tx, params)
+                tx = self._execute_statement(stmt, tx, params, True)
         return tx
 
     def is_create_only_node(self, node_record: dict) -> bool:
@@ -323,9 +324,10 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         template = Template("""
-            MERGE (node:{{ LABEL }} {key: $KEY})
+            MERGE (node:{{ LABEL }} {key: toLower($KEY)})
             ON CREATE SET {{ PROP_BODY }}
             {% if update %} ON MATCH SET {{ PROP_BODY }} {% endif %}
+            RETURN node
         """)
 
         prop_body = self._create_props_body(node_record, NODE_REQUIRED_KEYS, 'node')
@@ -363,10 +365,11 @@ class Neo4jCsvPublisher(Publisher):
                         start_key=rel_record[RELATION_START_KEY],
                         end_key=rel_record[RELATION_END_KEY],
                         relation=rel_record[RELATION_TYPE],
-                        reverse_relation=rel_record[RELATION_REVERSE_TYPE])
+                        reverse_relation=(rel_record[RELATION_REVERSE_TYPE] if RELATION_REVERSE_TYPE in rel_record else None)
+                    )
 
                     if stmt:
-                        tx = self._execute_statement(stmt, tx=tx, params=params)
+                        tx = self._execute_statement(stmt, tx=tx, params=params, expect_result=True)
                         count += 1
 
             LOGGER.info('Executed pre-processing Cypher statement %i times', count)
@@ -399,23 +402,30 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         template = Template("""
-            MATCH (n1:{{ START_LABEL }} {key: $START_KEY}), (n2:{{ END_LABEL }} {key: $END_KEY})
-            MERGE (n1)-[r1:{{ TYPE }}]->(n2)-[r2:{{ REVERSE_TYPE }}]->(n1)
+            MATCH (n1:{{ START_LABEL }} {key: toLower($START_KEY)}), (n2:{{ END_LABEL }} {key: toLower($END_KEY)})
+            MERGE (n1)-[r1:{{ TYPE }}]->(n2){{ REVERSE_REL }}
             {% if update_prop_body %}
             ON CREATE SET {{ prop_body }}
             ON MATCH SET {{ prop_body }}
             {% endif %}
             RETURN n1.key, n2.key
         """)
+        reverse_rel_template = Template("-[r2:{{ REVERSE_TYPE }}]->(n1)")
 
         prop_body_r1 = self._create_props_body(rel_record, RELATION_REQUIRED_KEYS, 'r1')
-        prop_body_r2 = self._create_props_body(rel_record, RELATION_REQUIRED_KEYS, 'r2')
-        prop_body = ' , '.join([prop_body_r1, prop_body_r2])
+
+        reverse_rel_stmt = ''
+        prop_body = prop_body_r1
+        if "REVERSE_TYPE" in rel_record and rel_record["REVERSE_TYPE"] != '':
+            # Only if there is a reverse_type specified
+            reverse_rel_stmt = reverse_rel_template.render(REVERSE_TYPE=rel_record["REVERSE_TYPE"])
+            prop_body_r2 = self._create_props_body(rel_record, RELATION_REQUIRED_KEYS, 'r2')
+            prop_body = ' , '.join([prop_body_r1, prop_body_r2])
 
         return template.render(START_LABEL=rel_record["START_LABEL"],
                                END_LABEL=rel_record["END_LABEL"],
                                TYPE=rel_record["TYPE"],
-                               REVERSE_TYPE=rel_record["REVERSE_TYPE"],
+                               REVERSE_REL=reverse_rel_stmt,
                                update_prop_body=prop_body_r1,
                                prop_body=prop_body)
 
@@ -497,7 +507,7 @@ class Neo4jCsvPublisher(Publisher):
 
             return tx
         except Exception as e:
-            LOGGER.exception('Failed to execute Cypher query')
+            LOGGER.exception(f'Failed to execute Cypher query:\nstmt=\n{str(stmt)}\nparams=\n{params}')
             if not tx.closed():
                 tx.rollback()
             raise e
@@ -510,13 +520,23 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         stmt = Template("""
-            CREATE CONSTRAINT ON (node:{{ LABEL }}) ASSERT node.key IS UNIQUE
+            CREATE CONSTRAINT FOR (node:{{ LABEL }}) REQUIRE node.key IS UNIQUE
         """).render(LABEL=label)
 
         LOGGER.info(f'Trying to create index for label {label} if not exist: {stmt}')
         with self._driver.session(database=self._db_name) as session:
             try:
-                session.run(stmt)
+                result = session.run(f"""
+                    SHOW CONSTRAINTS
+                    YIELD name, type, entityType, labelsOrTypes, properties
+                    WHERE type = 'UNIQUENESS' AND entityType = 'NODE' AND labelsOrTypes = ['{label}'] AND properties = ['key']
+                    RETURN count(*) AS constraintExists
+                """)
+                constraint_exists = result.single()["constraintExists"]
+
+                # Step 2: Conditionally create the constraint
+                if constraint_exists == 0:
+                    session.run(stmt)
             except Neo4jError as e:
                 if 'An equivalent constraint already exists' not in e.__str__():
                     raise

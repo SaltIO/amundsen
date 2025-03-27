@@ -12,16 +12,19 @@ from amundsen_common.models.generation_code import GenerationCode
 from amundsen_common.models.lineage import Lineage
 from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import Table
+from amundsen_common.models.data_source import DataProvider, File
 from amundsen_common.models.user import User
+from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare
 from flask import current_app as app
 
 from metadata_service.entity.dashboard_detail import \
     DashboardDetail as DashboardDetailEntity
 from metadata_service.entity.description import Description
 from metadata_service.util import UserResourceRel
+from metadata_service.proxy.snowflake_base_proxy import SnowflakeBaseProxy
 
 
-class BaseProxy(metaclass=ABCMeta):
+class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     """
     Base Proxy, which behaves like an interface for all
     the proxy clients available in the amundsen metadata service
@@ -86,6 +89,17 @@ class BaseProxy(metaclass=ABCMeta):
     def put_table_description(self, *,
                               table_uri: str,
                               description: str) -> None:
+        pass
+
+    @abstractmethod
+    def put_table_update_frequency(self, *,
+                              table_uri: str,
+                              frequency: str) -> None:
+        pass
+
+    @abstractmethod
+    def delete_table_update_frequency(self, *,
+                                      table_uri: str) -> None:
         pass
 
     @abstractmethod
@@ -259,3 +273,27 @@ class BaseProxy(metaclass=ABCMeta):
                                      uri: str,
                                      resource_type: ResourceType) -> GenerationCode:
         pass
+
+    @abstractmethod
+    def get_snowflake_table_shares(self, *, table_uri: str) -> Union[List[SnowflakeTableShare], None]:
+        pass
+
+    @abstractmethod
+    def get_data_provider(self, *, data_provider_uri: str) -> DataProvider:
+        pass
+
+    @abstractmethod
+    def get_file(self, *, file_uri: str) -> File:
+        pass
+
+    @abstractmethod
+    def get_file_description(self, *,
+                             id: str) -> Union[str, None]:
+        pass
+
+    @abstractmethod
+    def put_file_description(self, *,
+                             id: str,
+                             description: str) -> None:
+        pass
+

@@ -8,7 +8,7 @@ import configureStore from 'redux-mock-store';
 import { mocked } from 'ts-jest/utils';
 
 import { SortDirection } from 'interfaces';
-import { BadgeStyle } from 'config/config-types';
+import { DefaultBadgeStyle } from 'config/config-types';
 import * as ConfigUtils from 'config/config-utils';
 
 import globalState from 'fixtures/globalState';
@@ -344,7 +344,7 @@ describe('ColumnList', () => {
 
       getBadgeConfigSpy.mockImplementation((badgeName: string) => ({
         displayName: badgeName + ' test name',
-        style: BadgeStyle.PRIMARY,
+        style: DefaultBadgeStyle.PRIMARY,
       }));
 
       it('should render the rows', () => {

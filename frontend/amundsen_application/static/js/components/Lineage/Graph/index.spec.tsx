@@ -13,13 +13,16 @@ describe('Graph', () => {
       upstream_entities: [
         {
           badges: [],
-          cluster: 'gold',
-          database: 'hive',
+          type: 'Table',
+          lineage_item_detail: {
+            cluster: 'gold',
+            database: 'hive',
+            schema: 'test_schema',
+            name: 'test_table1',
+          },
           key: 'hive://gold.test_schema/test_table1',
           level: 0,
-          name: 'test_table1',
           parent: null,
-          schema: 'test_schema',
           source: 'hive',
           usage: 0,
         },

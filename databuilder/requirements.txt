@@ -3,7 +3,8 @@
 
 elasticsearch>=6.2.0,<8.0
 elasticsearch-dsl==7.4.0
-neo4j-driver>=4.4.5,<5.0
+# neo4j-driver>=4.4.5,<5.0
+neo4j-driver==4.4.12
 requests>=2.25.0,<3.0
 
 freezegun>=1.1.0
@@ -26,5 +27,10 @@ pandas>=0.21.0,<1.5.0
 responses>=0.10.6
 jsonref==0.2
 
-amundsen-common>=0.16.0
+# amundsen-common>=0.16.0
+amundsen-common==0.31.0+foodtruck.7
 amundsen-rds==0.0.8
+
+queryparser-python3==0.7.0
+
+sqlmetadata

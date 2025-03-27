@@ -69,7 +69,7 @@ class FeatureLineageAPI(Resource):
             return {'message': f'feature_uri {id} lineage does not exist'}, HTTPStatus.NOT_FOUND
         except Exception as e:
             LOGGER.error(f'Internal server error occurred when getting feature lineage: {e}')
-            return {'message': f'Exception raised when getting lineage: {e}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+            return {'message': f'Exception raised when getting feature lineage: {e}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 class FeatureStatsAPI(Resource):

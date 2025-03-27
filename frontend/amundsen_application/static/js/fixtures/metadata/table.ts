@@ -117,12 +117,13 @@ export const tableMetadata: TableMetadata = {
     value: '2020-03-05',
   },
   programmatic_descriptions: {},
+  update_frequency: '',
   schema: 'base',
-  source: {
+  sources: [{
     source:
       'https://github.com/lyft/etl/blob/master/sql/hive/base/rides.config',
     source_type: 'github',
-  },
+  }],
   resource_reports: [{ name: 'Test report', url: 'http://localhost' }],
   table_readers: [
     {
@@ -197,12 +198,15 @@ export const tableLineage: Lineage = {
   downstream_entities: [
     {
       badges: [],
-      cluster: 'cluster',
-      database: 'database',
+      type: 'Table',
+      lineage_item_detail: {
+        cluster: 'cluster',
+        database: 'database',
+        name: 'table_name',
+        schema: 'schema',
+      },
       key: 'database://cluster.schema/table_name',
       level: 1,
-      name: 'table_name',
-      schema: 'schema',
       usage: 1398,
       parent: 'database://cluster.schema/parent_table_name',
     },
@@ -210,12 +214,15 @@ export const tableLineage: Lineage = {
   upstream_entities: [
     {
       badges: [],
-      cluster: 'cluster',
-      database: 'database',
+      type: 'Table',
+      lineage_item_detail: {
+        cluster: 'cluster',
+        database: 'database',
+        name: 'table_name',
+        schema: 'schema',
+      },
       key: 'database://cluster.schema/table_name',
       level: 1,
-      name: 'table_name',
-      schema: 'schema',
       usage: 1398,
       parent: 'database://cluster.schema/parent_table_name',
     },

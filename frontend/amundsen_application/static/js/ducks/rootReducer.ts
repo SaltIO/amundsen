@@ -15,6 +15,12 @@ import search, { SearchReducerState } from './search/reducer';
 import tableMetadata, {
   TableMetadataReducerState,
 } from './tableMetadata/reducer';
+import fileMetadata, {
+  FileMetadataReducerState,
+} from './fileMetadata/reducer';
+import providerMetadata, {
+  ProviderMetadataReducerState,
+} from './providerMetadata/reducer';
 import lastIndexed, { LastIndexedReducerState } from './lastIndexed/reducer';
 import tags, { TagsReducerState } from './tags/reducer';
 import user, { UserReducerState } from './user/reducer';
@@ -24,6 +30,8 @@ import notification, { NotificationReducerState } from './notification/reducer';
 import notices, { NoticesReducerState } from './notices';
 import issue, { IssueReducerState } from './issue/reducer';
 import lineage, { LineageReducerState } from './lineage/reducer';
+import snowflakeTableShares, { SnowflakeTableSharesReducerState } from './snowflake/reducer';
+import gptResponse, { GPTResponseReducerState } from './ai/reducer';
 
 export interface GlobalState {
   announcements: AnnouncementsReducerState;
@@ -36,6 +44,8 @@ export interface GlobalState {
   popularResources: PopularResourcesReducerState;
   search: SearchReducerState;
   tableMetadata: TableMetadataReducerState;
+  fileMetadata: FileMetadataReducerState;
+  providerMetadata: ProviderMetadataReducerState;
   lastIndexed: LastIndexedReducerState;
   tags: TagsReducerState;
   badges: BadgesReducerState;
@@ -43,6 +53,8 @@ export interface GlobalState {
   ui: UIReducerState;
   lineage: LineageReducerState;
   notices: NoticesReducerState;
+  snowflakeTableShares: SnowflakeTableSharesReducerState;
+  gptResponse: GPTResponseReducerState;
 }
 
 const rootReducer = combineReducers<GlobalState>({
@@ -56,6 +68,8 @@ const rootReducer = combineReducers<GlobalState>({
   popularResources,
   search,
   tableMetadata,
+  fileMetadata,
+  providerMetadata,
   lastIndexed,
   tags,
   badges,
@@ -63,6 +77,8 @@ const rootReducer = combineReducers<GlobalState>({
   ui,
   lineage,
   notices,
+  snowflakeTableShares,
+  gptResponse
 });
 
 export default rootReducer;

@@ -1,5 +1,5 @@
 import AppConfig from 'config/config';
-import { BadgeStyle, BadgeStyleConfig } from 'config/config-types';
+import { DefaultBadgeStyle, BadgeStyleConfig } from 'config/config-types';
 import { convertText, CaseType } from 'utils/text';
 
 import { TableMetadata } from 'interfaces/TableMetadata';
@@ -13,12 +13,15 @@ import {
   TourConfig,
   HomePageWidgetsConfig,
   TableLineageConfig,
+  FileLineageConfig,
   DateFormatConfig,
 } from './config-types';
 
 const DEFAULT_DYNAMIC_NOTICES_ENABLED_FLAG = false;
 export const DEFAULT_DATABASE_ICON_CLASS = 'icon-database icon-color';
 export const DEFAULT_DASHBOARD_ICON_CLASS = 'icon-dashboard icon-color';
+export const DEFAULT_DATA_PROVIDER_ICON_CLASS = 'icon-provider icon-color';
+export const DEFAULT_FILE_ICON_CLASS = 'icon-file icon-color';
 const WILDCARD_SIGN = '*';
 const RESOURCE_SEPARATOR = '.';
 const ANNOUNCEMENTS_LINK_LABEL = 'Announcements';
@@ -100,6 +103,12 @@ export function getSourceIconClass(
     }
     if (resource === ResourceType.feature) {
       return DEFAULT_DATABASE_ICON_CLASS;
+    }
+    if (resource === ResourceType.data_provider) {
+      return DEFAULT_DATA_PROVIDER_ICON_CLASS;
+    }
+    if (resource === ResourceType.file) {
+      return DEFAULT_FILE_ICON_CLASS;
     }
 
     return '';
@@ -213,13 +222,13 @@ export function getIconNotRequiredStatTypes(): string[] | undefined {
 /*
  * Given a badge name, this will return a badge style and a display name.
  * If these are not specified by config, it will default to some simple rules:
- * use BadgeStyle.DEFAULT and badge name as display name.
+ * use DefaultBadgeStyle.DEFAULT and badge name as display name.
  */
 export function getBadgeConfig(badgeName: string): BadgeStyleConfig {
   const config: object = AppConfig.badges[badgeName] || {};
 
   return {
-    style: BadgeStyle.DEFAULT,
+    style: DefaultBadgeStyle.DEFAULT,
     displayName: convertText(badgeName, CaseType.TITLE_CASE),
     ...config,
   };
@@ -247,6 +256,55 @@ export function announcementsEnabled(): boolean {
 }
 
 /**
+ * Returns whether or not preview should be enabled
+ */
+export function previewEnabled(): boolean {
+  return AppConfig.preview.enabled;
+}
+
+/**
+ * Returns whether or not preview should be enabled
+ */
+export function previewExportEnabled(): boolean {
+  return (AppConfig.preview.export ? AppConfig.preview.export.enabled : false);
+}
+
+/**
+ * Returns whether or not preview should be enabled
+ */
+export function aiEnabled(): boolean {
+  return AppConfig.ai.enabled;
+}
+
+/**
+ * Returns whether or not snowflake shares should be enabled
+ */
+export function snowflakeEnabled(): boolean {
+  return AppConfig.snowflake.enabled;
+}
+
+/**
+ * Returns whether or not snowflake table shares should be enabled
+ */
+export function snowflakeSharesEnabled(): boolean {
+  return (AppConfig.snowflake.shares ? snowflakeEnabled() && AppConfig.snowflake.shares.enabled : false);
+}
+
+/**
+ * Returns whether or not bookmark features should be enabled
+ */
+export function bookmarksEnabled(): boolean {
+  return AppConfig.bookmarks.enabled;
+}
+
+/**
+ * Returns whether or not export features should be enabled
+ */
+export function exportEnabled(): boolean {
+  return AppConfig.export.enabled;
+}
+
+/**
  * Returns whether or not dashboard features should be shown
  */
 export function indexDashboardsEnabled(): boolean {
@@ -265,6 +323,20 @@ export function indexFeaturesEnabled(): boolean {
  */
 export function indexUsersEnabled(): boolean {
   return AppConfig.indexUsers.enabled;
+}
+
+/**
+ * Returns whether or not user features should be shown
+ */
+export function indexFilesEnabled(): boolean {
+  return AppConfig.indexFiles.enabled;
+}
+
+/**
+ * Returns whether or not user features should be shown
+ */
+export function indexProvidersEnabled(): boolean {
+  return AppConfig.indexProviders.enabled;
 }
 
 /**
@@ -340,6 +412,26 @@ export function getTableSortCriterias() {
   if (config.sortCriterias) {
     return config.sortCriterias;
   }
+
+  return {};
+}
+
+export function getProviderSortCriterias() {
+  //const config = AppConfig.resourceConfig[ResourceType.data_provider];
+
+  //if (config.sortCriterias) {
+  //  return config.sortCriterias;
+  //}
+
+  return {};
+}
+
+export function getFileSortCriterias() {
+  //const config = AppConfig.resourceConfig[ResourceType.file];
+
+  //if (config.sortCriterias) {
+  //  return config.sortCriterias;
+  //}
 
   return {};
 }
@@ -469,6 +561,13 @@ export function getDocumentTitle(): string {
 }
 
 /**
+ * Returns footerContent.
+ */
+export function getFooterContentHtml(): string {
+  return AppConfig.footerContentHtml;
+}
+
+/**
  * Returns logoTitle.
  */
 export function getLogoTitle(): string {
@@ -504,6 +603,13 @@ export function isColumnListLineageEnabled() {
 }
 
 /**
+ * Returns whether the eagleye ui are enabled
+ */
+export function isEagleyeEnabled() {
+  return AppConfig.eagleye.isEnabled;
+}
+
+/**
  * Returns whether the in-app column lineage page is enabled.
  */
 export function isColumnLineagePageEnabled() {
@@ -515,6 +621,13 @@ export function isColumnLineagePageEnabled() {
  */
 export function getTableLineageConfiguration(): TableLineageConfig {
   return AppConfig.tableLineage;
+}
+
+/**
+ * Returns fileLineage configuration
+ */
+export function getFileLineageConfiguration(): FileLineageConfig {
+  return AppConfig.fileLineage;
 }
 
 /**
@@ -543,6 +656,34 @@ export function getTableLineageDisableAppListLinks() {
  */
 export function getTableLineageDefaultDepth() {
   return AppConfig.tableLineage.defaultLineageDepth;
+}
+
+/**
+ * Returns whether the in-app table lineage list is enabled.
+ */
+export function isFileListLineageEnabled() {
+  return AppConfig.fileLineage.inAppListEnabled;
+}
+
+/**
+ * Returns whether the in-app table lineage page is enabled.
+ */
+export function isFileLineagePageEnabled() {
+  return AppConfig.fileLineage.inAppPageEnabled;
+}
+
+/**
+ * Returns disableAppListLinks configuration for table lineage.
+ */
+export function getFileLineageDisableAppListLinks() {
+  return AppConfig.fileLineage.disableAppListLinks;
+}
+
+/**
+ * Returns the depth of lineage you should see in the lineage page
+ */
+export function getFileLineageDefaultDepth() {
+  return AppConfig.fileLineage.defaultLineageDepth;
 }
 
 /**

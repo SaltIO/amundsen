@@ -46,6 +46,8 @@ import {
   getTypeMetadataDescriptionWatcher,
   updateColumnDescriptionWatcher,
   updateTableDescriptionWatcher,
+  updateTableUpdateFrequencyWatcher,
+  deleteTableUpdateFrequencyWatcher,
   updateTypeMetadataDescriptionWatcher,
 } from './tableMetadata/sagas';
 import { getLastIndexedWatcher } from './lastIndexed/sagas';
@@ -60,7 +62,25 @@ import {
   getColumnLineageWatcher,
   getTableColumnLineageWatcher,
   getTableLineageWatcher,
+  getFileLineageWatcher
 } from './lineage/sagas';
+import {
+  getSnowflakeTableSharesWatcher,
+} from './snowflake/sagas';
+import {
+  getGPTReponseWatcher,
+} from './ai/sagas';
+import {
+  getProviderDataWatcher,
+  getProviderDescriptionWatcher,
+  updateProviderDescriptionWatcher
+} from './providerMetadata/sagas';
+import {
+  getFileDataWatcher,
+  getFileDescriptionWatcher,
+  updateFileDescriptionWatcher
+} from './fileMetadata/sagas'
+import { updateFileOwnerWatcher } from './fileMetadata/owners/sagas';
 
 export default function* rootSaga() {
   yield all([
@@ -90,6 +110,7 @@ export default function* rootSaga() {
     getTableDataWatcher(),
     getTableDescriptionWatcher(),
     getTableLineageWatcher(),
+    getFileLineageWatcher(),
     getTableQualityChecksWatcher(),
     getTypeMetadataDescriptionWatcher(),
     getUserOwnWatcher(),
@@ -112,8 +133,19 @@ export default function* rootSaga() {
     updateResourceTagsWatcher(),
     updateSearchStateWatcher(),
     updateTableDescriptionWatcher(),
+    updateTableUpdateFrequencyWatcher(),
+    deleteTableUpdateFrequencyWatcher(),
     updateTableOwnerWatcher(),
     updateTypeMetadataDescriptionWatcher(),
     urlDidUpdateWatcher(),
+    getSnowflakeTableSharesWatcher(),
+    getGPTReponseWatcher(),
+    getProviderDataWatcher(),
+    getProviderDescriptionWatcher(),
+    updateProviderDescriptionWatcher(),
+    getFileDataWatcher(),
+    getFileDescriptionWatcher(),
+    updateFileDescriptionWatcher(),
+    updateFileOwnerWatcher()
   ]);
 }

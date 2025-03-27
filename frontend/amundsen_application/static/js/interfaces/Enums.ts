@@ -27,6 +27,7 @@ export enum SearchType {
 // Image-based Icon types from _icons.scss
 export enum ImageIconType {
   ALERT = 'icon-alert',
+  EXPORT_METADATA = 'icon-export-metadata',
   BOOKMARK = 'icon-bookmark',
   BOOKMARK_FILLED = 'icon-bookmark-filled',
   DELETE = 'icon-delete',
@@ -52,29 +53,46 @@ export enum ImageIconType {
 }
 
 // Icon types from _icons.scss
-export enum IconType {
-  CHECK = 'icon-check',
-  USERS = 'icon-users',
-  DASHBOARD = 'icon-dashboard',
-  MODE = 'icon-mode',
-  REDASH = 'icon-redash',
-  TABLEAU = 'icon-tableau',
-  DATABASE = 'icon-database',
-  HIVE = 'icon-hive',
-  BIGQUERY = 'icon-bigquery',
-  DREMIO = 'icon-dremio',
-  DRUID = 'icon-druid',
-  ORACLE = 'icon-oracle',
-  PRESTO = 'icon-presto',
-  TRINO = 'icon-trino',
-  POSTGRES = 'icon-postgres',
-  REDSHIFT = 'icon-redshift',
-  SNOWFLAKE = 'icon-snowflake',
-  SUPERSET = 'icon-superset',
-  ELASTICSEARCH = 'icon-elasticsearch',
-  DATABRICKS_SQL = 'icon-databricks-sql',
-  TERADATA = 'icon-teradata',
-}
+// export enum IconType {
+//   CHECK = 'icon-check',
+//   USERS = 'icon-users',
+//   DASHBOARD = 'icon-dashboard',
+//   MODE = 'icon-mode',
+//   REDASH = 'icon-redash',
+//   TABLEAU = 'icon-tableau',
+//   COUNT = 'icon-count',
+//   DATABASE = 'icon-database',
+//   HIVE = 'icon-hive',
+//   BIGQUERY = 'icon-bigquery',
+//   DREMIO = 'icon-dremio',
+//   DRUID = 'icon-druid',
+//   ORACLE = 'icon-oracle',
+//   PRESTO = 'icon-presto',
+//   TRINO = 'icon-trino',
+//   POSTGRES = 'icon-postgres',
+//   REDSHIFT = 'icon-redshift',
+//   SNOWFLAKE = 'icon-snowflake',
+//   MYSQL = 'icon-mysql',
+//   MSSQL = 'icon-mssql',
+//   CLICKHOUSE = 'icon-clickhouse',
+//   SUPERSET = 'icon-superset',
+//   ELASTICSEARCH = 'icon-elasticsearch',
+//   DATABRICKS_SQL = 'icon-databricks-sql',
+//   TERADATA = 'icon-teradata',
+//   CREDIQ = 'icon-crediq',
+//   SALT = 'icon-salt',
+//   // Providers
+//   PROVIDER = 'icon-provider',
+//   SECGOV = 'icon-secgov',
+//   CMDRVL = 'icon-cmdrvl',
+//   // Files
+//   FILE = 'icon-file',
+//   CSV = 'icon-csv',
+//   PDF = 'icon-pdf',
+//   JSON = 'icon-json',
+//   EXCEL = 'icon-excel',
+//   BINARY = 'icon-binary',
+// }
 
 // Icon sizes
 export enum IconSizes {

@@ -30,13 +30,16 @@ describe('LineageList', () => {
         items: [
           {
             badges: [],
-            cluster: 'gold',
-            database: 'hive',
+            type: 'Table',
+            lineage_item_detail: {
+              cluster: 'gold',
+              database: 'hive',
+              name: 'test_table1',
+              schema: 'test_schema',
+            },
             key: 'hive://gold.test_schema/test_table1',
             level: 0,
-            name: 'test_table1',
             parent: null,
-            schema: 'test_schema',
             source: 'hive',
             usage: 0,
           },
@@ -56,13 +59,16 @@ describe('LineageList', () => {
         items: [
           {
             badges: [],
-            cluster: 'gold',
-            database: 'hive',
+            type: 'Table',
+            lineage_item_detail: {
+              cluster: 'gold',
+              database: 'hive',
+              name: 'test_table1',
+              schema: 'test_schema',
+            },
             key: 'hive://gold.test_schema/test_table1',
             level: 0,
-            name: 'test_table1',
             parent: null,
-            schema: 'test_schema',
             source: 'hive',
             usage: 0,
           },

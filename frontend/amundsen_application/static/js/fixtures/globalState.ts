@@ -12,9 +12,7 @@ import { STATUS_CODES } from '../constants';
 
 const sharedLineageItemCore = {
   badges: [],
-  cluster: 'cluster',
-  database: 'h',
-  schema: 'schema',
+  type: 'Table',
   source: 'source',
   usage: 0,
 };
@@ -208,6 +206,16 @@ const globalState: GlobalState = {
       results: [],
       total_results: 0,
     },
+    files: {
+      page_index: 0,
+      results: [],
+      total_results: 0,
+    },
+    providers: {
+      page_index: 0,
+      results: [],
+      total_results: 0,
+    },
     inlineResults: {
       isLoading: false,
       dashboards: {
@@ -230,9 +238,47 @@ const globalState: GlobalState = {
         results: [],
         total_results: 0,
       },
+      files: {
+        page_index: 0,
+        results: [],
+        total_results: 0,
+      },
+      providers: {
+        page_index: 0,
+        results: [],
+        total_results: 0,
+      },
     },
     filters: defaultEmptyFilters,
     didSearch: false,
+  },
+  fileMetadata: {
+    isLoading: true,
+    statusCode: STATUS_CODES.OK,
+    fileData: {
+      badges: [],
+      key: '',
+      name: '',
+      type: '',
+      path: '',
+      category: '',
+      description: '',
+      is_editable: true
+    },
+    fileOwners: {
+      isLoading: true,
+      owners: {},
+    },
+  },
+  providerMetadata: {
+    isLoading: true,
+    statusCode: STATUS_CODES.OK,
+    providerData: {
+      key: '',
+      name: '',
+      description: '',
+      is_editable: true,
+    }
   },
   tableMetadata: {
     isLoading: true,
@@ -257,10 +303,11 @@ const globalState: GlobalState = {
       table_apps: [],
       partition: { is_partitioned: false },
       table_readers: [],
-      source: { source: '', source_type: '' },
+      sources: [{ source: '', source_type: '' }],
       resource_reports: [],
       watermarks: [],
       programmatic_descriptions: {},
+      update_frequency: '',
     },
     tableOwners: {
       isLoading: true,
@@ -369,21 +416,36 @@ const globalState: GlobalState = {
           ...sharedLineageItemCore,
           key: 'h/parent-3',
           level: 3,
-          name: 'parent-3',
+          lineage_item_detail: {
+            name: 'parent-3',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: '',
         },
         {
           ...sharedLineageItemCore,
           key: 'h/parent-1',
           level: 1,
-          name: 'parent-1',
+          lineage_item_detail: {
+            name: 'parent-1',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: 'h/parent-2-solo',
         },
         {
           ...sharedLineageItemCore,
           key: 'h/parent-1',
           level: 1,
-          name: 'parent-1',
+          lineage_item_detail: {
+            name: 'parent-1',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: 'h/parent-2',
         },
 
@@ -391,14 +453,24 @@ const globalState: GlobalState = {
           ...sharedLineageItemCore,
           key: 'h/parent-2',
           level: 2,
-          name: 'parent-2',
+          lineage_item_detail: {
+            name: 'parent-2',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: 'h/parent-3',
         },
         {
           ...sharedLineageItemCore,
           key: 'h/parent-2-solo',
           level: 2,
-          name: 'parent-2-solo',
+          lineage_item_detail: {
+            name: 'parent-2-solo',
+            schema: 'schema',
+            database: 'h',
+            cluster: 'cluster'
+          },
           parent: '',
         },
       ] as LineageItem[],
@@ -410,6 +482,47 @@ const globalState: GlobalState = {
     statusCode: null,
     isLoading: false,
     columnLineageMap: {},
+  },
+  snowflakeTableShares: {
+    isLoading: false,
+    snowflakeTableShares: [
+      {
+        owner_account: 'owner_account1',
+        name: 'share1',
+        listing: {
+          global_name: 'global_name1',
+          name: 'name1',
+          title: 'title1',
+          subtitle: 'subtitle1',
+          description: 'description1'
+        }
+      },
+      {
+        owner_account: 'owner_account1',
+        name: 'share2',
+        listing: {
+          global_name: 'global_name2',
+          name: 'name2',
+          title: 'title2',
+          subtitle: 'subtitle2',
+          description: 'description2'
+        }
+      },
+      {
+        owner_account: 'owner_account2',
+        name: 'share3',
+      },
+    ],
+  },
+  gptResponse: {
+    isLoading: false,
+    gptResponse: {
+      finish_reason: 'done',
+      message: {
+        role: 'assistant',
+        content: 'gpt response'
+      }
+    }
   },
 };
 

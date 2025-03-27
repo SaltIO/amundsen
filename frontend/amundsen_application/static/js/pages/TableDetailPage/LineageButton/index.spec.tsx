@@ -44,13 +44,14 @@ describe('LineageButton', () => {
         value: 'partition_value',
       },
       table_readers: [],
-      source: {
+      sources: [{
         source: '',
         source_type: '',
-      },
+      }],
       resource_reports: [],
       watermarks: [],
       programmatic_descriptions: {},
+      update_frequency: '',
       ...tableDataOverrides,
     };
 
@@ -79,7 +80,7 @@ describe('LineageButton', () => {
     });
 
     it('renders correctly', () => {
-      const builderSpy = jest.spyOn(NavigationUtils, 'buildLineageURL');
+      const builderSpy = jest.spyOn(NavigationUtils, 'buildTableLineageURL');
       const { props, wrapper } = setup();
 
       expect(builderSpy).toHaveBeenCalledWith(props.tableData);

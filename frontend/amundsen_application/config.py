@@ -10,6 +10,8 @@ from flask import Flask  # noqa: F401
 
 from amundsen_application.tests.test_utils import get_test_user
 
+from amundsen_application.client.slack.slack_client import SlackClient
+
 
 class MatchRuleObject:
     def __init__(self,
@@ -53,7 +55,7 @@ class Config:
     POPULAR_RESOURCES_PERSONALIZATION = False  # type: bool
 
     # Request Timeout Configurations in Seconds
-    REQUEST_SESSION_TIMEOUT_SEC = 3
+    REQUEST_SESSION_TIMEOUT_SEC = int(os.getenv('REQUEST_SESSION_TIMEOUT_SEC', '3'))
 
     # Frontend Application
     FRONTEND_BASE = ''
@@ -72,8 +74,8 @@ class Config:
     METADATASERVICE_BASE = ''
 
     # Mail Client Features
-    MAIL_CLIENT = None
-    NOTIFICATIONS_ENABLED = False
+    MAIL_CLIENT = os.getenv('MAIL_CLIENT', None)
+    NOTIFICATIONS_ENABLED = os.getenv('MAIL_CLIENT') == 'true'  # type: bool
 
     # Initialize custom routes
     INIT_CUSTOM_ROUTES = None  # type: Callable[[Flask], None]
@@ -86,6 +88,10 @@ class Config:
     PREVIEW_CLIENT_USERNAME = os.getenv('PREVIEW_CLIENT_USERNAME')  # type: Optional[str]
     PREVIEW_CLIENT_PASSWORD = os.getenv('PREVIEW_CLIENT_PASSWORD')  # type: Optional[str]
     PREVIEW_CLIENT_CERTIFICATE = os.getenv('PREVIEW_CLIENT_CERTIFICATE')  # type: Optional[str]
+
+    # Settings for AI Client integration
+    AI_CLIENT_ENABLED = os.getenv('AI_CLIENT_ENABLED') == 'true'  # type: bool
+    AI_CLIENT = os.getenv('AI_CLIENT', None)  # type: Optional[str]
 
     # Settings for Quality client
     QUALITY_CLIENT = os.getenv('QUALITY_CLIENT', None)  # type: Optional[str]
@@ -100,6 +106,8 @@ class Config:
 
     # Settings for Issue tracker integration
     ISSUE_LABELS = []  # type: List[str]
+    ISSUE_IGNORE_REPORTER = False  # type: bool
+    ISSUE_PRIORITY_OVERRIDES = None
     ISSUE_TRACKER_API_TOKEN = None  # type: str
     ISSUE_TRACKER_URL = None  # type: str
     ISSUE_TRACKER_USER = None  # type: str
@@ -147,6 +155,17 @@ class Config:
 
     MTLS_CLIENT_KEY = os.getenv('MTLS_CLIENT_KEY')
     """Optional. The path to a PEM formatted key to use with the MTLS_CLIENT_CERT. MTLS_CLIENT_CERT must also be set."""
+
+    HOST_ID = os.getenv('HOST_ID')
+    AWS_DEFAULT_REGION = os.getenv('AWS_DEFAULT_REGION')
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+    SLACK_TOKEN = os.getenv('SLACK_TOKEN')
+    SLACK_SUPPORT_CHANNEL = os.getenv('SLACK_SUPPORT_CHANNEL')
+
+    if SLACK_TOKEN:
+        SLACK_CLIENT = SlackClient(token=SLACK_TOKEN)
 
 
 class LocalConfig(Config):

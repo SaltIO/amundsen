@@ -79,9 +79,14 @@ export class InputFilter extends React.Component<
   };
 
   onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { filterState, resourceType, categoryId, updateFilterState } =
-      this.props;
-    const newValue = e.target.value.toLowerCase();
+    const {
+      filterState,
+      resourceType,
+      categoryId,
+      updateFilterState,
+    } = this.props;
+    // const newValue = e.target.value.toLowerCase();
+    const newValue = e.target.value;
 
     const showFilterOperationToggle = newValue.includes(',');
 

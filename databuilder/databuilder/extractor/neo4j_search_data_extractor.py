@@ -30,7 +30,7 @@ class Neo4jSearchDataExtractor(Extractor):
         OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descs:Programmatic_Description)
         WITH db, cluster, schema, schema_description, table, table_description,
         COLLECT(prog_descs.description) as programmatic_descriptions
-        OPTIONAL MATCH (table)-[:TAGGED_BY]->(tags:Tag) WHERE tags.tag_type='default'
+        OPTIONAL MATCH (table)-[:TAGGED_BY]->(tags:Tag) // WHERE tags.tag_type='default'
         WITH db, cluster, schema, schema_description, table, table_description, programmatic_descriptions,
         COLLECT(DISTINCT tags.key) as tags
         OPTIONAL MATCH (table)-[:HAS_BADGE]->(badges:Badge)
@@ -98,7 +98,7 @@ class Neo4jSearchDataExtractor(Extractor):
          WITH dashboard, dbg, db_descr, dbg_descr, cluster, last_exec, COLLECT(DISTINCT query.name) as query_names,
          COLLECT(DISTINCT chart.name) as chart_names,
          total_usage
-         OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tags:Tag) WHERE tags.tag_type='default'
+         OPTIONAL MATCH (dashboard)-[:TAGGED_BY]->(tags:Tag) // WHERE tags.tag_type='default'
          WITH dashboard, dbg, db_descr, dbg_descr, cluster, last_exec, query_names, chart_names, total_usage,
          COLLECT(DISTINCT tags.key) as tags
          OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badges:Badge)
@@ -141,11 +141,62 @@ class Neo4jSearchDataExtractor(Extractor):
         """
     )
 
+    DEFAULT_NEO4J_DATA_PROVIDER_CYPHER_QUERY = textwrap.dedent(
+        """
+        MATCH (dp:Data_Provider)
+        //OPTIONAL MATCH (dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp)
+        //OPTIONAL MATCH (dl:Data_Location)-[:DATA_LOCATION_OF]->(dc)
+        OPTIONAL MATCH (dp)-[:DESCRIPTION]->(data_provider_desc:Description)
+        OPTIONAL MATCH (dp)-[:TAGGED_BY]->(tags:Tag)
+        {publish_tag_filter}
+        WITH dp, data_provider_desc, COLLECT(DISTINCT tags.key) as tags //, dc, dl
+        RETURN
+        dp.name as name,
+        dp.key as key,
+        data_provider_desc.description as description,
+        //collect(distinct dc.name) as data_channel_names,
+        //collect(distinct dc.type) as data_channel_types,
+        //collect(distinct dc.desc) as data_channel_descriptions,
+        //collect(distinct dl.name) as data_location_names,
+        //collect(distinct dl.type) as data_location_types
+        tags
+        """
+    )
+
+    DEFAULT_NEO4J_FILE_CYPHER_QUERY = textwrap.dedent(
+        """
+        MATCH (f:File)
+        OPTIONAL MATCH (f)-[:FILE_OF]->(dl:Data_Location)
+        OPTIONAL MATCH (f)-[:FILE_OF]->(dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp:Data_Provider)
+        OPTIONAL MATCH (f)-[:DESCRIPTION]->(file_desc:Description)
+        OPTIONAL MATCH (f)-[:TAGGED_BY]->(tags:Tag)
+        {publish_tag_filter}
+        WITH f, file_desc, COLLECT(DISTINCT tags.key) as tags, dl, dc, dp
+        RETURN
+        f.name as name,
+        f.key as key,
+        file_desc.description as description,
+        f.type as type,
+        f.category as category,
+        f.path as path,
+        f.is_directory as is_directory,
+        dl.name as data_location_name,
+        dl.type as data_location_type,
+        dc.name as data_channel_name,
+        dc.type as data_channel_type,
+        dc.license as data_channel_license,
+        dp.name as data_provider_name,
+        tags
+        """
+    )
+
     DEFAULT_QUERY_BY_ENTITY = {
         'table': DEFAULT_NEO4J_TABLE_CYPHER_QUERY,
         'user': DEFAULT_NEO4J_USER_CYPHER_QUERY,
         'dashboard': DEFAULT_NEO4J_DASHBOARD_CYPHER_QUERY,
         'feature': DEFAULT_NEO4J_FEATURE_CYPHER_QUERY,
+        'file': DEFAULT_NEO4J_FILE_CYPHER_QUERY,
+        'data_provider': DEFAULT_NEO4J_DATA_PROVIDER_CYPHER_QUERY
     }
 
     def init(self, conf: ConfigTree) -> None:

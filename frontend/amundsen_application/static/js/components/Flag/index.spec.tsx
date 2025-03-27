@@ -5,7 +5,7 @@ import * as React from 'react';
 
 import { shallow } from 'enzyme';
 
-import { BadgeStyle } from 'config/config-types';
+import { DefaultBadgeStyle } from 'config/config-types';
 import Flag, { FlagProps } from '.';
 
 describe('Flag', () => {
@@ -23,16 +23,16 @@ describe('Flag', () => {
   describe('render', () => {
     it('renders span with correct default className', () => {
       expect(subject.find('span').props().className).toEqual(
-        `flag label label-${BadgeStyle.DEFAULT}`
+        `flag label label-${DefaultBadgeStyle.DEFAULT}`
       );
     });
 
     it('renders span with correct custom className', () => {
-      props.labelStyle = BadgeStyle.PRIMARY;
+      props.labelStyle = DefaultBadgeStyle.PRIMARY;
       subject.setProps(props);
 
       expect(subject.find('span').props().className).toEqual(
-        `flag label label-${BadgeStyle.PRIMARY}`
+        `flag label label-${DefaultBadgeStyle.PRIMARY}`
       );
     });
 

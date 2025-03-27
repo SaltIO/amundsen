@@ -46,12 +46,15 @@ describe('tableMetadata ducks', () => {
       upstream_entities: [
         {
           badges: [],
-          cluster: 'cluster',
-          database: 'database',
+          type: 'Table',
+          lineage_item_detail: {
+            cluster: 'cluster',
+            database: 'database',
+            name: 'name',
+            schema: 'schema',
+          },
           key: 'key',
           level: 1,
-          name: 'name',
-          schema: 'schema',
           usage: 100,
           parent: 'parent',
         },

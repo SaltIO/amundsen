@@ -4,7 +4,7 @@
 import * as React from 'react';
 
 import { getBadgeConfig } from 'config/config-utils';
-import { BadgeStyle, BadgeStyleConfig } from 'config/config-types';
+import { DefaultBadgeStyle, BadgeStyleConfig } from 'config/config-types';
 
 import { convertText, CaseType } from 'utils/text';
 import { logClick } from 'utils/analytics';
@@ -22,7 +22,7 @@ export interface BadgeListProps {
 }
 
 export interface ActionableBadgeProps {
-  style: BadgeStyle;
+  style: DefaultBadgeStyle;
   displayName: string;
   action: any;
 }
@@ -32,7 +32,7 @@ const StaticBadge: React.FC<BadgeStyleConfig> = ({
   displayName,
 }: BadgeStyleConfig) => (
   <span className={`static-badge flag label label-${style}`}>
-    <div className={`badge-overlay-${style}`}>{displayName}</div>
+    <div className={`badge-overlay-${style}`} style={{ fontFamily: 'IBM Plex Mono'}}>{displayName}</div>
   </span>
 );
 

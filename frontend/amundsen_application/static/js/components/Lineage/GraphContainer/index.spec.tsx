@@ -11,13 +11,16 @@ import { GraphContainer } from './index';
 
 const item: LineageItem = {
   badges: [],
-  cluster: 'cluster',
-  database: 'database',
+  type: 'Table',
+  lineage_item_detail: {
+    cluster: 'cluster',
+    database: 'database',
+    name: 'table',
+    schema: 'schema',
+  },
   key: 'h/root',
   level: 0,
-  name: 'table',
   parent: null,
-  schema: 'schema',
   usage: null,
 };
 

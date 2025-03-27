@@ -39,7 +39,11 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
 
         return """
         SELECT
-            *
+            *,
+            CASE
+                WHEN description IS NULL THEN 'true'  -- Assuming description is NULL for views
+                ELSE 'false'
+            END AS is_view
         FROM (
             SELECT
               {cluster_source} as cluster,
@@ -64,7 +68,7 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
               {cluster_source} as cluster,
               view_schema as schema,
               view_name as name,
-              NULL as description,
+              NULL as object_description,
               column_name as col_name,
               data_type as col_type,
               NULL as col_description,
@@ -79,7 +83,7 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
               {cluster_source} AS cluster,
               schemaname AS schema,
               tablename AS name,
-              NULL AS description,
+              NULL AS object_description,
               columnname AS col_name,
               external_type AS col_type,
               NULL AS col_description,
@@ -93,6 +97,50 @@ class RedshiftMetadataExtractor(BasePostgresMetadataExtractor):
             cluster_source=cluster_source,
             where_clause=where_clause,
         )
+
+    def get_key_sql_statement(self, schema_name, table_name) -> Any:
+        return """
+            SELECT
+                CASE
+                    WHEN con.contype = 'u' THEN 'UNIQUE'
+                    WHEN con.contype = 'p' THEN 'PRIMARY KEY'
+                    WHEN con.contype = 'f' THEN 'FOREIGN KEY'
+                    ELSE 'OTHER'
+                END AS constraint_type,
+                n.nspname AS table_schema,
+                c.relname AS table_name,
+                a.attname AS column_name
+            FROM
+                pg_constraint con
+            JOIN
+                pg_class c ON c.oid = con.conrelid
+            JOIN
+                pg_namespace n ON n.oid = c.relnamespace
+            JOIN
+                pg_attribute a ON a.attrelid = con.conrelid
+                AND a.attnum = ANY(con.conkey)
+            WHERE
+                con.contype IN ('u', 'p', 'f') -- Unique, Primary Key, Foreign Key
+                AND n.nspname = '{schema_name}'
+                AND c.relname = '{table_name}';
+        """.format(schema_name=schema_name, table_name=table_name)
+
+    def _get_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return """
+            SELECT
+                view_definition
+            FROM
+                information_schema.views
+            WHERE
+                table_schema = '{schema_name}'
+                AND table_name = '{view_name}';
+        """.format(schema_name=schema_name, view_name=view_name)
+
+    def get_old_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return self._get_view_def_sql_statement(schema_name=schema_name, view_name=view_name)
+
+    def get_new_view_def_sql_statement(self, schema_name, view_name) -> Any:
+        return self._get_view_def_sql_statement(schema_name=schema_name, view_name=view_name)
 
     def get_scope(self) -> str:
         return 'extractor.redshift_metadata'

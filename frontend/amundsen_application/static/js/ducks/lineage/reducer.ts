@@ -12,6 +12,9 @@ import {
   GetTableColumnLineage,
   GetTableColumnLineageRequest,
   GetTableColumnLineageResponse,
+  GetFileLineage,
+  GetFileLineageRequest,
+  GetFileLineageResponse,
 } from './types';
 
 export const initialLineageState = {
@@ -163,6 +166,42 @@ export function getTableColumnLineageFailure(
   };
 }
 
+export function getFileLineage(
+  key: string,
+  depth: number,
+  direction: string = 'both'
+): GetFileLineageRequest {
+  return {
+    type: GetFileLineage.REQUEST,
+    payload: { key, depth, direction },
+  };
+}
+
+export function getFileLineageSuccess(
+  data: Lineage,
+  statusCode: number
+): GetFileLineageResponse {
+  return {
+    type: GetFileLineage.SUCCESS,
+    payload: {
+      lineageTree: data,
+      statusCode,
+    },
+  };
+}
+
+export function getFileLineageFailure(
+  statusCode: number
+): GetFileLineageResponse {
+  return {
+    type: GetFileLineage.FAILURE,
+    payload: {
+      lineageTree: initialLineageState,
+      statusCode,
+    },
+  };
+}
+
 /* REDUCER */
 export interface LineageReducerState {
   statusCode: number | null;
@@ -232,6 +271,14 @@ export default function reducer(
         },
       };
     }
+    case GetFileLineage.SUCCESS:
+    case GetFileLineage.FAILURE:
+      return {
+        ...state,
+        lineageTree: (<GetFileLineageResponse>action).payload.lineageTree,
+        statusCode: (<GetFileLineageResponse>action).payload.statusCode,
+        isLoading: false,
+      };
     default:
       return state;
   }

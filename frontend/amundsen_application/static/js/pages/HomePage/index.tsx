@@ -11,7 +11,7 @@ import { UpdateSearchStateReset } from 'ducks/search/types';
 
 import Announcements from 'features/AnnouncementsWidget';
 
-import { announcementsEnabled, getHomePageWidgets } from 'config/config-utils';
+import { announcementsEnabled, bookmarksEnabled, getHomePageWidgets } from 'config/config-utils';
 
 import { HomePageWidgetsConfig } from 'config/config-types';
 import { HOMEPAGE_TITLE } from './constants';

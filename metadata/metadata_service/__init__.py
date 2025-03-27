@@ -36,14 +36,23 @@ from metadata_service.api.system import Neo4jDetailAPI, StatisticsMetricsAPI
 from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
                                         TableDescriptionAPI, TableDetailAPI,
                                         TableLineageAPI, TableOwnerAPI,
-                                        TableTagAPI)
+                                        TableTagAPI, TableUpdateFrequencyAPI)
 from metadata_service.api.tag import TagAPI
 from metadata_service.api.type_metadata import (TypeMetadataBadgeAPI,
                                                 TypeMetadataDescriptionAPI)
 from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
                                        UserFollowsAPI, UserOwnAPI, UserOwnsAPI,
                                        UserReadsAPI)
+from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
+from metadata_service.api.data_source import (DataProviderDetailAPI,
+                                              DataProviderDescriptionAPI,
+                                              FileDetailAPI,
+                                              FileTagAPI,
+                                              FileDescriptionAPI,
+                                              FileOwnerAPI,
+                                              FileLineageAPI)
 from metadata_service.deprecations import process_deprecations
+
 
 # For customized flask use below arguments to override.
 FLASK_APP_MODULE_NAME = os.getenv('FLASK_APP_MODULE_NAME')
@@ -136,6 +145,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/table/<path:table_uri>/column/<column_name>/badge/<badge>')
     api.add_resource(ColumnLineageAPI,
                      '/table/<path:table_uri>/column/<column_name>/lineage')
+    api.add_resource(TableUpdateFrequencyAPI,
+                     '/table/<path:table_uri>/update_frequency')
     api.add_resource(TypeMetadataDescriptionAPI,
                      '/type_metadata/<path:type_metadata_key>/description')
     api.add_resource(TypeMetadataBadgeAPI,
@@ -186,6 +197,22 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/feature/<path:id>/sample_data')
     api.add_resource(FeatureGenerationCodeAPI,
                      '/feature/<path:feature_uri>/generation_code')
+    api.add_resource(SnowflakeTableShareAPI,
+                     '/snowflake/table/<path:table_uri>/shares')
+    api.add_resource(DataProviderDetailAPI,
+                     '/data_source/data_provider/<path:data_provider_uri>')
+    api.add_resource(DataProviderDescriptionAPI,
+                     '/data_source/data_provider/<path:id>/description')
+    api.add_resource(FileDetailAPI,
+                     '/data_source/file/<path:file_uri>')
+    api.add_resource(FileTagAPI,
+                     '/data_source/file/<path:id>/tag/<tag>')
+    api.add_resource(FileDescriptionAPI,
+                     '/data_source/file/<path:id>/description')
+    api.add_resource(FileOwnerAPI,
+                     '/data_source/file/<path:file_uri>/owner/<owner>')
+    api.add_resource(FileLineageAPI,
+                     '/data_source/file/<path:id>/lineage')
     app.register_blueprint(api_bp)
 
     # cli registration

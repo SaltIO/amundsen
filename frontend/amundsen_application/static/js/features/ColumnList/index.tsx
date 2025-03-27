@@ -198,6 +198,7 @@ const ColumnList: React.FC<ColumnListProps> = ({
       tableParams,
       index,
       typeMetadata: item.type_metadata,
+      programmaticDescriptions: item.programmatic_descriptions
     };
   };
   const formattedData: FormattedDataType[] = columns.map(formatColumnData);

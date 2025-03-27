@@ -61,6 +61,7 @@ export interface TableColumn {
   type_metadata?: TypeMetadata;
   sort_order: number;
   stats: TableColumnStats[];
+  programmatic_descriptions?: ProgrammaticDescriptions;
 }
 
 export interface TypeMetadata {
@@ -84,7 +85,7 @@ export interface ProgrammaticDescription {
   source: string;
   text: string;
 }
-export interface TableProgrammaticDescriptions {
+export interface ProgrammaticDescriptions {
   left?: ProgrammaticDescription[];
   right?: ProgrammaticDescription[];
   other?: ProgrammaticDescription[];
@@ -111,10 +112,11 @@ export interface TableMetadata {
   table_apps?: TableApp[];
   partition: PartitionData;
   table_readers: TableReader[];
-  source: TableSource;
+  sources: TableSource[];
   resource_reports: ResourceReport[];
   watermarks: Watermark[];
-  programmatic_descriptions: TableProgrammaticDescriptions;
+  programmatic_descriptions: ProgrammaticDescriptions;
+  update_frequency?: string;
 }
 
 export interface UpdateOwnerPayload {

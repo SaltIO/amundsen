@@ -5,10 +5,17 @@ import * as autosize from 'autosize';
 import * as React from 'react';
 import * as ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import DOMPurify from 'dompurify';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import he from 'he';
 
+import LoadingSpinnerOverlay from 'components/LoadingSpinnerOverlay';
 import { EditableSectionChildProps } from 'components/EditableSection';
 import { logClick } from 'utils/analytics';
-
+import {
+  aiEnabled
+} from 'config/config-utils';
 import {
   CANCEL_BUTTON_TEXT,
   REFRESH_BUTTON_TEXT,
@@ -18,6 +25,8 @@ import {
 } from './constants';
 
 import './styles.scss';
+import { GetGPTResponseRequest, GetGPTResponseResponse } from 'ducks/ai/types';
+import { GPTResponse } from 'interfaces/AI';
 
 export interface StateFromProps {
   refreshValue?: string;
@@ -30,12 +39,18 @@ export interface DispatchFromProps {
     onSuccess?: () => any,
     onFailure?: () => any
   ) => void;
+  getGPTResponse?: (
+    prompt: string,
+    onSuccess?: (gptResponse: GetGPTResponseResponse) => any,
+    onFailure?: (gptResponse: GetGPTResponseResponse) => any
+  ) => GetGPTResponseRequest;
 }
 
 export interface ComponentProps {
   editable?: boolean;
   maxLength?: number;
   value?: string;
+  gptResponse?: GPTResponse;
   allowDangerousHtml?: boolean;
 }
 
@@ -46,7 +61,11 @@ export type EditableTextProps = ComponentProps &
 
 interface EditableTextState {
   value?: string;
+  gptResponse?: GPTResponse;
   isDisabled: boolean;
+  isAIEnabled: boolean;
+  isGPTResponseLoading: boolean;
+  aiError: boolean;
 }
 
 class EditableText extends React.Component<
@@ -54,20 +73,27 @@ class EditableText extends React.Component<
   EditableTextState
 > {
   readonly textAreaRef: React.RefObject<HTMLTextAreaElement>;
+  readonly aiTextAreaRef: React.RefObject<HTMLTextAreaElement>;
 
   public static defaultProps: EditableTextProps = {
     editable: true,
     maxLength: 500,
     value: '',
+    gptResponse: undefined
   };
 
   constructor(props: EditableTextProps) {
     super(props);
     this.textAreaRef = React.createRef<HTMLTextAreaElement>();
+    this.aiTextAreaRef = React.createRef<HTMLTextAreaElement>();
 
     this.state = {
       isDisabled: false,
+      isAIEnabled: false,
       value: props.value,
+      gptResponse: undefined,
+      isGPTResponseLoading: false,
+      aiError: false
     };
   }
 
@@ -77,12 +103,13 @@ class EditableText extends React.Component<
       value: propValue,
       isEditing,
       refreshValue,
-      getLatestValue,
+      getLatestValue
     } = this.props;
 
     if (prevProps.value !== propValue) {
       this.setState({ value: propValue });
-    } else if (isEditing && !prevProps.isEditing) {
+    }
+    else if (isEditing && !prevProps.isEditing) {
       const textArea = this.textAreaRef.current;
 
       if (textArea) {
@@ -93,11 +120,10 @@ class EditableText extends React.Component<
       if (getLatestValue) {
         getLatestValue();
       }
-    } else if (
-      (refreshValue || stateValue) &&
-      refreshValue !== stateValue &&
-      !isDisabled
-    ) {
+    }
+    else if ((refreshValue || stateValue) &&
+              refreshValue !== stateValue &&
+              !isDisabled) {
       // disable the component if a refresh is needed
       this.setState({ isDisabled: true });
     }
@@ -161,24 +187,85 @@ class EditableText extends React.Component<
     }
   };
 
+  handleAIEnabledChange = (event) => {
+    this.setState({ isAIEnabled: event.target.checked});
+  };
+
+  handleGenerateDescription = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const { getGPTResponse } = this.props;
+
+    const onSuccessCallback = (gptResponse: GetGPTResponseResponse) => {
+      this.setState({ isGPTResponseLoading: false, aiError: false});
+      if (gptResponse.payload.gptResponse && gptResponse.payload.gptResponse.message && gptResponse.payload.gptResponse.message.content) {
+        const textArea = this.textAreaRef.current;
+        if (textArea) {
+          textArea.value = gptResponse.payload.gptResponse.message.content
+          autosize.update(textArea);
+        }
+      }
+    };
+    const onFailureCallback = (gptResponse: GetGPTResponseResponse) => {
+      this.setState({ isGPTResponseLoading: false, aiError: true});
+    };
+
+    if (this.aiTextAreaRef.current && this.aiTextAreaRef.current.value) {
+      getGPTResponse?.(this.aiTextAreaRef.current.value, onSuccessCallback, onFailureCallback);
+      this.setState({ isGPTResponseLoading: true, aiError: false});
+    }
+  };
+
+  isJsonString = (str: string) => {
+    let isJson = false;
+    try {
+      const parsed = JSON.parse(he.decode(str));
+      isJson = typeof parsed === 'object' && parsed !== null;
+    } catch (e) {
+      console.log(e)
+      isJson = false;
+    }
+
+    console.log(`isJson=${isJson}`)
+    return isJson
+  };
+
   render() {
     const { isEditing, editable, maxLength, allowDangerousHtml } = this.props;
-    const { value = '', isDisabled } = this.state;
+    const { value = '', isDisabled, isAIEnabled, isGPTResponseLoading, aiError } = this.state;
+
+    if (isGPTResponseLoading) {
+      return (
+        <LoadingSpinnerOverlay isLoading={true} />
+      )
+    }
 
     if (!isEditing) {
+      const sanitizedContent = allowDangerousHtml ? DOMPurify.sanitize(value) : value;
+      const isJson = this.isJsonString(sanitizedContent)
+
       return (
         <div className="editable-text">
-          <div className="markdown-wrapper">
-            <ReactMarkdown
-              allowDangerousHtml={!!allowDangerousHtml}
-              plugins={[remarkGfm]}
-            >
-              {value}
-            </ReactMarkdown>
-          </div>
+            <div className="markdown-wrapper">
+              {isJson ?
+                (
+                  <div style={{ width: '400px', height: '500px', overflow: 'auto', border: '1px solid #ddd' }}>
+                    <SyntaxHighlighter language="json" style={dark}>
+                      {JSON.stringify(JSON.parse(he.decode(sanitizedContent)), null, 2)}
+                    </SyntaxHighlighter>
+                  </div>
+                ) : (
+                  <ReactMarkdown
+                    allowDangerousHtml={!!allowDangerousHtml}
+                    plugins={[remarkGfm]}
+                  >
+                    {sanitizedContent}
+                  </ReactMarkdown>
+                )
+              }
+            </div>
           {editable && !value && (
             <button
               className="edit-link btn btn-link"
+              style={{ fontFamily: 'IBM Plex Mono'}}
               onClick={this.handleEnterEditMode}
               data-type="add-editable-text"
               type="button"
@@ -192,11 +279,51 @@ class EditableText extends React.Component<
 
     return (
       <div className="editable-text">
+        {/* Conditionally render the additional textarea and button */}
+          {isAIEnabled && (
+            <>
+              <textarea
+                className="editable-textarea"
+                rows={2}
+                maxLength={maxLength}
+                ref={this.aiTextAreaRef}
+                placeholder="Enter prompt here..."
+                disabled={isDisabled}
+                aria-label="Editable text area"
+              />
+              <button
+                className="btn btn-primary update-button"
+                onClick={this.handleGenerateDescription}
+                type="button"
+                data-type="update-editable-text"
+              >
+                Generate Description
+              </button>
+            </>
+          )}
+          {aiError && (
+            <h2 className="label label-danger refresh-message">
+              There was a problem accessing the AI service. Plesae try again later.
+            </h2>
+          )}
+        {aiEnabled() && (
+          <div className="editable-textarea-controls">
+            <label>
+              <input
+                type="checkbox"
+                checked={isAIEnabled}
+                onChange={this.handleAIEnabledChange}
+              />
+              Enable AI
+            </label>
+          </div>
+        )}
         <textarea
           className="editable-textarea"
           rows={2}
           maxLength={maxLength}
           ref={this.textAreaRef}
+          placeholder="Enter description here..."
           defaultValue={value}
           disabled={isDisabled}
           aria-label="Editable text area"
@@ -243,3 +370,4 @@ class EditableText extends React.Component<
 }
 
 export default EditableText;
+

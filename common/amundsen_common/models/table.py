@@ -69,6 +69,17 @@ class TypeMetadataSchema(AttrsSchema):
         target = TypeMetadata
         register_as_scheme = True
 
+@attr.s(auto_attribs=True, kw_only=True)
+class ProgrammaticDescription:
+    source: str
+    text: str
+
+
+class ProgrammaticDescriptionSchema(AttrsSchema):
+    class Meta:
+        target = ProgrammaticDescription
+        register_as_scheme = True
+
 
 @attr.s(auto_attribs=True, kw_only=True)
 class Column:
@@ -80,6 +91,7 @@ class Column:
     stats: List[Stat] = []
     badges: Optional[List[Badge]] = []
     type_metadata: Optional[TypeMetadata] = None  # Used to support complex column types
+    programmatic_descriptions: List[ProgrammaticDescription] = []
 
 
 class ColumnSchema(AttrsSchema):
@@ -131,18 +143,6 @@ class ResourceReportSchema(AttrsSchema):
 # `attr.converters.default_if_none(default=False)`
 def default_if_none(arg: Optional[bool]) -> bool:
     return arg or False
-
-
-@attr.s(auto_attribs=True, kw_only=True)
-class ProgrammaticDescription:
-    source: str
-    text: str
-
-
-class ProgrammaticDescriptionSchema(AttrsSchema):
-    class Meta:
-        target = ProgrammaticDescription
-        register_as_scheme = True
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -205,9 +205,10 @@ class Table:
     table_apps: Optional[List[Application]] = None
     resource_reports: Optional[List[ResourceReport]] = None
     last_updated_timestamp: Optional[int] = None
-    source: Optional[Source] = None
+    sources: Optional[List[Source]] = None
     is_view: Optional[bool] = attr.ib(default=None, converter=default_if_none)
     programmatic_descriptions: List[ProgrammaticDescription] = []
+    update_frequency: Optional[str] = None
     common_joins: Optional[List[SqlJoin]] = None
     common_filters: Optional[List[SqlWhere]] = None
 

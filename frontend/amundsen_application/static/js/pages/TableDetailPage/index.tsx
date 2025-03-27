@@ -22,6 +22,8 @@ import {
 import { OpenRequestAction } from 'ducks/notification/types';
 import { GetNoticesRequest } from 'ducks/notices/types';
 import { UpdateSearchStateRequest } from 'ducks/search/types';
+import { GetSnowflakeTableSharesRequest } from 'ducks/snowflake/types';
+import { getSnowflakeTableShares } from 'ducks/snowflake/reducer';
 
 import {
   getDescriptionSourceDisplayName,
@@ -37,6 +39,8 @@ import {
   notificationsEnabled,
   isTableQualityCheckEnabled,
   getTableLineageDefaultDepth,
+  previewEnabled,
+  snowflakeSharesEnabled
 } from 'config/config-utils';
 import { NoticeType, NoticeSeverity } from 'config/config-types';
 
@@ -46,6 +50,7 @@ import ColumnDetailsPanel from 'features/ColumnList/ColumnDetailsPanel';
 
 import { AlertList } from 'components/Alert';
 import BookmarkIcon from 'components/Bookmark/BookmarkIcon';
+import ExportMetadataIcon from 'components/ExportMetadata/ExportMetadataIcon';
 import Breadcrumb from 'features/Breadcrumb';
 import EditableSection from 'components/EditableSection';
 import EditableText from 'components/EditableText';
@@ -73,6 +78,7 @@ import {
   Lineage,
   TableApp,
   DynamicResourceNotice,
+  SnowflakeTableShare
 } from 'interfaces';
 import { FormattedDataType } from 'interfaces/ColumnList';
 
@@ -83,7 +89,7 @@ import FrequentUsers from './FrequentUsers';
 import LineageLink from './LineageLink';
 import LineageList from './LineageList';
 import TableOwnerEditor from './TableOwnerEditor';
-import SourceLink from './SourceLink';
+import SourceDropdown from './SourceDropdown';
 import TableDashboardResourceList from './TableDashboardResourceList';
 import TableDescEditableText from './TableDescEditableText';
 import TableHeaderBullets from './TableHeaderBullets';
@@ -95,6 +101,8 @@ import TableReportsDropdown from './ResourceReportsDropdown';
 import RequestDescriptionText from './RequestDescriptionText';
 import RequestMetadataForm from './RequestMetadataForm';
 import ListSortingDropdown from './ListSortingDropdown';
+import SnowflakeSharesList from './SnowflakeSharesList';
+import TableUpdateFrequencyEditor from './TableUpdateFrequencyEditor';
 
 import * as Constants from './constants';
 import { AIRFLOW, DATABRICKS } from './ApplicationDropdown/constants';
@@ -146,6 +154,8 @@ export interface PropsFromState {
   isLoadingLineage: boolean;
   notices: DynamicResourceNotice[];
   isLoadingNotices: boolean;
+  isLoadingSnowflakeTableShares: boolean;
+  snowflakeTableShares: SnowflakeTableShare[]
 }
 export interface DispatchFromProps {
   getTableData: (
@@ -167,6 +177,9 @@ export interface DispatchFromProps {
     columnName: string
   ) => OpenRequestAction;
   searchSchema: (schemaText: string) => UpdateSearchStateRequest;
+  getSnowflakeTableSharesDispatch: (
+    tableUri: string
+  ) => GetSnowflakeTableSharesRequest;
 }
 
 export interface MatchProps {
@@ -224,6 +237,7 @@ export class TableDetail extends React.Component<
       getTableData,
       getTableLineageDispatch,
       getNoticesDispatch,
+      getSnowflakeTableSharesDispatch
     } = this.props;
     const { index, source } = getLoggingParams(location.search);
     const {
@@ -235,6 +249,10 @@ export class TableDetail extends React.Component<
 
     if (isTableListLineageEnabled()) {
       getTableLineageDispatch(this.key, defaultDepth);
+    }
+
+    if (snowflakeSharesEnabled()) {
+      getSnowflakeTableSharesDispatch(this.key);
     }
 
     if (getDynamicNoticesEnabledByResource(ResourceType.table)) {
@@ -255,6 +273,7 @@ export class TableDetail extends React.Component<
       location,
       getTableData,
       getTableLineageDispatch,
+      getSnowflakeTableSharesDispatch,
       match: { params },
     } = this.props;
     const newKey = buildTableKey(params);
@@ -267,6 +286,10 @@ export class TableDetail extends React.Component<
 
       if (isTableListLineageEnabled()) {
         getTableLineageDispatch(this.key, defaultDepth);
+      }
+
+      if (snowflakeSharesEnabled()) {
+        getSnowflakeTableSharesDispatch(this.key);
       }
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({ currentTab: this.getDefaultTab() });
@@ -451,6 +474,8 @@ export class TableDetail extends React.Component<
       tableData,
       isLoadingLineage,
       tableLineage,
+      isLoadingSnowflakeTableShares,
+      snowflakeTableShares
     } = this.props;
     const {
       areNestedColumnsExpanded,
@@ -496,7 +521,7 @@ export class TableDetail extends React.Component<
     if (indexDashboardsEnabled()) {
       const loadingTitle = (
         <div className="tab-title">
-          Dashboards <LoadingSpinner />
+          Canvases <LoadingSpinner />
         </div>
       );
 
@@ -510,7 +535,7 @@ export class TableDetail extends React.Component<
         key: Constants.TABLE_TAB.DASHBOARD,
         title: isLoadingDashboards
           ? loadingTitle
-          : `Dashboards (${numRelatedDashboards})`,
+          : `Canvases (${numRelatedDashboards})`,
       });
     }
 
@@ -564,6 +589,28 @@ export class TableDetail extends React.Component<
         ),
         key: Constants.TABLE_TAB.DOWNSTREAM,
         title: downstreamLoadingTitle,
+      });
+    }
+
+    // Render the Snowflake Shares tab only if enabled and if the database is 'snowflake'
+    if (snowflakeSharesEnabled() && tableData.database.toLowerCase() == "snowflake") {
+      const snowflakeSharesLoadingTitle = isLoadingSnowflakeTableShares ? (
+        <div className="tab-title is-loading">
+          Snowflake Shares <LoadingSpinner />
+        </div>
+      ) : (
+        `Snowflake Shares`
+      );
+
+      tabInfo.push({
+        content: (
+          <SnowflakeSharesList
+            shares={isLoadingSnowflakeTableShares ? [] : snowflakeTableShares}
+            tableDetails={tableData}
+          />
+        ),
+        key: Constants.TABLE_TAB.SNOWFLAKE_SHARES,
+        title: snowflakeSharesLoadingTitle,
       });
     }
 
@@ -684,19 +731,19 @@ export class TableDetail extends React.Component<
       innerContent = <ErrorMessage />;
     } else {
       const data = tableData;
-      const editText = data.source
+      const editText = data.sources[0]
         ? `${Constants.EDIT_DESC_TEXT} ${getDescriptionSourceDisplayName(
-            data.source.source_type
+            data.sources[0].source_type
           )}`
         : '';
-      const ownersEditText = data.source
+      const ownersEditText = data.sources[0]
         ? // TODO rename getDescriptionSourceDisplayName to more generic since
           // owners also edited on the same file?
           `${Constants.EDIT_OWNERS_TEXT} ${getDescriptionSourceDisplayName(
-            data.source.source_type
+            data.sources[0].source_type
           )}`
         : '';
-      const editUrl = data.source ? data.source.source : '';
+      const editUrl = data.sources[0] ? data.sources[0].source : '';
       const aggregatedTableNotices = aggregateResourceNotices(data, notices);
 
       innerContent = (
@@ -726,24 +773,32 @@ export class TableDetail extends React.Component<
                 bookmarkKey={data.key}
                 resourceType={ResourceType.table}
               />
+              <ExportMetadataIcon
+                tableData={data}
+              />
               <div className="header-details">
                 <TableHeaderBullets
                   database={data.database}
                   cluster={data.cluster}
                   isView={data.is_view}
                 />
+              </div>
+              <div className="header-details">
                 {data.badges.length > 0 && <BadgeList badges={data.badges} />}
               </div>
             </div>
             <div className="header-section header-links header-external-links">
               {this.renderTableAppDropdowns(data.table_writer, data.table_apps)}
               <LineageLink tableData={data} />
-              <SourceLink tableSource={data.source} />
+              <SourceDropdown tableSources={data.sources} />
+              {/* <SourceLink tableSource={data.sources[0]} /> */}
             </div>
             <div className="header-section header-buttons">
               <LineageButton tableData={data} />
               <TableReportsDropdown resourceReports={data.resource_reports} />
-              <DataPreviewButton modalTitle={this.getDisplayName()} />
+              {previewEnabled() && (
+                <DataPreviewButton modalTitle={this.getDisplayName()} />
+              )}
               <ExploreButton tableData={data} />
             </div>
           </header>
@@ -781,30 +836,35 @@ export class TableDetail extends React.Component<
               )}
               <section className="two-column-layout">
                 <section className="left-column">
-                  {!!data.last_updated_timestamp && (
-                    <section className="metadata-section">
-                      <div className="section-title">
-                        {Constants.LAST_UPDATED_TITLE}
-                      </div>
-                      <time className="time-body-text">
-                        {formatDateTimeShort({
-                          epochTimestamp: data.last_updated_timestamp,
-                        })}
-                      </time>
-                    </section>
-                  )}
+                  <section className="metadata-section">
+                    <div className="section-title">
+                      {Constants.LAST_UPDATED_TITLE}
+                    </div>
+                    <time className="time-body-text">
+                      {
+                        data.last_updated_timestamp != null
+                        ? formatDateTimeShort({
+                            epochTimestamp: data.last_updated_timestamp,
+                          })
+                        : ''
+                      }
+                    </time>
+                  </section>
+                  <section className="editable-section">
+                    <div className="section-title">
+                      {Constants.UPDATE_FREQUENCY_TITLE}
+                    </div>
+                    <TableUpdateFrequencyEditor
+                      value={data.update_frequency}
+                      editable={data.is_editable}
+                    />
+                  </section>
                   <section className="metadata-section">
                     <div className="section-title">
                       {Constants.DATE_RANGE_TITLE}
                     </div>
                     <WatermarkLabel watermarks={data.watermarks} />
                   </section>
-                  <EditableSection title={Constants.TAG_TITLE}>
-                    <TagInput
-                      resourceType={ResourceType.table}
-                      uriKey={tableData.key}
-                    />
-                  </EditableSection>
                   {isTableQualityCheckEnabled() && (
                     <TableQualityChecksLabel tableKey={tableData.key} />
                   )}
@@ -832,6 +892,12 @@ export class TableDetail extends React.Component<
                   )}
                 </section>
               </section>
+              <EditableSection title={Constants.TAG_TITLE}>
+                <TagInput
+                  resourceType={ResourceType.table}
+                  uriKey={tableData.key}
+                />
+              </EditableSection>
               {this.renderProgrammaticDesc(
                 data.programmatic_descriptions.other
               )}
@@ -876,6 +942,8 @@ export const mapStateToProps = (state: GlobalState) => ({
   isLoadingDashboards: state.tableMetadata.dashboards
     ? state.tableMetadata.dashboards.isLoading
     : true,
+  isLoadingSnowflakeTableShares: state.snowflakeTableShares ? state.snowflakeTableShares.isLoading : false,
+  snowflakeTableShares: state.snowflakeTableShares.snowflakeTableShares
 });
 
 export const mapDispatchToProps = (dispatch: any) =>
@@ -883,6 +951,7 @@ export const mapDispatchToProps = (dispatch: any) =>
     {
       getTableData,
       getTableLineageDispatch: getTableLineage,
+      getSnowflakeTableSharesDispatch: getSnowflakeTableShares,
       getNoticesDispatch: getNotices,
       getColumnLineageDispatch: getTableColumnLineage,
       openRequestDescriptionDialog,

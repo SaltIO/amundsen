@@ -4,7 +4,7 @@
 import { User } from './User';
 import { Badge } from './Badges';
 import { Tag } from './Tags';
-import { ProgrammaticDescription } from './TableMetadata';
+import { ProgrammaticDescriptions } from './TableMetadata';
 
 export interface FeatureMetadata {
   key: string;
@@ -26,12 +26,6 @@ export interface FeatureMetadata {
   last_updated_timestamp: number;
   created_timestamp: number;
   partition_column?: string;
-}
-
-export interface ProgrammaticDescriptions {
-  left?: ProgrammaticDescription[];
-  right?: ProgrammaticDescription[];
-  other?: ProgrammaticDescription[];
 }
 
 // TODO - duplicated with FeatureResource in Resources.ts. Might delete this.

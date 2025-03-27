@@ -195,7 +195,7 @@ class Neo4jCsvUnwindPublisher(Publisher):
     def _create_node_merge_statement(self, node_keys: list, node_label: str) -> str:
         template = Template("""
             UNWIND $batch AS row
-            MERGE (node:{{ LABEL }} {key: row.KEY})
+            MERGE (node:{{ LABEL }} {key: toLower(row.KEY)})
             ON CREATE SET {{ PROPS_BODY_CREATE }}
             {% if update %} ON MATCH SET {{ PROPS_BODY_UPDATE }} {% endif %}
         """)
@@ -240,11 +240,11 @@ class Neo4jCsvUnwindPublisher(Publisher):
                                              relation_reverse_type: str) -> str:
         template = Template("""
             UNWIND $batch as row
-            MATCH (n1:{{ START_LABEL }} {key: row.START_KEY}), (n2:{{ END_LABEL }} {key: row.END_KEY})
+            MATCH (n1:{{ START_LABEL }} {key: toLower(row.START_KEY)}), (n2:{{ END_LABEL }} {key: toLower(row.END_KEY)})
             {% if publish_reverse_relationships %}
             MERGE (n1)-[r1:{{ TYPE }}]->(n2)-[r2:{{ REVERSE_TYPE }}]->(n1)
             {% elif not publish_reverse_relationships and has_key %}
-            MERGE (n1)-[r1:{{ TYPE }} {key: row.key}]->(n2)
+            MERGE (n1)-[r1:{{ TYPE }} {key: toLower(row.key)}]->(n2)
             {% else %}
             MERGE (n1)-[r1:{{ TYPE }}]->(n2)
             {% endif %}

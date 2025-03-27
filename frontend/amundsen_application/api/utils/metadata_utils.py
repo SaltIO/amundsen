@@ -11,6 +11,7 @@ from amundsen_common.models.dashboard import DashboardSummary, DashboardSummaryS
 from amundsen_common.models.feature import Feature, FeatureSchema
 from amundsen_common.models.popular_table import PopularTable, PopularTableSchema
 from amundsen_common.models.table import Table, TableSchema, TypeMetadata
+from amundsen_common.models.data_source import DataProvider, DataProviderSchema, File, FileSchema
 from amundsen_application.models.user import load_user, dump_user
 from amundsen_application.config import MatchRuleObject
 from flask import current_app as app
@@ -39,6 +40,51 @@ class TableUri:
         spec = groups.groupdict() if groups else {}
 
         return TableUri(**spec)
+
+@dataclass
+class ColumnUri:
+    database: str
+    cluster: str
+    schema: str
+    table: str
+    column: str
+
+    def __str__(self) -> str:
+        return f"{self.database}://{self.cluster}.{self.schema}/{self.table}/{self.column}"
+
+    @classmethod
+    def from_uri(cls, uri: str) -> 'TableUri':
+        """
+        COLUMN_KEY_FORMAT = '{db}://{cluster}.{schema}/{tbl}/{col}'
+        """
+        pattern = re.compile(r'^(?P<database>.*?)://(?P<cluster>.*)\.(?P<schema>.*?)/(?P<table>.*?)/(?P<column>.*?)$', re.X)
+
+        groups = pattern.match(uri)
+
+        spec = groups.groupdict() if groups else {}
+
+        return ColumnUri(**spec)
+
+@dataclass
+class FileUri:
+    name: str
+    type: str
+    data_location_type: str
+    data_location_container: str
+    data_location_name: str
+
+    def __str__(self) -> str:
+        return f"{self.data_location_type}://{self.data_location_name}/{self.data_location_container}/{self.type}/{self.name}"
+
+    @classmethod
+    def from_uri(cls, uri: str) -> 'FileUri':
+        pattern = re.compile(r'^(?P<data_location_type>.*?)://(?P<data_location_name>.*)/(?P<data_location_container>.*?)/(?P<type>.*?)/(?P<name>.*?)$', re.X)
+
+        groups = pattern.match(uri)
+
+        spec = groups.groupdict() if groups else {}
+
+        return FileUri(**spec)
 
 
 def marshall_table_partial(table_dict: Dict) -> Dict:
@@ -140,6 +186,10 @@ def marshall_table_full(table_dict: Dict) -> Dict:
     prog_descriptions = results['programmatic_descriptions']
     results['programmatic_descriptions'] = _convert_prog_descriptions(prog_descriptions)
 
+    update_frequency = results['update_frequency']
+    results['update_frequency'] = update_frequency
+    results['update_frequency']
+
     columns = results['columns']
     for col in columns:
         # Set column key to guarantee it is available on the frontend
@@ -147,6 +197,10 @@ def marshall_table_full(table_dict: Dict) -> Dict:
         col['key'] = results['key'] + '/' + col['name']
         # Set editable state
         col['is_editable'] = is_editable
+
+        prog_descriptions = col['programmatic_descriptions']
+        col['programmatic_descriptions'] = _convert_prog_descriptions(prog_descriptions)
+
         _recursive_set_type_metadata_is_editable(col['type_metadata'], is_editable)
         # If order is provided, we sort the column based on the pre-defined order
         if app.config['COLUMN_STAT_ORDER']:
@@ -187,6 +241,14 @@ def marshall_dashboard_full(dashboard_dict: Dict) -> Dict:
     dashboard_dict['tables'] = [marshall_table_partial(table) for table in dashboard_dict['tables']]
     return dashboard_dict
 
+def marshall_lineage_item(entity: Dict) -> Dict:
+    type = entity.get('type')
+    if type == "Table":
+        return marshall_lineage_table(entity)
+    elif type == "Column":
+        return marshall_lineage_column(entity)
+    elif type == "File":
+        return marshall_lineage_file(entity)
 
 def marshall_lineage_table(table_dict: Dict) -> Dict:
     """
@@ -196,11 +258,43 @@ def marshall_lineage_table(table_dict: Dict) -> Dict:
     """
     table_key = str(table_dict.get('key'))
     table_uri = TableUri.from_uri(table_key)
-    table_dict['database'] = table_uri.database
-    table_dict['schema'] = table_uri.schema
-    table_dict['cluster'] = table_uri.cluster
-    table_dict['name'] = table_uri.table
+
+    table_dict['lineage_item_detail'] = {}
+    table_dict['lineage_item_detail']['database'] = table_uri.database
+    table_dict['lineage_item_detail']['schema'] = table_uri.schema
+    table_dict['lineage_item_detail']['cluster'] = table_uri.cluster
+    table_dict['lineage_item_detail']['name'] = table_uri.table
     return table_dict
+
+def marshall_lineage_column(column_dict: Dict) -> Dict:
+    column_key = str(column_dict.get('key'))
+    column_uri = ColumnUri.from_uri(column_key)
+
+    column_dict['lineage_item_detail'] = {}
+    column_dict['lineage_item_detail']['database'] = column_uri.database
+    column_dict['lineage_item_detail']['schema'] = column_uri.schema
+    column_dict['lineage_item_detail']['cluster'] = column_uri.cluster
+    column_dict['lineage_item_detail']['table'] = column_uri.table
+    column_dict['lineage_item_detail']['column'] = column_uri.column
+    return column_dict
+
+def marshall_lineage_file(file_dict: Dict) -> Dict:
+    """
+    Decorate lineage entries with database, schema, cluster, and table
+    :param table_dict:
+    :return: table entry with additional fields
+    """
+    file_key = str(file_dict.get('key'))
+    file_uri = FileUri.from_uri(file_key)
+
+    file_dict['lineage_item_detail'] = {}
+    file_dict['lineage_item_detail']['type'] = file_uri.type
+    file_dict['lineage_item_detail']['name'] = file_uri.name
+    file_dict['lineage_item_detail']['data_location_type'] = file_uri.data_location_type
+    file_dict['lineage_item_detail']['data_location_container'] = file_uri.data_location_container
+    file_dict['lineage_item_detail']['data_location_name'] = file_uri.data_location_name
+
+    return file_dict
 
 
 def _convert_prog_descriptions(prog_descriptions: List = None) -> Dict:
@@ -289,5 +383,37 @@ def marshall_feature_full(feature_dict: Dict) -> Dict:
 
     prog_descriptions = results['programmatic_descriptions']
     results['programmatic_descriptions'] = _convert_prog_descriptions(prog_descriptions)
+
+    return results
+
+def marshall_data_provider_full(data_provider_dict: Dict) -> Dict:
+    """
+    """
+
+    schema = DataProviderSchema()
+    data_provider: DataProvider = schema.load(data_provider_dict)
+    results: Dict[str, Any] = schema.dump(data_provider)
+
+    # is_editable = is_table_editable(results['schema'], results['name'])
+    is_editable = True
+    results['is_editable'] = is_editable
+
+    # data_provider_name_key = re.sub(r'\W+', '_', data_provider.name).lower()
+    # results['key'] = f"data_provider://{data_provider_name_key}"
+
+    return results
+
+def marshall_file_full(file_dict: Dict) -> Dict:
+    """
+    """
+
+    schema = FileSchema()
+    file: File = schema.load(file_dict)
+    results: Dict[str, Any] = schema.dump(file)
+
+    # is_editable = is_table_editable(results['schema'], results['name'])
+    is_editable = True
+    results['is_editable'] = is_editable
+
 
     return results
