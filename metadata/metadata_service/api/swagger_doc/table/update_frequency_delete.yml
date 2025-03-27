@@ -1,0 +1,26 @@
+Delete update frequency of a table
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'table'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'The update frequency was deleted successfully'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/MessageResponse'
+  404:
+    description: 'Table or update frequency not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

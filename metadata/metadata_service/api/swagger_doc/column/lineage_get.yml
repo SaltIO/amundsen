@@ -1,15 +1,12 @@
 Get lineage
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'lineage'
 parameters:
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'hive://gold.test_schema/test_table1'
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
   - name: column_name
     in: path
     type: string
@@ -32,6 +29,8 @@ parameters:
     required: false
     example: 0
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Lineage for requested direction and depth'
     content:

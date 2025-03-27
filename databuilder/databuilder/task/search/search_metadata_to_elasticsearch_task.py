@@ -111,7 +111,7 @@ class SearchMetadatatoElasticasearchTask(Task):
         :return: list of elasticsearch indices
         """
         try:
-            indices = connection.indices.get_alias(self.elasticsearch_alias).keys()
+            indices = connection.indices.get_alias(name=self.elasticsearch_alias).keys()
             return indices
         except NotFoundError:
             LOGGER.warn("Received index not found error from Elasticsearch. " +
@@ -129,7 +129,7 @@ class SearchMetadatatoElasticasearchTask(Task):
         alias_updates.append({"add": {
             "index": self.elasticsearch_new_index,
             "alias": self.elasticsearch_alias}})
-        connection.indices.update_aliases({"actions": alias_updates})
+        connection.indices.update_aliases(body={"actions": alias_updates})
 
     def run(self) -> None:
         LOGGER.info('Running search metadata to Elasticsearch task')
@@ -138,7 +138,7 @@ class SearchMetadatatoElasticasearchTask(Task):
             record = self.extractor.extract()
 
             # create connection
-            connections.add_connection('default', self.elasticsearch_client)
+            connections.add_connection(alias='default', conn=self.elasticsearch_client)
             connection = connections.get_connection()
 
             # health check ES

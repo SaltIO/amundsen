@@ -18,9 +18,12 @@ from flask_restful import Resource
 from marshmallow.exceptions import ValidationError as SchemaValidationError
 
 from metadata_service.api import BaseAPI
+from metadata_service.auth.auth import requires_auth
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.util import UserResourceRel
+from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +37,8 @@ class UserDetailAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(UserSchema, 'user', self.client)
 
-    @swag_from('swagger_doc/user/detail_get.yml')
+    @requires_auth()
+    # @swag_from('swagger_doc/user/detail_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         if app.config['USER_DETAIL_METHOD']:
             try:
@@ -46,6 +50,15 @@ class UserDetailAPI(BaseAPI):
         else:
             return super().get(id=id)
 
+class UserPutAPI(Resource):
+    """
+    User PUT API for people resources
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/user/detail_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -58,12 +71,19 @@ class UserDetailAPI(BaseAPI):
             return {'message': 'No user information provided in the request.'}, HTTPStatus.BAD_REQUEST
 
         try:
-            user_attributes = json.loads(request.data)
+            data = json.loads(request.data)
             schema = UserSchema()
-            user = schema.load(user_attributes)
+            user = schema.load(data)
 
-            new_user, user_created = self.client.create_update_user(user=user)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            new_user, user_created = self.client.create_update_user(
+                user=user,
+                published_tag=published_tag
+            )
+
             resp_code = HTTPStatus.CREATED if user_created else HTTPStatus.OK
+
             return schema.dumps(new_user), resp_code
 
         except SchemaValidationError as schema_err:
@@ -83,6 +103,7 @@ class UserFollowsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/user/follow_get.yml')
     def get(self, user_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -136,6 +157,7 @@ class UserFollowAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/user/follow_put.yml')
     def put(self, user_id: str, resource_type: str, resource_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -146,10 +168,16 @@ class UserFollowAPI(Resource):
         :return:
         """
         try:
-            self.client.add_resource_relation_by_user(id=resource_id,
-                                                      user_id=user_id,
-                                                      relation_type=UserResourceRel.follow,
-                                                      resource_type=to_resource_type(label=resource_type))
+            data = json.loads(request.data)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.add_resource_relation_by_user(
+                id=resource_id,
+                user_id=user_id,
+                relation_type=UserResourceRel.follow,
+                resource_type=to_resource_type(label=resource_type),
+                published_tag=published_tag
+            )
 
             return {'message': 'The user {} for id {} resource type {} '
                                'is added successfully'.format(user_id,
@@ -162,6 +190,7 @@ class UserFollowAPI(Resource):
                                                                   resource_id,
                                                                   resource_type)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth()
     @swag_from('swagger_doc/user/follow_delete.yml')
     def delete(self, user_id: str, resource_type: str, resource_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -196,6 +225,7 @@ class UserOwnsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/user/own_get.yml')
     def get(self, user_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -243,6 +273,7 @@ class UserOwnAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/user/own_put.yml')
     def put(self, user_id: str, resource_type: str, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -254,7 +285,15 @@ class UserOwnAPI(Resource):
         :return:
         """
         try:
-            self.client.add_owner(table_uri=table_uri, owner=user_id)
+            data = json.loads(request.data)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.add_owner(
+                table_uri=table_uri,
+                owner=user_id,
+                published_tag=published_tag
+            )
+
             return {'message': 'The owner {} for table_uri {} '
                                'is added successfully'.format(user_id,
                                                               table_uri)}, HTTPStatus.OK
@@ -264,6 +303,7 @@ class UserOwnAPI(Resource):
                                'is not added successfully'.format(user_id,
                                                                   table_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth()
     @swag_from('swagger_doc/user/own_delete.yml')
     def delete(self, user_id: str, resource_type: str, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -286,6 +326,7 @@ class UserReadsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/user/read_get.yml')
     def get(self, user_id: str) -> Iterable[Union[Mapping, int, None]]:
         """

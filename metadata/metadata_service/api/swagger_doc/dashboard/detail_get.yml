@@ -1,8 +1,11 @@
-Gets dashboard descriptions
+Gets dashboard details
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'dashboard'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: dashboard_uri
     in: path
     type: string
@@ -11,6 +14,8 @@ parameters:
     required: true
     example: 'mode_dashboard://gold.abcdefg/1234567'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Dashboard details'
     content:

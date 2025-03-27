@@ -1,27 +1,250 @@
 openapi: '3.0.2'
 info:
-  title: 'Metadata Service'
-  description: 'Used to provide and update metadata, such as table & column description, stored in either neo4j or apache atlas.'
-  version: '1.1.7'
+  title: 'Metadata API'
+  description: 'Used to provide and update metadata, such as table & column description.'
+  version: '4.0.0'
 
 components:
+
+  parameters:
+    AuthorizationHeaderParameter:
+      name: Authorization
+      in: header
+      description: "Bearer token"
+      required: true
+      schema:
+        type: string
+        example: "Bearer your_token_here"
+    TableUriParameter:
+      name: table_uri
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'hive://gold.test_schema/test_table1'
+    ResourceIdParameter:
+      name: id
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'dynamo://gold.test_schema/test_table2'
+    ResourceIdQParameter:
+      name: id
+      in: query
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'dynamo://gold.test_schema/test_table2'
+    BadgeNameParameter:
+      name: badge
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'beta'
+    BadgeCategoryParameter:
+      name: category
+      in: query
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'column'
+    TagNameParameter:
+      name: tag
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'tag3'
+    TagTypeParameter:
+      name: tag_type
+      in: query
+      type: string
+      schema:
+        type: string
+      required: false
+      default: 'default'
+      example: 'badge'
+
+  requestBodies:
+    PublisherRequest:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Publisher'
+    EmptyRequest:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object  # ✅ Allows an empty JSON body
+    TableDetailPutRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TableDetailPut'
+    DescriptionPutRequest:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DescriptionPut'
+    UpdateFrequencyPutRequest:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdateFrequencyPut'
+    UserDetailPutRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserDetailPut'
+
+  responses:
+    AuthTokenResponse:
+      description: 'The auth token'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthToken'
+            description: 'Auth Token Response'
+    AuthTokenInvalidResponse:
+      description: 'Auth Token Missing, Invalid or Expired'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+            description: 'Auth Token Invalid Response'
+    ReadOnlyModeResponse:
+      description: 'API is in read-only mode. Write operations are not allowed.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+            description: 'Read-only Mode Response'
+    ResourceDescriptionResponse:
+      description: 'Resource description'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Description'
+            description: 'Resource description'
+    EmptyResponse:
+      description: 'Empty response'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EmptyResponse'
+
+    ResourceNotFoundResponse:
+      description: 'Resource not found'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerErrorResponse:
+      description: 'Internal server error'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthcheckResponse:
       type: object
       properties:
         status:
           type: string
-          description: The status of the service, values will be 'ok' or 'fail'
+          description: The status of the API, values will be 'ok' or 'fail'
         checks:
           type: object
           description: An arbitrary dictionary representing the healthchecks that have run
           example:
             $ref: '#/detailedExamples/healthcheck'
+    AuthToken:
+      type: object
+      required:
+        - access_token
+        - expires_in
+        - token_type
+      properties:
+        access_token:
+          description: 'The Auth Token'
+          type: string
+        expires_in:
+          description: 'The Auth Token expiration in seconds'
+          type: integer
+        token_type:
+          description: 'The type of token (ie Bearer)'
+          type: string
+    AuthTokenClient:
+      type: object
+      required:
+        - client_id
+        - client_secret
+      properties:
+        client_id:
+          description: 'The Auth Client ID as provided by your Admin'
+          type: string
+        client_secret:
+          description: 'The Auth Client Secret as provided by your Admin'
+          type: string
     Description:
       type: object
+      required:
+        - description
       properties:
         description:
           type: string
+          example: "Metadata Rocks!"
+    DescriptionPut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Description'
+        - $ref: '#/components/schemas/Publisher'
+    TableDetailPut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/TableDetail'
+        - $ref: '#/components/schemas/Publisher'
+    UpdateFrequency:
+      type: object
+      required:
+        - frequency
+      properties:
+        frequency:
+          type: string
+          example: "monthly"
+    UpdateFrequencyPut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/UpdateFrequency'
+        - $ref: '#/components/schemas/Publisher'
+    Publisher:
+      type: object
+      properties:
+        published_tag:
+          type: string
+          description: "A meaningful tag to describe the publishing mechanism."
+          example: "api"
     PopularTables:
       type: object
       properties:
@@ -61,6 +284,17 @@ components:
         table_description:
           description: 'Table description'
           type: string
+    Tag:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'Tag key'
+          example: 'test'
+        tag_type:
+          type: string
+          description: 'Tag type'
+          example: 'default'
     TagFields:
       type: object
       properties:
@@ -108,8 +342,10 @@ components:
         last_name:
           type: string
           description: 'User last name'
-    UserDetailFields:
+    UserDetail:
       type: object
+      required:
+        - email
       properties:
         email:
           type: string
@@ -149,6 +385,11 @@ components:
           additionalProperties:
             type: string
             description: 'Additional key value properties'
+    UserDetailPut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/UserDetail'
+        - $ref: '#/components/schemas/Publisher'
     ColumnFields:
       type: object
       properties:
@@ -268,70 +509,128 @@ components:
         source:
           type: string
           description: 'Source name'
-    TableDetail:
+    KeyStatus:
+      type: object
+      required:
+        - key
+        - status
+      properties:
+        key:
+          type: string
+          description: 'The key of the resource created or updated'
+        status:
+          type: string
+          description: 'The status of the resource action: created or updated'
+    DatabaseDetail:
       type: object
       properties:
-          database:
-            type: string
-            description: 'Name of the database'
-            example: 'dynamo'
-          cluster:
-            type: string
-            description: 'Name of the cluster'
-            example: 'gold'
-          schema:
-            type: string
-            description: 'Name of the database schema'
-          table_name:
-            type: string
-            description: 'Name of the table'
-          table_description:
-            type: string
-            description: 'Table description'
-          tags:
-            type: array
-            description: 'Tags attached to the table'
-            items:
-              $ref: '#/components/schemas/TagFields'
-          badges:
-            type: array
-            description: 'Badges associated with the table'
-            items:
-              $ref: '#/components/schemas/Badge'
-          table_readers:
-            type: array
-            description: 'Table readers'
-            items:
-              $ref: '#/components/schemas/TableReaderFields'
-          owners:
-            type: array
-            description: 'Owners of the table'
-            items:
-              $ref: '#/components/schemas/UserFields'
-          columns:
-            type: array
-            description: 'Columns of the table'
-            items:
-              $ref: '#/components/schemas/ColumnFields'
-          watermarks:
-            type: array
-            description: 'Watermarks of the table'
-            items:
-              $ref: '#/components/schemas/WatermarkFields'
-          table_writer:
-            $ref: '#/components/schemas/ApplicationFields'
-          table_apps:
-            type: array
-            description: 'Supersedes table_writer by allowing multiple applications which may be consumers or producers of a table'
-            $ref: '#/components/schemas/ApplicationFields'
-          last_updated_timestamp:
-            type: integer
-            description: 'Epoch timestamp of when it was last updated'
-          source:
-            $ref: '#/components/schemas/SourceFields'
-          is_view:
-            type: boolean
-            description: 'If the table is a view'
+        key:
+          type: string
+          description: 'ID of the database'
+        name:
+          type: string
+          description: 'Name of the database'
+          example: 'snowflake://client'
+    Database:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'ID of the database'
+          example: 'database://snowflake'
+        name:
+          type: string
+          description: 'Name of the database'
+          example: 'snowflake'
+    Cluster:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'ID of the cluster'
+          example: 'snowflake://client'
+        name:
+          type: string
+          description: 'Name of the cluster'
+          example: 'client'
+    Schema:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'ID of the Schema'
+          example: 'snowflake://client'
+        name:
+          type: string
+          description: 'Name of the Schema'
+          example: 'client'
+    Table:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'ID of the table'
+        database:
+          type: string
+          description: 'Name of the database'
+          example: 'dynamo'
+        cluster:
+          type: string
+          description: 'Name of the cluster'
+          example: 'gold'
+        schema:
+          type: string
+          description: 'Name of the database schema'
+        table_name:
+          type: string
+          description: 'Name of the table'
+        table_description:
+          type: string
+          description: 'Table description'
+        tags:
+          type: array
+          description: 'Tags attached to the table'
+          items:
+            $ref: '#/components/schemas/TagFields'
+        badges:
+          type: array
+          description: 'Badges associated with the table'
+          items:
+            $ref: '#/components/schemas/Badge'
+        table_readers:
+          type: array
+          description: 'Table readers'
+          items:
+            $ref: '#/components/schemas/TableReaderFields'
+        owners:
+          type: array
+          description: 'Owners of the table'
+          items:
+            $ref: '#/components/schemas/UserFields'
+        columns:
+          type: array
+          description: 'Columns of the table'
+          items:
+            $ref: '#/components/schemas/ColumnFields'
+        watermarks:
+          type: array
+          description: 'Watermarks of the table'
+          items:
+            $ref: '#/components/schemas/WatermarkFields'
+        table_writer:
+          $ref: '#/components/schemas/ApplicationFields'
+        table_apps:
+          type: array
+          description: 'Supersedes table_writer by allowing multiple applications which may be consumers or producers of a table'
+          $ref: '#/components/schemas/ApplicationFields'
+        last_updated_timestamp:
+          type: integer
+          description: 'Epoch timestamp of when it was last updated'
+        source:
+          $ref: '#/components/schemas/SourceFields'
+        is_view:
+          type: boolean
+          description: 'If the table is a view'
     FeatureDetail:
       type: object
       properties:
@@ -504,24 +803,24 @@ components:
           type: string
           description: 'Dashboard description'
         created_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard created timestamp in epoch'
         updated_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard updated timestamp in epoch'
         last_run_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard last run timestamp in epoch'
         owners:
           type: array
           description: 'Dashboard owners'
           items:
-            $ref: '#/components/schemas/UserDetailFields'
+            $ref: '#/components/schemas/UserDetail'
         frequent_users:
           type: array
           description: 'Users frequently view dashboard'
           items:
-            $ref: '#/components/schemas/UserDetailFields'
+            $ref: '#/components/schemas/UserDetail'
         chart_names:
           type: array
           description: 'Chart names associated with the Dashboard'
@@ -548,7 +847,7 @@ components:
             items:
               $ref: '#/components/schemas/Badge'
         recent_view_count:
-          type: int
+          type: integer
           description: 'Dashboard recent view count. Not using explicit duration, as it is up to timely ingestion and timely removal of stale data'
           example: 1024
     DashboardSummary:
@@ -580,7 +879,7 @@ components:
           type: string
           description: 'Dashboard description'
         last_successful_run_timestamp:
-          type: int
+          type: integer
           description: 'Dashboard last run timestamp in epoch'
     DashboardQuery:
       type: object
@@ -620,7 +919,6 @@ components:
         share_name:
           type: string
           description: 'The name of the share'
-        
 
 detailedExamples:
   healthcheck:

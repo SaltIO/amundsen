@@ -8,10 +8,14 @@ import textwrap
 import time
 import json
 from random import randint
-from typing import (Any, Dict, Iterable, List, Optional, Tuple,  # noqa: F401
+from typing import (Any, Dict, Iterable, List, Optional, Set, Tuple,  # noqa: F401
                     Union, no_type_check)
 
+from jinja2 import Template
+
 import neo4j
+from neo4j.exceptions import Neo4jError
+
 from amundsen_common.entity.resource_type import ResourceType, to_resource_type
 from amundsen_common.models.api import health_check
 from amundsen_common.models.dashboard import DashboardSummary
@@ -22,17 +26,25 @@ from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import (Application, Badge, Column,
                                           ProgrammaticDescription, Reader,
                                           ResourceReport, Source, SqlJoin,
-                                          SqlWhere, Stat, Table, TableSummary,
-                                          Tag, TypeMetadata, User, Watermark)
+                                          SqlWhere, Stat, Table, TableSchema, TableSummary,
+                                          TypeMetadata, User, Watermark)
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.user import UserSchema
+from amundsen_common.models.tag import Tag, TagSchema
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare, SnowflakeListing
 from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable, ProspectusWaterfallScheme, ProspectusScheme)
+from amundsen_common.models.database import Database, DatabaseSchema
+from amundsen_common.models.cluster import Cluster, ClusterSchema
+from amundsen_common.models.schema import Schema, SchemaSchema
+
+from databuilder.models.graph_node import GraphNode
+from databuilder.models.graph_relationship import GraphRelationship
+from databuilder.models.table_metadata import TableMetadata, ColumnMetadata
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
 from flask import current_app, has_app_context
-from neo4j import GraphDatabase, Record, Transaction  # noqa: F401
+from neo4j import GraphDatabase, Record, Result, Transaction  # noqa: F401
 from neo4j.api import (SECURITY_TYPE_SECURE,
                        SECURITY_TYPE_SELF_SIGNED_CERTIFICATE, parse_neo4j_uri)
 from neo4j.exceptions import ClientError
@@ -44,10 +56,11 @@ from metadata_service.entity.dashboard_query import \
     DashboardQuery as DashboardQueryEntity
 from metadata_service.entity.description import Description
 from metadata_service.entity.tag_detail import TagDetail
-from metadata_service.exception import NotFoundException
+from metadata_service.exception import NotCreatedOrUpdatedException, NotFoundException
 from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.proxy.statsd_utilities import timer_with_counter
 from metadata_service.util import UserResourceRel
+
 
 _CACHE = CacheManager(**parse_cache_config_options({'cache.type': 'memory'}))
 
@@ -61,7 +74,7 @@ PUBLISHED_TAG_PROPERTY_NAME = 'published_tag'
 LOGGER = logging.getLogger(__name__)
 
 
-def execute_statement(tx: Transaction, stmt: str, params: dict = None) -> List[Record]:
+def _execute_statement(tx: Transaction, stmt: str, params: dict = None) -> List[Record]:
     """
     Executes statement against Neo4j. If execution fails, it rollsback and raises exception.
     """
@@ -71,18 +84,24 @@ def execute_statement(tx: Transaction, stmt: str, params: dict = None) -> List[R
     return [record for record in result]
 
 
-def get_single_record(records_list: List[Record]) -> Record:
+def get_single_record(records_list: List[Record], strict: bool = False) -> Record:
     """
     Helper method to get single item from _execute_cypher_query return when only one item is expected.
     Emulates neo4j's Result.single() behavior.
     """
     records_list_length = len(records_list)
     if records_list_length > 1:
-        LOGGER.warning(f'There are {records_list_length} records in this result but only 1 was expected')
+        if not strict:
+            LOGGER.warning(f'There are {records_list_length} records in this result but only 1 was expected')
+        else:
+            raise NotFoundException("More than 1 record found")
     try:
         return records_list[0]
     except IndexError as e:
-        return None
+        if strict:
+            raise NotFoundException("No record found")
+        else:
+            return None
 
 
 class Neo4jProxy(BaseProxy):
@@ -133,6 +152,9 @@ class Neo4jProxy(BaseProxy):
 
         self._driver = GraphDatabase.driver(**driver_args)
 
+        self._transaction_size = 500
+        self._progress_report_frequency = 500
+
     def get_database_name(self):
         if self._database_name is None or self._database_name == '':
             self._database_name = None
@@ -179,47 +201,230 @@ class Neo4jProxy(BaseProxy):
         return health_check.HealthCheck(status=status, checks=final_checks)
 
     @timer_with_counter
-    def get_table(self, *, table_uri: str) -> Table:
+    def get_table(
+            self, *,
+            id: Optional[str] = None,
+            database: Optional[str] = None,
+            cluster: Optional[str] = None,
+            schema: Optional[str] = None,
+            table: Optional[str] = None) -> Table:
         """
-        :param table_uri: Table URI
+        :param id: Table URI
         :return:  A Table object
         """
-        cols, last_neo4j_record = self._exec_col_query(table_uri)
+        LOGGER.info("############# GET TABLE #############")
 
-        readers = self._exec_usage_query(table_uri)
-        owners = self._exec_owners_query(table_uri)
+        if id:
+            key = id
+        elif database and cluster and schema:
+            key = TableMetadata(database=database, cluster=cluster, schema=schema, name=table, description='')._get_table_key()
+        else:
+            raise ValueError('Requires args id or (database, cluster, schema, and table)')
+
+        cols, last_neo4j_record = self._exec_col_query(key)
+
+        readers = self._exec_usage_query(key)
+        owners = self._exec_owners_query(key)
 
         wmk_results, table_writer, table_apps, timestamp_value, tags, sources, \
-            badges, prog_descs, update_frequency, resource_reports = self._exec_table_query(table_uri)
+            badges, prog_descs, update_frequency, resource_reports = self._exec_table_query(key)
 
-        joins, filters = self._exec_table_query_query(table_uri)
+        joins, filters = self._exec_table_query_query(key)
 
-        LOGGER.info(f"sources={sources}")
-
-        table = Table(database=last_neo4j_record['db']['name'],
-                      cluster=last_neo4j_record['clstr']['name'],
-                      schema=last_neo4j_record['schema']['name'],
-                      name=last_neo4j_record['table']['name'],
-                      tags=tags,
-                      badges=badges,
-                      description=self._safe_get(last_neo4j_record, 'tbl_dscrpt', 'description'),
-                      columns=cols,
-                      owners=owners,
-                      table_readers=readers,
-                      watermarks=wmk_results,
-                      table_writer=table_writer,
-                      table_apps=table_apps,
-                      last_updated_timestamp=timestamp_value,
-                      sources=sources,
-                      is_view=self._safe_get(last_neo4j_record, 'table', 'is_view'),
-                      programmatic_descriptions=prog_descs,
-                      update_frequency=update_frequency,
-                      common_joins=joins,
-                      common_filters=filters,
-                      resource_reports=resource_reports
-                      )
+        table = Table(
+            key=key,
+            database=last_neo4j_record['db']['name'],
+            cluster=last_neo4j_record['clstr']['name'],
+            schema=last_neo4j_record['schema']['name'],
+            name=last_neo4j_record['table']['name'],
+            tags=tags,
+            badges=badges,
+            description=self._safe_get(last_neo4j_record, 'tbl_dscrpt', 'description'),
+            columns=cols,
+            owners=owners,
+            table_readers=readers,
+            watermarks=wmk_results,
+            table_writer=table_writer,
+            table_apps=table_apps,
+            last_updated_timestamp=timestamp_value,
+            sources=sources,
+            is_view=self._safe_get(last_neo4j_record, 'table', 'is_view'),
+            programmatic_descriptions=prog_descs,
+            update_frequency=update_frequency,
+            common_joins=joins,
+            common_filters=filters,
+            resource_reports=resource_reports
+        )
 
         return table
+
+    @timer_with_counter
+    def get_tables(self, *, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> List[Table]:
+        statement = self._get_tables_query_statement()
+
+        filter = "(d:Database {database_filter})-[]->(c:Cluster {cluster_filter})-[]->(s:Schema {schema_filter})-[]->"
+        database_filter = ''
+        cluster_filter = ''
+        schema_filter = ''
+        params = {}
+
+        if database:
+            database_filter = '{name: $database_name}'
+            params['database_name'] = database
+        if cluster:
+            cluster_filter = '{name: $cluster_name}'
+            params['cluster_name'] = cluster
+        if schema:
+            schema_filter = '{name: $schema_name}'
+            params['schema_name'] = schema
+
+        statement = statement.format(filter=filter.format(database_filter=database_filter, cluster_filter=cluster_filter, schema_filter=schema_filter))
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict=params)
+        result = get_single_record(record)
+
+        tables = TableSchema(many=True).dump(result['tables'])
+
+        for table in tables:
+            cols, last_neo4j_record = self._exec_col_query(table['key'])
+
+            readers = self._exec_usage_query(table['key'])
+            owners = self._exec_owners_query(table['key'])
+
+            wmk_results, table_writer, table_apps, timestamp_value, tags, sources, \
+                badges, prog_descs, update_frequency, resource_reports = self._exec_table_query(table['key'])
+
+            table['tags'] = tags
+            table['badges'] = badges
+            table['description'] = self._safe_get(last_neo4j_record, 'tbl_dscrpt', 'description')
+            table['columns'] = cols
+            table['owners'] = owners
+            table['table_readers'] = readers
+            table['watermarks'] = wmk_results
+            table['table_writer'] = table_writer
+            table['table_apps'] = table_apps
+            table['last_updated_timestamp'] = timestamp_value
+            table['sources'] = sources
+            table['programmatic_descriptions'] = prog_descs
+            table['update_frequency'] = update_frequency
+            table['resource_reports'] = resource_reports
+
+        return tables
+
+    @timer_with_counter
+    def create_update_table(
+            self,
+            *,
+            table: Table,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+
+        columns = None
+        if table.columns and len(table.columns) > 0:
+            columns = []
+            for column in table.columns:
+                col_badges = None
+                if column.badges and len(column.badges) > 0:
+                    col_badges = []
+                    for col_badge in column.badges:
+                        col_badges.append(col_badge.badge_name)
+
+                columns.append(ColumnMetadata(
+                    name=column.name,
+                    description=column.description,
+                    col_type=column.col_type,
+                    sort_order=column.sort_order,
+                    badges=col_badges
+                ))
+
+        tags = []
+        if table.tags and len(table.tags) > 0:
+            tags = []
+            for tag in table.tags:
+                tags.append(tag.tag_name)
+
+        table_metadata = TableMetadata(
+            database=table.database,
+            cluster=table.cluster,
+            schema=table.schema,
+            name=table.name,
+            description=table.description,
+            columns=columns,
+            is_view=table.is_view,
+            tags=tags
+        )
+        table_key = table_metadata._get_table_key()
+
+        _session = self._driver.session(database=self._database_name)
+
+        try:
+            status = None
+
+            count = 0
+            tx = _session.begin_transaction()
+
+            node = table_metadata.create_next_node()
+            while node:
+                self._try_create_index(
+                    label=node.label,
+                    count=count,
+                    tx=tx
+                )
+
+                node_dict = self._serialize_node(node)
+
+                stmt = self._create_node_merge_statement(
+                    node_record=node_dict,
+                    node_label=node.label,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(node_dict),
+                    tx=tx,
+                    count=count
+                )
+
+                result_record = result.single()
+                if not result_record:
+                    raise NotCreatedOrUpdatedException(f"During create_update_table(), failed to create or update node {node.label}")
+
+                if node.label == 'Table':
+                    status = result_record['status']
+
+                node = table_metadata.create_next_node()
+
+            rel = table_metadata.create_next_relation()
+            while rel:
+                rel_dict = self._serialize_relationship(rel)
+
+                stmt = self._create_relationship_merge_statement(
+                    rel_record=rel_dict,
+                    rel_start_label=rel.start_label,
+                    rel_end_label=rel.end_label,
+                    rel_type=rel.type,
+                    rel_reverse_type=rel.reverse_type,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(rel_dict),
+                    tx=tx,
+                    count=count
+                )
+
+                rel = table_metadata.create_next_relation()
+
+            tx.commit()
+            # LOGGER.info('Committed total %i statements', count)
+
+            return table_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to put_table. Rolling back.')
+            if not tx.closed():
+                tx.rollback()
+            raise e
 
     def _get_col_query_statement(self) -> str:
         # column_level_query = textwrap.dedent("""
@@ -684,6 +889,63 @@ class Neo4jProxy(BaseProxy):
 
         return joins, filters
 
+    def _get_tables_query_statement(self) -> str:
+        # table_query_level_query = textwrap.dedent("""
+        #     MATCH (table:Table {key: $table_key})
+        #     OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
+        #     OPTIONAL MATCH (j)-[JOIN_OF_COLUMN]->(col2:Column)
+        #     OPTIONAL MATCH (j)-[JOIN_OF_QUERY]->(jq:Query)-[:HAS_EXECUTION]->(exec:Execution)
+        #     WITH table, j, col, col2,
+        #         sum(coalesce(exec.execution_count, 0)) as join_exec_cnt
+        #     ORDER BY join_exec_cnt desc
+        #     LIMIT 5
+        #     WITH table,
+        #         COLLECT(DISTINCT {
+        #         join: {
+        #             joined_on_table: {
+        #                 database: case when j.left_table_key = $table_key
+        #                         then j.right_database
+        #                         else j.left_database
+        #                         end,
+        #                 cluster: case when j.left_table_key = $table_key
+        #                         then j.right_cluster
+        #                         else j.left_cluster
+        #                         end,
+        #                 schema: case when j.left_table_key = $table_key
+        #                         then j.right_schema
+        #                         else j.left_schema
+        #                         end,
+        #                 name: case when j.left_table_key = $table_key
+        #                     then j.right_table
+        #                     else j.left_table
+        #                     end
+        #             },
+        #             joined_on_column: col2.name,
+        #             column: col.name,
+        #             join_type: j.join_type,
+        #             join_sql: j.join_sql
+        #         },
+        #         join_exec_cnt: join_exec_cnt
+        #     }) as joins
+        #     WITH table, joins
+        #     OPTIONAL MATCH (table)-[:COLUMN]->(col:Column)-[USES_WHERE_CLAUSE]->(whr:Where)
+        #     OPTIONAL MATCH (whr)-[WHERE_CLAUSE_OF]->(wq:Query)-[:HAS_EXECUTION]->(whrexec:Execution)
+        #     WITH table, joins,
+        #         whr, sum(coalesce(whrexec.execution_count, 0)) as where_exec_cnt
+        #     ORDER BY where_exec_cnt desc
+        #     LIMIT 5
+        #     RETURN table, joins,
+        #     COLLECT(DISTINCT {
+        #         where_clause: whr.where_clause,
+        #         where_exec_cnt: where_exec_cnt
+        #     }) as filters
+        # """)
+        tables_query_statment = textwrap.dedent("""
+            MATCH {filter}(table:Table)
+            RETURN collect(table) as tables
+        """)
+        return tables_query_statment
+
     def _extract_programmatic_descriptions_from_query(self, raw_prog_descriptions: dict) -> list:
         prog_descriptions = []
         for prog_description in raw_prog_descriptions:
@@ -759,7 +1021,7 @@ class Neo4jProxy(BaseProxy):
         start = time.time()
         try:
             with self._driver.session(database=self.get_database_name()) as session:
-                return session.read_transaction(execute_statement, statement, param_dict)
+                return session.read_transaction(_execute_statement, statement, param_dict)
 
         finally:
             # TODO: Add support on statsd
@@ -836,10 +1098,12 @@ class Neo4jProxy(BaseProxy):
                                              uri=type_metadata_key).description
 
     @timer_with_counter
-    def put_resource_description(self, *,
-                                 resource_type: ResourceType,
-                                 uri: str,
-                                 description: str) -> None:
+    def put_resource_description(
+        self, *,
+        resource_type: ResourceType,
+        uri: str,
+        description: str,
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update resource description with one from user
         :param uri: Resource uri (key in Neo4j)
@@ -849,16 +1113,17 @@ class Neo4jProxy(BaseProxy):
         desc_key = uri + '/_description'
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "edited"
 
         upsert_desc_query = textwrap.dedent("""
-        MERGE (u:Description {key: toLower($desc_key)})
-        on CREATE SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
-        on MATCH SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        MERGE (u:Description {key: $desc_key})
+        on CREATE SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
         """)
 
         upsert_desc_tab_relation_query = textwrap.dedent("""
-        MATCH (n1:Description {{key: toLower($desc_key)}}), (n2:{node_label} {{key: toLower($desc_key)}})
+        MATCH (n1:Description {{key: $desc_key}})
+        MATCH (n2:{node_label} {{key: $key}})
+        WITH n1, n2
         MERGE (n2)-[r1:DESCRIPTION]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -906,7 +1171,8 @@ class Neo4jProxy(BaseProxy):
     @timer_with_counter
     def put_table_description(self, *,
                               table_uri: str,
-                              description: str) -> None:
+                              description: str,
+                              published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update table description with one from user
         :param table_uri: Table uri (key in Neo4j)
@@ -915,12 +1181,15 @@ class Neo4jProxy(BaseProxy):
 
         self.put_resource_description(resource_type=ResourceType.Table,
                                       uri=table_uri,
-                                      description=description)
+                                      description=description,
+                                      published_tag=published_tag)
 
     @timer_with_counter
-    def put_table_update_frequency(self, *,
-                                   table_uri: str,
-                                   frequency: str) -> None:
+    def put_table_update_frequency(
+        self, *,
+        table_uri: str,
+        frequency: str,
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update table update frequency with one from user
         :param table_uri: Table uri (key in Neo4j)
@@ -930,16 +1199,17 @@ class Neo4jProxy(BaseProxy):
         uf_key = table_uri + '/updatefrequency'
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "edited"
 
         upsert_update_frequency_query = textwrap.dedent("""
-        MERGE (u:Update_Frequency {key: toLower($uf_key)})
-        on CREATE SET u={frequency: $frequency, key: toLower($uf_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
-        on MATCH SET u={frequency: $frequency, key: toLower($uf_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        MERGE (u:Update_Frequency {key: $uf_key})
+        on CREATE SET u={frequency: $frequency, key: $uf_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+        on MATCH SET u={frequency: $frequency, key: $uf_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
         """)
 
         upsert_update_frequency_table_relation_query = textwrap.dedent("""
-        MATCH (n1:Update_Frequency {key: toLower($uf_key)}), (n2:Table {key: toLower($table_key)})
+        MATCH (n1:Update_Frequency {key: $uf_key})
+        MATCH (n2:Table {key: $table_key})
+        WITH n1, n2
         MERGE (n2)-[r1:UPDATE_FREQUENCY]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1028,7 +1298,8 @@ class Neo4jProxy(BaseProxy):
     @timer_with_counter
     def put_type_metadata_description(self, *,
                                       type_metadata_key: str,
-                                      description: str) -> None:
+                                      description: str,
+                                      published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update type_metadata description with one from user
         :param type_metadata_key:
@@ -1037,7 +1308,8 @@ class Neo4jProxy(BaseProxy):
 
         self.put_resource_description(resource_type=ResourceType.Type_Metadata,
                                       uri=type_metadata_key,
-                                      description=description)
+                                      description=description,
+                                      published_tag=published_tag)
 
     def _get_column_description_query_statement(self) -> str:
         # column_description_query = textwrap.dedent("""
@@ -1072,10 +1344,13 @@ class Neo4jProxy(BaseProxy):
         return column_description
 
     @timer_with_counter
-    def put_column_description(self, *,
-                               table_uri: str,
-                               column_name: str,
-                               description: str) -> None:
+    def put_column_description(
+        self,
+        *,
+        table_uri: str,
+        column_name: str,
+        description: str,
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update column description with input from user
         :param table_uri:
@@ -1088,16 +1363,17 @@ class Neo4jProxy(BaseProxy):
         desc_key = column_uri + '/_description'
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "edited"
 
         upsert_desc_query = textwrap.dedent("""
-            MERGE (u:Description {key: toLower($desc_key)})
-            on CREATE SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
-            on MATCH SET u={description: $description, key: toLower($desc_key), publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+            MERGE (u:Description {key: $desc_key})
+            on CREATE SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
+            on MATCH SET u={description: $description, key: $desc_key, publisher_last_updated_epoch_ms: $publisher_last_updated_epoch_ms, published_tag: $published_tag}
             """)
 
         upsert_desc_col_relation_query = textwrap.dedent("""
-            MATCH (n1:Description {key: toLower($desc_key)}), (n2:Column {key: toLower($column_key)})
+            MATCH (n1:Description {key: $desc_key})
+            MATCH (n2:Column {key: $column_key})
+            WITH n1, n2
             MERGE (n2)-[r1:DESCRIPTION]->(n1)
             SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
             SET r1.published_tag = $published_tag
@@ -1148,7 +1424,8 @@ class Neo4jProxy(BaseProxy):
     @timer_with_counter
     def add_owner(self, *,
                   table_uri: str,
-                  owner: str) -> None:
+                  owner: str,
+                  published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update table owner informations.
         1. Do a create if not exists query of the owner(user) node.
@@ -1160,13 +1437,15 @@ class Neo4jProxy(BaseProxy):
 
         self.add_resource_owner(uri=table_uri,
                                 resource_type=ResourceType.Table,
-                                owner=owner)
+                                owner=owner,
+                                published_tag=published_tag)
 
     @timer_with_counter
     def add_resource_owner(self, *,
                            uri: str,
                            resource_type: ResourceType,
-                           owner: str) -> None:
+                           owner: str,
+                           published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update table owner informations.
         1. Do a create if not exists query of the owner(user) node.
@@ -1178,7 +1457,6 @@ class Neo4jProxy(BaseProxy):
         """
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "edited"
 
         create_owner_query = textwrap.dedent("""
         MERGE (u:User {key: toLower($user_email)})
@@ -1186,7 +1464,9 @@ class Neo4jProxy(BaseProxy):
         """)
 
         upsert_owner_relation_query = textwrap.dedent("""
-        MATCH (n1:User {{key: toLower($user_email)}}), (n2:{resource_type} {{key: toLower($res_key)}})
+        MATCH (n1:User {{key: toLower($user_email)}})
+        MATCH (n2:{resource_type} {{key: $res_key}})
+        WITH n1, n2
         MERGE (n1)-[r1:OWNER_OF]->(n2)-[r2:OWNER]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1268,13 +1548,13 @@ class Neo4jProxy(BaseProxy):
                   id: str,
                   badge_name: str,
                   category: str = '',
-                  resource_type: ResourceType) -> None:
+                  resource_type: ResourceType,
+                  published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
 
         LOGGER.info('New badge {} for id {} with category {} '
                     'and resource type {}'.format(badge_name, id, category, resource_type.name))
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "edited"
 
         validation_query = \
             'MATCH (n:{resource_type} {{key: $key}}) return n'.format(resource_type=resource_type.name)
@@ -1286,8 +1566,9 @@ class Neo4jProxy(BaseProxy):
         """)
 
         upsert_badge_relation_query = textwrap.dedent("""
-        MATCH(n1:Badge {{key: $badge_name, category: $category}}),
-        (n2:{resource_type} {{key: toLower($key)}})
+        MATCH (n1:Badge {{key: $badge_name, category: $category}})
+        MATCH (n2:{resource_type} {{key: $key}})
+        WITH n1, n2
         MERGE (n1)-[r1:BADGE_FOR]->(n2)-[r2:HAS_BADGE]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1381,7 +1662,8 @@ class Neo4jProxy(BaseProxy):
                 id: str,
                 tag: str,
                 tag_type: str = 'default',
-                resource_type: ResourceType = ResourceType.Table) -> None:
+                resource_type: ResourceType = ResourceType.Table,
+                published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Add new tag
         1. Create the node with type Tag if the node doesn't exist.
@@ -1397,7 +1679,6 @@ class Neo4jProxy(BaseProxy):
                                                                                     resource_type.name))
 
         current_time_milliseconds = int(time.time() * 1000)
-        published_tag = "edited"
 
         validation_query = \
             'MATCH (n:{resource_type} {{key: $key}}) return n'.format(resource_type=resource_type.name)
@@ -1409,7 +1690,9 @@ class Neo4jProxy(BaseProxy):
         """)
 
         upsert_tag_relation_query = textwrap.dedent("""
-        MATCH (n1:Tag {{key: $tag, tag_type: $tag_type}}), (n2:{resource_type} {{key: toLower($key)}})
+        MATCH (n1:Tag {{key: $tag, tag_type: $tag_type}})
+        MATCH (n2:{resource_type} {{key: $key}})
+        WITH n1, n2
         MERGE (n1)-[r1:TAG]->(n2)-[r2:TAGGED_BY]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
@@ -1445,6 +1728,62 @@ class Neo4jProxy(BaseProxy):
                                            resource=id,
                                            resource_type=resource_type.name))
             tx.commit()
+        except Exception as e:
+            if not tx.closed():
+                tx.rollback()
+            # propagate the exception back to api
+            raise e
+
+    @timer_with_counter
+    def update_tag(
+            self, *,
+            old_tag: str,
+            new_tag: str,
+            old_tag_type: str = 'default',
+            new_tag_type: str = 'default',
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tag:
+
+        current_time_milliseconds = int(time.time() * 1000)
+
+        if not old_tag_type:
+            old_tag_type = 'default'
+        if not new_tag_type:
+            new_tag_type = 'default'
+
+        update_tag_query = textwrap.dedent("""
+            MATCH (t:Tag {key: $old_key, tag_type: $old_tag_type})
+            SET t.key = $new_key, t.tag_type = $new_tag_type, t.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms, t.published_tag = $published_tag
+            RETURN t {.*} as tag
+        """)
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(
+                update_tag_query,
+                {
+                    'old_key': old_tag,
+                    'old_tag_type': old_tag_type,
+                    'new_key': new_tag,
+                    'new_tag_type': new_tag_type,
+                    'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                    'published_tag': published_tag
+                }
+            )
+
+            record = result.single()
+
+            if not record or not record.get('tag', None):
+                raise NotFoundException('Tag {old_tag} with type {old_tag_type} does not exist'.format(old_tag=old_tag, old_tag_type=old_tag_type))
+
+            tx.commit()
+
+            tag = TagSchema().dump({
+                'tag_name': record['tag']['key'],
+                'tag_type': record['tag']['tag_type']
+            })
+
+            return tag
         except Exception as e:
             if not tx.closed():
                 tx.rollback()
@@ -1540,6 +1879,8 @@ class Neo4jProxy(BaseProxy):
                                             param_dict={})
         # None means we don't have record for neo4j, es last updated / index ts
         record = get_single_record(record)
+        LOGGER.info(f"last_updated_ts={record}")
+        LOGGER.info(f"type(record)={type(record)}")
         if record:
             return record.get('ts', {}).get('latest_timestamp', 0)
         else:
@@ -1916,7 +2257,7 @@ class Neo4jProxy(BaseProxy):
 
         return self._build_user_from_record(record=record, manager_name=manager_name)
 
-    def create_update_user(self, *, user: User) -> Tuple[User, bool]:
+    def create_update_user(self, *, user: User, published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[User, bool]:
         """
         Create a user if it does not exist, otherwise update the user. Required
         fields for creating / updating a user are validated upstream to this when
@@ -1936,8 +2277,8 @@ class Neo4jProxy(BaseProxy):
         """ % (user_props, CREATED_EPOCH_MS, user_props, CREATED_EPOCH_MS))
 
         try:
-            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
-            result = tx.run(create_update_user_query, user_data)
+            tx: Transaction = self._driver.session(database=self.get_database_name()).begin_transaction()
+            result = tx.run(create_update_user_query, self._create_props_param(user_data))
 
             user_result = result.single()
             if not user_result:
@@ -1955,20 +2296,47 @@ class Neo4jProxy(BaseProxy):
 
         return new_user, new_user_created
 
+    def _create_props_param(self, record_dict: dict) -> dict:
+        """
+        """
+        params = {}
+        for k, v in record_dict.items():
+            # LOGGER.info(f"_create_props_param\n k={k}\n type(v)={type(v)}\n v={v}")
+            if v is not None:
+                if isinstance(v, dict):
+                    # LOGGER.info(f"Unwinding prop")
+                    for _k, _v in v.items():
+                        params[_k] = _v
+                else: # isinstance(v, (int, float, str, bool, list)):
+                    # LOGGER.info(f"Adding prop")
+                    params[k] = v
+
+        return params
+
     def _create_props_body(self,
                            record_dict: dict,
-                           identifier: str) -> str:
+                           identifier: str,
+                           published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> str:
         """
         Creates a Neo4j property body by converting a dictionary into a comma
         separated string of KEY = VALUE.
         """
         props = []
         for k, v in record_dict.items():
-            if v:
-                props.append(f'{identifier}.{k} = ${k}')
+            # LOGGER.info(f"_create_props_body\n k={k}\n type(v)={type(v)}\n v={v}")
+            if v is not None:
+                if isinstance(v, dict):
+                    # LOGGER.info(f"Unwinding prop")
+                    for _k, _v in v.items():
+                        props.append(f'{identifier}.{_k} = ${_k}')
+                elif isinstance(v, (int, float, str, bool, list)):
+                    # LOGGER.info(f"Adding prop")
+                    props.append(f'{identifier}.{k} = ${k}')
 
-        props.append(f"{identifier}.{PUBLISHED_TAG_PROPERTY_NAME} = 'api_create_update_user'")
+
+        props.append(f"{identifier}.{PUBLISHED_TAG_PROPERTY_NAME} = '{published_tag}'")
         props.append(f"{identifier}.{LAST_UPDATED_EPOCH_MS} = timestamp()")
+
         return ', '.join(props)
 
     def _get_users_query_statement(self) -> str:
@@ -2203,7 +2571,8 @@ class Neo4jProxy(BaseProxy):
                                       id: str,
                                       user_id: str,
                                       relation_type: UserResourceRel,
-                                      resource_type: ResourceType) -> None:
+                                      resource_type: ResourceType,
+                                      published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update table user informations.
         1. Do a upsert of the user node.
@@ -2215,6 +2584,8 @@ class Neo4jProxy(BaseProxy):
         :return:
         """
 
+        current_time_milliseconds = int(time.time() * 1000)
+
         upsert_user_query = textwrap.dedent("""
         MERGE (u:User {key: toLower($user_email)})
         on CREATE SET u={email: $user_email, key: $user_email}
@@ -2224,8 +2595,14 @@ class Neo4jProxy(BaseProxy):
                                                                       resource_type=resource_type)
 
         upsert_user_relation_query = textwrap.dedent("""
-        MATCH (usr:User {{key: $user_key}}), (resource:{resource_type} {{key: toLower($resource_key)}})
+        MATCH (usr:User {{key: $user_key}})
+        MATCH (resource:{resource_type} {{key: $resource_key}})
+        WITH usr, resource
         MERGE {rel_clause}
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r1.published_tag = $published_tag
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+        SET r2.published_tag = $published_tag
         RETURN usr.key, resource.key
         """.format(resource_type=resource_type.name,
                    rel_clause=rel_clause))
@@ -2234,7 +2611,12 @@ class Neo4jProxy(BaseProxy):
             tx = self._driver.session(database=self.get_database_name()).begin_transaction()
             # upsert the node
             tx.run(upsert_user_query, {'user_email': user_id})
-            result = tx.run(upsert_user_relation_query, {'user_key': user_id, 'resource_key': id})
+            result = tx.run(upsert_user_relation_query, {
+                'user_key': user_id,
+                'resource_key': id,
+                'published_tag': published_tag,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds
+            })
 
             if not result.single():
                 raise RuntimeError('Failed to create relation between '
@@ -2449,7 +2831,8 @@ class Neo4jProxy(BaseProxy):
     @timer_with_counter
     def put_dashboard_description(self, *,
                                   id: str,
-                                  description: str) -> None:
+                                  description: str,
+                                  published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update Dashboard description
         :param id: Dashboard URI
@@ -2458,7 +2841,8 @@ class Neo4jProxy(BaseProxy):
 
         self.put_resource_description(resource_type=ResourceType.Dashboard,
                                       uri=id,
-                                      description=description)
+                                      description=description,
+                                      published_tag=published_tag)
 
     def _get_resources_using_table_query_statement(self) -> str:
         # get_dashboards_using_table_query = textwrap.dedent(u"""
@@ -3250,7 +3634,8 @@ class Neo4jProxy(BaseProxy):
     @timer_with_counter
     def put_file_description(self, *,
                              id: str,
-                             description: str) -> None:
+                             description: str,
+                             published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update File description
         :param id: File URI
@@ -3259,7 +3644,8 @@ class Neo4jProxy(BaseProxy):
 
         self.put_resource_description(resource_type=ResourceType.File,
                                       uri=id,
-                                      description=description)
+                                      description=description,
+                                      published_tag=published_tag)
 
     @timer_with_counter
     def get_data_provider_description(self, *,
@@ -3276,7 +3662,8 @@ class Neo4jProxy(BaseProxy):
     @timer_with_counter
     def put_data_provider_description(self, *,
                                       id: str,
-                                      description: str) -> None:
+                                      description: str,
+                                      published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update Data Provider description
         :param id: Data Provider URI
@@ -3285,4 +3672,394 @@ class Neo4jProxy(BaseProxy):
 
         self.put_resource_description(resource_type=ResourceType.Data_Provider,
                                       uri=id,
-                                      description=description)
+                                      description=description,
+                                      published_tag=published_tag)
+
+    def _serialize_node(self, node: GraphNode = None) -> Dict[str,Any]:
+        if node is None:
+            return {}
+
+        node_dict = {
+            'label': node.label,
+            'key': node.key
+        }
+        if node.attributes:
+            node_dict.update(node.attributes)
+
+        return node_dict
+
+    def _serialize_relationship(self, relationship: GraphRelationship = None) -> Dict[str,Any]:
+        if relationship is None:
+            return {}
+
+        relationship_dict = {
+            'start_key': relationship.start_key,
+            'start_label': relationship.start_label,
+            'end_key': relationship.end_key,
+            'end_label': relationship.end_label,
+            'type': relationship.type,
+            'reverse_type': relationship.reverse_type,
+        }
+        if relationship.attributes:
+            relationship_dict.update(relationship.attributes)
+
+        return relationship_dict
+
+    def _create_node_merge_statement(
+            self,
+            node_record: dict,
+            node_label: str,
+            published_tag: str = None,
+            create_only: bool = False) -> str:
+        """
+        Creates node merge statement
+        :param node_record:
+        :return:
+        """
+        template = Template("""
+            OPTIONAL MATCH (existing:{{ LABEL }} {key: $key})
+            WITH existing
+
+            MERGE (node:{{ LABEL }} {key: $key})
+            ON CREATE SET {{ PROP_BODY }}
+            {% if update %} ON MATCH SET {{ PROP_BODY }} {% endif %}
+
+            RETURN
+                node,
+                CASE
+                    WHEN existing IS NULL THEN 'created'
+                    ELSE 'updated'
+                END AS status
+        """)
+
+        prop_body = self._create_props_body(
+            record_dict=node_record,
+            identifier='node',
+            published_tag=published_tag)
+
+        return template.render(
+            LABEL=node_label,
+            PROP_BODY=prop_body,
+            update=(not create_only)
+        )
+
+    def _create_relationship_merge_statement(
+            self,
+            rel_record: dict,
+            rel_start_label: str,
+            rel_end_label: str,
+            rel_type: str,
+            rel_reverse_type: str = None,
+            published_tag: str = None,
+            excludes: Set = None,
+            additional_fields: Dict[Any,Any] = None) -> str:
+        """
+        Creates relationship merge statement
+        :param rel_record:
+        :return:
+        """
+
+        template = Template("""
+            MATCH (n1:{{ START_LABEL }} {key: $start_key})
+            MATCH (n2:{{ END_LABEL }} {key: $end_key})
+            WITH n1, n2
+            MERGE (n1)-[r1:{{ TYPE }}]->(n2){{ REVERSE_REL }}
+            {% if update_prop_body %}
+            ON CREATE SET {{ prop_body }}
+            ON MATCH SET {{ prop_body }}
+            {% endif %}
+            RETURN n1.key, n2.key
+        """)
+        reverse_rel_template = Template("-[r2:{{ REVERSE_TYPE }}]->(n1)")
+
+        prop_body_r1 = self._create_props_body(
+            record_dict=rel_record,
+            identifier='r1',
+            published_tag=published_tag
+        )
+
+        reverse_rel_stmt = ''
+        prop_body = prop_body_r1
+        if rel_reverse_type and rel_reverse_type != '':
+            # Only if there is a reverse_type specified
+            reverse_rel_stmt = reverse_rel_template.render(REVERSE_TYPE=rel_reverse_type)
+            prop_body_r2 = self._create_props_body(
+                record_dict=rel_record,
+                identifier='r2',
+                published_tag=published_tag
+            )
+            prop_body = ' , '.join([prop_body_r1, prop_body_r2])
+
+        return template.render(
+            START_LABEL=rel_start_label,
+            END_LABEL=rel_end_label,
+            TYPE=rel_type,
+            REVERSE_REL=reverse_rel_stmt,
+            update_prop_body=prop_body_r1,
+            prop_body=prop_body
+        )
+
+    def _try_create_index(
+            self,
+            label: str,
+            tx: Transaction,
+            count: int = 0) -> Tuple[int,Transaction]:
+        """
+        For any label seen first time for this publisher it will try to create unique index.
+        Neo4j ignores a second creation in 3.x, but raises an error in 4.x.
+        :param label:
+        :return:
+        """
+        stmt = Template("""
+            CREATE CONSTRAINT FOR (node:{{ LABEL }}) REQUIRE node.key IS UNIQUE
+        """).render(LABEL=label)
+
+        LOGGER.info(f'Trying to create index for label {label} if not exist: {stmt}')
+        # with self._driver.session(database=self._database_name) as session:
+        try:
+            count, result, tx = self._execute_transaction_statement(
+                stmt=f"""
+                    SHOW CONSTRAINTS
+                    YIELD name, type, entityType, labelsOrTypes, properties
+                    WHERE type = 'UNIQUENESS' AND entityType = 'NODE' AND labelsOrTypes = ['{label}'] AND properties = ['key']
+                    RETURN count(*) AS constraintExists
+                """,
+                tx=tx,
+                count=count
+            )
+            constraint_exists = result.single()["constraintExists"]
+
+            if constraint_exists == 0:
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    tx=tx,
+                    count=count
+                )
+
+            return count, tx
+        except Neo4jError as e:
+            if 'An equivalent constraint already exists' not in e.__str__():
+                raise
+                # Else, swallow the exception, to make this function idempotent.
+
+    def _execute_transaction_statement(
+            self,
+            stmt: str,
+            tx: Transaction,
+            count: int = 0,
+            params: dict = None) -> Tuple[int,Result,Transaction]:
+        """
+        Executes statement against Neo4j. If execution fails, it rollsback and raise exception.
+        :param stmt:
+        :param tx:
+        :param count:
+        :return:
+        """
+        try:
+            LOGGER.debug('Executing statement: %s with params %s', stmt, params)
+
+            result = tx.run(str(stmt), parameters=params)
+
+            count += 1
+            if count > 1 and count % self._transaction_size == 0:
+                tx.commit()
+                LOGGER.info(f'Committed {count} statements so far')
+                return count, result, self._session.begin_transaction()
+
+            if count > 1 and count % self._progress_report_frequency == 0:
+                LOGGER.info(f'Processed {count} statements so far')
+
+            return count, result, tx
+        except Exception as e:
+            LOGGER.exception(f'Failed to execute Cypher query:\nstmt=\n{str(stmt)}\nparams=\n{params}')
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    def _get_database_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH (d:Database {key: $key})
+            RETURN d {.*} as database;
+        """)
+        return statement
+
+    @timer_with_counter
+    def get_database(self, *, id: Optional[str] = None, database: Optional[str] = None) -> Union[Database, None]:
+        statement = self._get_database_query_statement()
+        if id:
+            key = id
+        elif database:
+            key = TableMetadata(database=database, cluster='', schema='', name='', description='')._get_database_key()
+        else:
+            raise ValueError('Requires args id or database')
+
+        params = {
+            'key': key
+        }
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict=params)
+        result = get_single_record(record, strict=True)
+
+        database = DatabaseSchema().dump(result['database'])
+
+        return database
+
+    def _get_databases_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH (d:Database)
+            RETURN collect(d) as databases;
+        """)
+        return statement
+
+    @timer_with_counter
+    def get_databases(self) -> List[Database]:
+        statement = self._get_databases_query_statement()
+        record = self._execute_cypher_query(statement=statement, param_dict={})
+        result = get_single_record(record)
+        if not result or not result.get('databases'):
+            raise NotFoundException('Error getting users')
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict={}
+        )
+        result = get_single_record(record)
+
+        databases = DatabaseSchema(many=True).dump(result['databases'])
+
+        return databases
+
+    def _get_cluster_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH (c:Cluster {key: $key})
+            RETURN c {.*} as cluster;
+        """)
+        return statement
+
+    @timer_with_counter
+    def get_cluster(self, *, id: Optional[str] = None, database: Optional[str] = None, cluster: Optional[str] = None) -> Union[Cluster, None]:
+        statement = self._get_cluster_query_statement()
+        if id:
+            key = id
+        elif database and cluster:
+            key = TableMetadata(database=database, cluster=cluster, schema='', name='', description='')._get_cluster_key()
+        else:
+            raise ValueError('Requires args id or (database and cluster)')
+
+        params = {
+            'key': key
+        }
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict=params
+        )
+        result = get_single_record(record, strict=True)
+
+        cluster = ClusterSchema().dump(result['cluster'])
+
+        return cluster
+
+    def _get_clusters_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH {filter}(c:Cluster)
+            RETURN collect(c) as clusters;
+        """)
+        return statement
+
+    @timer_with_counter
+    def get_clusters(self, *, database: Optional[str] = None) -> List[Cluster]:
+
+        statement = self._get_clusters_query_statement()
+
+        filter = ""
+        params = {}
+
+        if database:
+            filter = "(d:Database {name: $database_name})-[]->"
+            params['database_name'] = database
+
+        statement = statement.format(filter=filter)
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict=params)
+        result = get_single_record(record)
+
+        clusters = ClusterSchema(many=True).dump(result['clusters'])
+
+        return clusters
+
+    def _get_schema_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH (s:Schema {key: $key})
+            RETURN s {.*} as schema;
+        """)
+        return statement
+
+    @timer_with_counter
+    def get_schema(self, *, id: Optional[str] = None, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> Union[Cluster, None]:
+        statement = self._get_schema_query_statement()
+        if id:
+            key = id
+        elif database and cluster and schema:
+            key = TableMetadata(database=database, cluster=cluster, schema=schema, name='', description='')._get_schema_key()
+        else:
+            raise ValueError('Requires args id or (database, cluster and schema)')
+
+        params = {
+            'key': key
+        }
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict=params
+        )
+        result = get_single_record(record, strict=True)
+
+        cluster = SchemaSchema().dump(result['schema'])
+
+        return cluster
+
+    def _get_schemas_query_statement(self) -> str:
+        statement = textwrap.dedent("""
+            MATCH {filter}(s:Schema)
+            RETURN collect(s) as schemas;
+        """)
+        return statement
+
+    @timer_with_counter
+    def get_schemas(self, *, database: Optional[str] = None, cluster: Optional[str] = None) -> List[Cluster]:
+
+        statement = self._get_schemas_query_statement()
+
+        filter = ""
+        params = {}
+
+        if database and cluster:
+            filter = "(d:Database {name: $database_name})-[]->(c:Cluster {name: $cluster_name})-[]->"
+            params['database_name'] = database
+            params['cluster_name'] = cluster
+        elif database:
+            filter = "(d:Database {name: $database_name})-[]->(c:Cluster)-[]->"
+            params = {
+                'database_name': database
+            }
+        elif cluster:
+            filter = "(c:Cluster {name: $cluster_name})-[]->"
+            params = {
+                'cluster_name': cluster
+            }
+
+        statement = statement.format(filter=filter)
+
+        record = self._execute_cypher_query(
+            statement=statement,
+            param_dict=params)
+        result = get_single_record(record)
+
+        clusters = SchemaSchema(many=True).dump(result['schemas'])
+
+        return clusters

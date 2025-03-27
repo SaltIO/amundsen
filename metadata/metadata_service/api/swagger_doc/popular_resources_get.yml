@@ -1,8 +1,11 @@
 Gets information about popular resources (tables, dashboards)
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'popular_resources'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - in: query
     name: limit
     required: false
@@ -18,6 +21,8 @@ parameters:
       type: string
       default: table
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Popular Resources'
     content:

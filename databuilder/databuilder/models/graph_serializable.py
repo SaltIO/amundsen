@@ -3,9 +3,13 @@
 
 import abc
 from typing import Union  # noqa: F401
+import logging
 
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
+
+
+LOGGER = logging.getLogger(__name__)
 
 NODE_KEY = 'KEY'
 NODE_LABEL = 'LABEL'
@@ -50,20 +54,28 @@ class GraphSerializable(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def next_node(self) -> Union[GraphNode, None]:
-        node_dict = self.create_next_node()
-        if not node_dict:
-            return None
+        try:
+            node_dict = self.create_next_node()
+            if not node_dict:
+                return None
 
-        self._validate_node(node_dict)
-        return node_dict
+            self._validate_node(node_dict)
+            return node_dict
+        except Exception as e:
+            LOGGER.exception(f"Failed to process Node: \n {node_dict} \n")
+            raise e
 
     def next_relation(self) -> Union[GraphRelationship, None]:
-        relation_dict = self.create_next_relation()
-        if not relation_dict:
-            return None
+        try:
+            relation_dict = self.create_next_relation()
+            if not relation_dict:
+                return None
 
-        self._validate_relation(relation_dict)
-        return relation_dict
+            self._validate_relation(relation_dict)
+            return relation_dict
+        except Exception as e:
+            LOGGER.exception(f"Failed to process Relationship: \n {relation_dict} \n")
+            raise e
 
     def _validate_node(self, node: GraphNode) -> None:
         node_id, node_label, _ = node

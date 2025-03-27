@@ -1,8 +1,11 @@
 Get tables a user read
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'user'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: user_id
     in: path
     example: 'roald9@example.org'
@@ -11,6 +14,8 @@ parameters:
       type: string
     required: true
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'List of tables the user has read'
     content:

@@ -1,6 +1,7 @@
 # Copyright Contributors to the Amundsen project.
 # SPDX-License-Identifier: Apache-2.0
 
+from flask import current_app as app
 from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -15,7 +16,8 @@ from amundsen_common.models.table import Table
 from amundsen_common.models.data_source import DataProvider, File
 from amundsen_common.models.user import User
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare
-from flask import current_app as app
+from amundsen_common.models.database import Database
+from amundsen_common.models.cluster import Cluster
 
 from metadata_service.entity.dashboard_detail import \
     DashboardDetail as DashboardDetailEntity
@@ -25,6 +27,9 @@ from metadata_service.proxy.snowflake_base_proxy import SnowflakeBaseProxy
 
 
 class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
+
+    DEFAULT_EDITED_PUBLISHED_TAG = "edited"
+
     """
     Base Proxy, which behaves like an interface for all
     the proxy clients available in the amundsen metadata service
@@ -53,7 +58,7 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def create_update_user(self, *, user: User) -> Tuple[User, bool]:
+    def create_update_user(self, *, user: User, published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[User, bool]:
         """
         Allows creating and updating users. Returns a tuple of the User
         object that has been created or updated as well as a flag that
@@ -69,7 +74,19 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_table(self, *, table_uri: str) -> Table:
+    def get_table(self, *, id: str) -> Table:
+        pass
+
+    @abstractmethod
+    def get_tables(self, *, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> List[Table]:
+        pass
+
+    @abstractmethod
+    def create_update_table(
+            self,
+            *,
+            table: Table,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -77,7 +94,7 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def add_owner(self, *, table_uri: str, owner: str) -> None:
+    def add_owner(self, *, table_uri: str, owner: str, published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -88,13 +105,15 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def put_table_description(self, *,
                               table_uri: str,
-                              description: str) -> None:
+                              description: str,
+                              published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
     def put_table_update_frequency(self, *,
                               table_uri: str,
-                              frequency: str) -> None:
+                              frequency: str,
+                              published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -103,12 +122,16 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def add_tag(self, *, id: str, tag: str, tag_type: str, resource_type: ResourceType) -> None:
+    def add_tag(self, *, id: str, tag: str, tag_type: str, resource_type: ResourceType, published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def update_tag(self, *, old_tag: str, old_tag_type: str, new_tag: str, new_tag_type: str) -> None:
         pass
 
     @abstractmethod
     def add_badge(self, *, id: str, badge_name: str, category: str = '',
-                  resource_type: ResourceType) -> None:
+                  resource_type: ResourceType, published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -124,7 +147,8 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     def put_column_description(self, *,
                                table_uri: str,
                                column_name: str,
-                               description: str) -> None:
+                               description: str,
+                               published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -136,7 +160,8 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def put_type_metadata_description(self, *,
                                       type_metadata_key: str,
-                                      description: str) -> None:
+                                      description: str,
+                                      published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -192,7 +217,8 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
                                       id: str,
                                       user_id: str,
                                       relation_type: UserResourceRel,
-                                      resource_type: ResourceType) -> None:
+                                      resource_type: ResourceType,
+                                      published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -217,7 +243,8 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def put_dashboard_description(self, *,
                                   id: str,
-                                  description: str) -> None:
+                                  description: str,
+                                  published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -251,14 +278,16 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     def put_resource_description(self, *,
                                  resource_type: ResourceType,
                                  uri: str,
-                                 description: str) -> None:
+                                 description: str,
+                                 published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
     def add_resource_owner(self, *,
                            uri: str,
                            resource_type: ResourceType,
-                           owner: str) -> None:
+                           owner: str,
+                           published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
@@ -294,6 +323,37 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def put_file_description(self, *,
                              id: str,
-                             description: str) -> None:
+                             description: str,
+                             published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
+    @abstractmethod
+    def put_data_provider_description(self, *,
+                                      id: str,
+                                      description: str,
+                                      published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def get_database(self, *, id: str = None) -> Union[Database, None]:
+        pass
+
+    @abstractmethod
+    def get_databases(self) -> List[Database]:
+        pass
+
+    @abstractmethod
+    def get_cluster(self, *, id: Optional[str] = None, database: Optional[str] = None, cluster: Optional[str] = None) -> Union[Cluster, None]:
+        pass
+
+    @abstractmethod
+    def get_clusters(self, *, database: Optional[str] = None) -> List[Cluster]:
+        pass
+
+    @abstractmethod
+    def get_schema(self, *, id: Optional[str] = None, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> Union[Cluster, None]:
+        pass
+
+    @abstractmethod
+    def get_schemas(self, *, database: Optional[str] = None, cluster: Optional[str] = None) -> List[Cluster]:
+        pass

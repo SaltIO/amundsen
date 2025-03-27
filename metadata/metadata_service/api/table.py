@@ -2,51 +2,120 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import logging
 from http import HTTPStatus
-from typing import Any, Iterable, Mapping, Optional, Union
+from typing import Any, Dict, Iterable, Mapping, Optional, Union
+
+from flasgger import swag_from
+from flask import request
+from flask_restful import Resource, reqparse
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.lineage import LineageSchema
 from amundsen_common.models.table import TableSchema
-from flasgger import swag_from
-from flask import request
-from flask_restful import Resource, reqparse
+from amundsen_common.models.key_status import KeyStatusSchema
 
 from metadata_service.api import BaseAPI
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.api.tag import TagCommon
 from metadata_service.entity.dashboard_summary import DashboardSummarySchema
 from metadata_service.exception import NotFoundException
-from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy import get_proxy_client, BaseProxy
+from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
 
-class TableDetailAPI(Resource):
+LOGGER = logging.getLogger(__name__)
+
+
+class TableIdGET(BaseAPI):
     """
-    TableDetail API
+    TableIdGET API
     """
 
     def __init__(self) -> None:
+        super().__init__(
+            schema=TableSchema,
+            str_type='table',
+            client=get_proxy_client(),
+            id_qstring_key='id'
+        )
+
+    @requires_auth()
+    @swag_from('swagger_doc/table/table_id_get.yml')
+    def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
+        return super().get(**kwargs)
+
+class TableGET(BaseAPI):
+    """
+    TableGET API
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            schema=TableSchema,
+            str_type='table',
+            client=get_proxy_client()
+        )
+
+    @requires_auth()
+    @swag_from('swagger_doc/table/table_get.yml')
+    def get(self, *, database: str, cluster: str, schema: str, table: str) -> Iterable[Union[Mapping, int, None]]:
+        return super().get(database=database, cluster=cluster, schema=schema, table=table)
+
+class TablesGET(BaseAPI):
+    """
+    TablesGET supports GET operation to get multiple tables
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super().__init__(TableSchema, 'tables', self.client)
+
+    @requires_auth()
+    @swag_from('swagger_doc/table/tables_get.yml')
+    def get(self, *, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
+        return super().get(database=database, cluster=cluster, schema=schema)
+
+class TablePutAPI(Resource):
+    """
+    TableDetail API
+    """
+    def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @swag_from('swagger_doc/table/detail_get.yml')
-    def get(self, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/table/detail_put.yml')
+    def put(self) -> Iterable[Union[Mapping, int, None]]:
+        data = None
         try:
-            table = self.client.get_table(table_uri=table_uri)
-            schema = TableSchema()
-            return schema.dump(table), HTTPStatus.OK
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            table = TableSchema().loads(json.dumps(data))
+
+            table_key, status = self.client.create_update_table(table=table, published_tag=published_tag)
+
+            result = KeyStatusSchema().dump({
+                'key': table_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
 
         except NotFoundException:
-            return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
+            return {'message': f'Failed to update/create table: {data}'}, HTTPStatus.NOT_FOUND
 
 
 class TableLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('direction', type=str, required=False, default="both")
-        self.parser.add_argument('depth', type=int, required=False, default=1)
+        self.parser.add_argument('direction', type=str, location="args", required=False, default="both")
+        self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(TableLineageAPI, self).__init__()
 
+    @requires_auth()
     @swag_from('swagger_doc/table/lineage_get.yml')
     def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -71,10 +140,14 @@ class TableOwnerAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/table/owner_put.yml')
     def put(self, table_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            self.client.add_owner(table_uri=table_uri, owner=owner)
+            data = json.loads(request.data)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.add_owner(table_uri=table_uri, owner=owner, published_tag=published_tag)
             return {'message': 'The owner {} for table_uri {} '
                                'is added successfully'.format(owner,
                                                               table_uri)}, HTTPStatus.OK
@@ -83,6 +156,7 @@ class TableOwnerAPI(Resource):
                                'is not added successfully'.format(owner,
                                                                   table_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth()
     @swag_from('swagger_doc/table/owner_delete.yml')
     def delete(self, table_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -105,7 +179,8 @@ class TableDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(TableDescriptionAPI, self).__init__()
 
-    @swag_from('swagger_doc/common/description_get.yml')
+    @requires_auth()
+    @swag_from('swagger_doc/table/description_get.yml')
     def get(self, id: str) -> Iterable[Any]:
         """
         Returns description in Neo4j endpoint
@@ -120,7 +195,8 @@ class TableDescriptionAPI(Resource):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @swag_from('swagger_doc/common/description_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/table/description_put.yml')
     def put(self, id: str) -> Iterable[Any]:
         """
         Updates table description (passed as a request body)
@@ -128,9 +204,13 @@ class TableDescriptionAPI(Resource):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_table_description(table_uri=id, description=description)
-            return None, HTTPStatus.OK
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_table_description(table_uri=id, description=description, published_tag=published_tag)
+
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -144,6 +224,7 @@ class TableUpdateFrequencyAPI(Resource):
         self.client = get_proxy_client()
         super(TableUpdateFrequencyAPI, self).__init__()
 
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/table/update_frequency_put.yml')
     def put(self, table_uri: str) -> Iterable[Any]:
         """
@@ -152,13 +233,17 @@ class TableUpdateFrequencyAPI(Resource):
         :return:
         """
         try:
-            frequency = json.loads(request.data).get('frequency')
-            self.client.put_table_update_frequency(table_uri=table_uri, frequency=frequency)
-            return None, HTTPStatus.OK
+            data = json.loads(request.data)
+            frequency = data.get('frequency')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_table_update_frequency(table_uri=table_uri, frequency=frequency, published_tag=published_tag)
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
+    @requires_auth()
     @swag_from('swagger_doc/table/update_frequency_delete.yml')
     def delete(self, table_uri: str) -> Iterable[Any]:
         """
@@ -168,7 +253,7 @@ class TableUpdateFrequencyAPI(Resource):
         """
         try:
             self.client.delete_table_update_frequency(table_uri=table_uri)
-            return None, HTTPStatus.OK
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -182,12 +267,13 @@ class TableTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
         super(TableTagAPI, self).__init__()
 
         self._tag_common = TagCommon(client=self.client)
 
-    @swag_from('swagger_doc/tag/tag_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/table/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to add a tag to existing table uri.
@@ -200,12 +286,19 @@ class TableTagAPI(Resource):
         # use tag_type to distinguish between tag and badge
         tag_type = args.get('tag_type', 'default')
 
-        return self._tag_common.put(id=id,
-                                    resource_type=ResourceType.Table,
-                                    tag=tag,
-                                    tag_type=tag_type)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
-    @swag_from('swagger_doc/tag/tag_delete.yml')
+        return self._tag_common.put(
+            id=id,
+            resource_type=ResourceType.Table,
+            tag=tag,
+            tag_type=tag_type,
+            published_tag=published_tag
+        )
+
+    @requires_auth()
+    @swag_from('swagger_doc/table/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to remove a association between a given tag and a table.
@@ -227,22 +320,30 @@ class TableBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
         super(TableBadgeAPI, self).__init__()
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @swag_from('swagger_doc/badge/badge_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/table/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        return self._badge_common.put(id=id,
-                                      resource_type=ResourceType.Table,
-                                      badge_name=badge,
-                                      category=category)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
-    @swag_from('swagger_doc/badge/badge_delete.yml')
+        return self._badge_common.put(
+            id=id,
+            resource_type=ResourceType.Table,
+            badge_name=badge,
+            category=category,
+            published_tag=published_tag
+        )
+
+    @requires_auth()
+    @swag_from('swagger_doc/table/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
@@ -262,6 +363,7 @@ class TableDashboardAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DashboardSummarySchema, 'resources_using_table', self.client)
 
+    @requires_auth()
     @swag_from('swagger_doc/table/dashboards_using_table_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """

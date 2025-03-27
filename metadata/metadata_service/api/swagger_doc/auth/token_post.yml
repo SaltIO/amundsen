@@ -1,0 +1,21 @@
+Retrieve an auth token
+---
+tags:
+  - 'auth'
+requestBody:
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/AuthTokenClient'
+        description: 'Auth Token Client'
+responses:
+  200:
+    $ref: '#/components/responses/AuthTokenResponse'
+  404:
+    description: 'Token not found with the given Auth Client'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

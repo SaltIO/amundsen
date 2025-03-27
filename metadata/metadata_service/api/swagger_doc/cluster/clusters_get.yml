@@ -1,0 +1,32 @@
+Gets a List of Cluster details
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'cluster'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: database
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    example: 'snowflake'
+responses:
+  200:
+    description: 'List of Cluster details'
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cluster'
+  400:
+    description: 'Bad Request'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'

@@ -1,22 +1,27 @@
 Gets the user details
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'user'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: id
     in: path
     example: 'roald9@example.org'
     type: string
     schema:
       type: string
-    required: true
+    required: false
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'User description'
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/UserDetailFields'
+          $ref: '#/components/schemas/UserDetail'
   404:
     description: 'User not found'
     content:

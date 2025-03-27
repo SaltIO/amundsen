@@ -3,11 +3,16 @@
 
 from http import HTTPStatus
 from typing import Iterable, Mapping, Union
+import logging
 
 from flasgger import swag_from
 from flask_restful import Resource
 
 from metadata_service.proxy import get_proxy_client
+from metadata_service.auth import requires_auth
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Neo4jDetailAPI(Resource):
@@ -18,9 +23,12 @@ class Neo4jDetailAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/neo4j/detail_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         last_updated_ts = self.client.get_latest_updated_ts()
+        LOGGER.info(f"last_updated_ts={last_updated_ts}")
+        LOGGER.info(f"type(last_updated_ts)={type(last_updated_ts)}")
         if last_updated_ts is not None:
             return {'neo4j_latest_timestamp': int(last_updated_ts)}, HTTPStatus.OK
         else:
@@ -35,6 +43,7 @@ class StatisticsMetricsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/system/statistics_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         statistics = self.client.get_statistics()

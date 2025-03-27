@@ -1,15 +1,12 @@
 Delete badges of a resource
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'column'
 parameters:
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'hive://gold.test_schema/test_table1'
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
   - name: badge_name
     in: path
     type: string
@@ -32,6 +29,10 @@ parameters:
     required: true
     example: 'beta'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'The badge was deleted successfully'
     content:

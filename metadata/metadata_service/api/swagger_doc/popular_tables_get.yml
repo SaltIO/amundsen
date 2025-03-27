@@ -1,8 +1,11 @@
 Gets information about popular tables
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'popular_tables'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - in: query
     name: limit
     required: false
@@ -11,6 +14,8 @@ parameters:
       type: integer
       default: 10
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Popular tables'
     content:

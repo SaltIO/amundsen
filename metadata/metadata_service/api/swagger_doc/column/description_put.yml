@@ -1,15 +1,12 @@
 Updates column description (passed as a request body)
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'column'
 parameters:
-  - name: table_uri
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'dynamo://gold.test_schema/test_table2'
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
   - name: column_name
     in: path
     type: string
@@ -18,13 +15,12 @@ parameters:
     required: true
     example: 'col2'
 requestBody:
-  content:
-    application/json:
-      schema:
-        $ref: '#/components/schemas/Description'
-        description: 'Column description'
-        required: true
+  $ref: '#/components/requestBodies/DescriptionPutRequest'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'Empty json response'
     content:

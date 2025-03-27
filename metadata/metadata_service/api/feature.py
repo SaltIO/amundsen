@@ -18,6 +18,8 @@ from metadata_service.api.badge import BadgeCommon
 from metadata_service.api.tag import TagCommon
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ class FeatureDetailAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/feature/detail_get.yml')
     def get(self, feature_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -49,9 +52,10 @@ class FeatureLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('direction', type=str, required=False, default="both")
-        self.parser.add_argument('depth', type=int, required=False, default=1)
+        self.parser.add_argument('direction', type=str, location="args", required=False, default="both")
+        self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
 
+    @requires_auth()
     @swag_from('swagger_doc/feature/lineage_get.yml')
     def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -78,6 +82,7 @@ class FeatureStatsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/feature/detail_get.yml')
     def get(self, feature_uri: str) -> Iterable[Union[Mapping, int, None]]:
         pass
@@ -88,6 +93,7 @@ class FeatureGenerationCodeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/feature/detail_get.yml')
     def get(self, feature_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -111,6 +117,7 @@ class FeatureSampleAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/feature/detail_get.yml')
     def get(self, feature_uri: str) -> Iterable[Union[Mapping, int, None]]:
         pass
@@ -121,10 +128,20 @@ class FeatureOwnerAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/feature/owner_put.yml')
     def put(self, feature_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            self.client.add_resource_owner(uri=feature_uri, resource_type=ResourceType.Feature, owner=owner)
+            data = json.loads(request.data)
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.add_resource_owner(
+                uri=feature_uri,
+                resource_type=ResourceType.Feature,
+                owner=owner,
+                published_tag=published_tag
+            )
+
             return {'message': f'The owner {owner} for feature_uri {feature_uri} '
                                'was added successfully'}, HTTPStatus.OK
         except Exception as e:
@@ -132,6 +149,7 @@ class FeatureOwnerAPI(Resource):
             return {'message': f'The owner {owner} for feature_uri {feature_uri} was '
                                f'not added successfully. Message: {e}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @requires_auth()
     @swag_from('swagger_doc/feature/owner_delete.yml')
     def delete(self, feature_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -149,7 +167,8 @@ class FeatureDescriptionAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @swag_from('swagger_doc/common/description_get.yml')
+    @requires_auth()
+    @swag_from('swagger_doc/feature/description_get.yml')
     def get(self, id: str) -> Iterable[Any]:
         """
         Returns description from proxy
@@ -167,16 +186,25 @@ class FeatureDescriptionAPI(Resource):
             LOGGER.error(f'Internal server error occurred when getting description: {e}')
             return {'message': f'Internal server error: {e}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @swag_from('swagger_doc/common/description_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/feature/description_put.yml')
     def put(self, id: str) -> Iterable[Any]:
         """
         Updates feature description (passed as a request body)
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_resource_description(resource_type=ResourceType.Feature,
-                                                 uri=id, description=description)
-            return None, HTTPStatus.OK
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_resource_description(
+                resource_type=ResourceType.Feature,
+                uri=id,
+                description=description,
+                published_tag=published_tag
+            )
+
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             LOGGER.error(f'NotFoundException: feature_uri {id} does not exist')
@@ -195,15 +223,19 @@ class FeatureTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
 
         self._tag_common = TagCommon(client=self.client)
 
-    @swag_from('swagger_doc/tag/tag_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/feature/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         # use tag_type to distinguish between tag and badge
         tag_type = args.get('tag_type', 'default')
+
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         if tag_type == 'owner':
             LOGGER.error(f'Invalid attempt to add owner tag')
@@ -213,12 +245,16 @@ class FeatureTagAPI(Resource):
                             'not added successfully because owner tags are not editable'}, \
                 HTTPStatus.CONFLICT
 
-        return self._tag_common.put(id=id,
-                                    resource_type=ResourceType.Feature,
-                                    tag=tag,
-                                    tag_type=tag_type)
+        return self._tag_common.put(
+            id=id,
+            resource_type=ResourceType.Feature,
+            tag=tag,
+            tag_type=tag_type,
+            published_tag=published_tag
+        )
 
-    @swag_from('swagger_doc/tag/tag_delete.yml')
+    @requires_auth()
+    @swag_from('swagger_doc/feature/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         tag_type = args.get('tag_type', 'default')
@@ -241,21 +277,29 @@ class FeatureBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @swag_from('swagger_doc/badge/badge_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/feature/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        return self._badge_common.put(id=id,
-                                      resource_type=ResourceType.Feature,
-                                      badge_name=badge,
-                                      category=category)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
-    @swag_from('swagger_doc/badge/badge_delete.yml')
+        return self._badge_common.put(
+            id=id,
+            resource_type=ResourceType.Feature,
+            badge_name=badge,
+            category=category,
+            published_tag=published_tag
+        )
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/feature/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
@@ -264,3 +308,4 @@ class FeatureBadgeAPI(Resource):
                                          resource_type=ResourceType.Feature,
                                          badge_name=badge,
                                          category=category)
+

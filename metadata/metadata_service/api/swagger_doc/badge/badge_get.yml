@@ -1,8 +1,14 @@
 Get badges
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'badge'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
     description: 'Badges with category'
     content:

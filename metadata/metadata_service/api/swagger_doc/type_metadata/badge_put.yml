@@ -1,8 +1,11 @@
 Add badge to a resource
 ---
+security:
+  - BearerAuth: []
 tags:
   - 'type_metadata'
 parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - name: type_metadata_key
     in: path
     type: string
@@ -24,7 +27,13 @@ parameters:
       type: string
     required: true
     example: 'table_status'
+requestBody:
+  $ref: '#/components/requestBodies/PublisherRequest'
 responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
     description: 'The badge was added successfully'
     content:

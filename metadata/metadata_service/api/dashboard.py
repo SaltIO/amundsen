@@ -17,6 +17,8 @@ from metadata_service.entity.dashboard_detail import DashboardSchema
 from metadata_service.entity.description import DescriptionSchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
 
 class DashboardDetailAPI(BaseAPI):
@@ -28,6 +30,7 @@ class DashboardDetailAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DashboardSchema, 'dashboard', self.client)
 
+    @requires_auth()
     @swag_from('swagger_doc/dashboard/detail_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -45,7 +48,8 @@ class DashboardDescriptionAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DescriptionSchema, 'dashboard_description', self.client)
 
-    @swag_from('swagger_doc/common/description_get.yml')
+    @requires_auth()
+    @swag_from('swagger_doc/dashboard/description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
         Returns description
@@ -59,7 +63,8 @@ class DashboardDescriptionAPI(BaseAPI):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @swag_from('swagger_doc/common/description_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/dashboard/description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
         Updates Dashboard description (passed as a request body)
@@ -67,9 +72,16 @@ class DashboardDescriptionAPI(BaseAPI):
         :return:
         """
         try:
-            description = json.loads(request.data).get('description')
-            self.client.put_dashboard_description(id=id, description=description)
-            return None, HTTPStatus.OK
+            data = json.loads(request.data)
+            description = data.get('description')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.put_dashboard_description(
+                id=id,
+                description=description,
+                published_tag=published_tag
+            )
+            return {}, HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
@@ -83,23 +95,30 @@ class DashboardBadgeAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('category', type=str, required=True)
+        self.parser.add_argument('category', type=str, location="args", required=True)
         super(DashboardBadgeAPI, self).__init__()
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @swag_from('swagger_doc/badge/badge_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/dashboard/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
-
         category = args.get('category', '')
 
-        return self._badge_common.put(id=id,
-                                      resource_type=ResourceType.Dashboard,
-                                      badge_name=badge,
-                                      category=category)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
-    @swag_from('swagger_doc/badge/badge_delete.yml')
+        return self._badge_common.put(
+            id=id,
+            resource_type=ResourceType.Dashboard,
+            badge_name=badge,
+            category=category,
+            published_tag=published_tag
+        )
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/dashboard/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         category = args.get('category', '')
@@ -119,12 +138,13 @@ class DashboardTagAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
         self.parser = reqparse.RequestParser()
-        self.parser.add_argument('tag_type', type=str, required=False, default='default')
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
         super(DashboardTagAPI, self).__init__()
 
         self._tag_common = TagCommon(client=self.client)
 
-    @swag_from('swagger_doc/tag/tag_put.yml')
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/dashboard/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to add a tag to existing Dashboard.
@@ -136,12 +156,19 @@ class DashboardTagAPI(Resource):
         args = self.parser.parse_args()
         tag_type = args.get('tag_type', 'default')
 
-        return self._tag_common.put(id=id,
-                                    resource_type=ResourceType.Dashboard,
-                                    tag=tag,
-                                    tag_type=tag_type)
+        data = json.loads(request.data)
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
-    @swag_from('swagger_doc/tag/tag_delete.yml')
+        return self._tag_common.put(
+            id=id,
+            resource_type=ResourceType.Dashboard,
+            tag=tag,
+            tag_type=tag_type,
+            published_tag=published_tag
+        )
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/dashboard/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to remove a association between a given tag and a Dashboard.
@@ -157,3 +184,4 @@ class DashboardTagAPI(Resource):
                                        resource_type=ResourceType.Dashboard,
                                        tag=tag,
                                        tag_type=tag_type)
+

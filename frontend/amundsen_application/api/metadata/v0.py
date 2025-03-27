@@ -170,7 +170,7 @@ def _get_table_metadata(*, table_key: str, index: int, source: str) -> Dict[str,
 
     try:
         table_endpoint = _get_table_endpoint()
-        url = '{0}/{1}'.format(table_endpoint, table_key)
+        url = '{0}?id={1}'.format(table_endpoint, table_key)
         response = request_metadata(url=url)
     except ValueError as e:
         # envoy client BadResponse is a subclass of ValueError
@@ -399,7 +399,11 @@ def put_table_description() -> Response:
         url = '{0}/{1}/description'.format(table_endpoint, table_key)
         _log_put_table_description(table_key=table_key, description=description, source=src)
 
-        response = request_metadata(url=url, method='PUT', data=json.dumps({'description': description}))
+        response = request_metadata(
+            url=url,
+            method='PUT',
+            data=json.dumps({'description': description})
+        )
         status_code = response.status_code
 
         if status_code == HTTPStatus.OK:
@@ -629,7 +633,6 @@ def _update_metadata_tag(table_key: str, method: str, tag: str) -> int:
         LOGGER.info(f'Fail to update tag in metadataservice, http status code: {status_code}')
         LOGGER.debug(response.text)
     return status_code
-
 
 @metadata_blueprint.route('/update_table_tags', methods=['PUT', 'DELETE'])
 def update_table_tags() -> Response:
@@ -1024,11 +1027,14 @@ def get_table_lineage() -> Response:
         depth = get_query_param(request.args, 'depth')
         direction = get_query_param(request.args, 'direction')
         url = f'{table_endpoint}/{table_key}/lineage?depth={depth}&direction={direction}'
+
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        LOGGER.info(f'DREW={json}')
+        LOGGER.info(f'get_table_lineage={json}')
+
         downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
         upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
+
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 

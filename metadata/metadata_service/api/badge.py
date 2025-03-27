@@ -14,6 +14,7 @@ from metadata_service.entity.badge import Badge
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
+from metadata_service.auth import requires_auth
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class BadgeAPI(Resource):
         self.client = get_proxy_client()
         super(BadgeAPI, self).__init__()
 
+    @requires_auth()
     @swag_from('swagger_doc/badge/badge_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -47,7 +49,8 @@ class BadgeCommon:
 
     def put(self, id: str, resource_type: ResourceType,
             badge_name: str,
-            category: str = '') -> Tuple[Any, HTTPStatus]:
+            category: str = '',
+            published_tag = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[Any, HTTPStatus]:
 
         if category == '':
             return \
@@ -58,27 +61,28 @@ class BadgeCommon:
 
         # TODO check resource type is column when adding a badge of category column after
         # implementing column level badges
-        whitelist_badges = app.config.get('WHITELIST_BADGES', [])
+        # whitelist_badges = app.config.get('WHITELIST_BADGES', [])
         incomimg_badge = Badge(badge_name=badge_name,
                                category=category)
         # need to check whether the badge combination is part of the whitelist:
 
-        in_whitelist = False
-        for badge in whitelist_badges:
-            if incomimg_badge.badge_name == badge.badge_name and incomimg_badge.category == badge.category:
-                in_whitelist = True
-        if not in_whitelist:
-            return \
-                {'message': f'The badge {badge_name} with category {category} for resource '
-                            f'id {id} and resource_type {resource_type.name} is not added successfully because '
-                            'this combination of values is not part of the whitelist'}, \
-                HTTPStatus.NOT_FOUND
+        # in_whitelist = False
+        # for badge in whitelist_badges:
+        #     if incomimg_badge.badge_name == badge.badge_name and incomimg_badge.category == badge.category:
+        #         in_whitelist = True
+        # if not in_whitelist:
+        #     return \
+        #         {'message': f'The badge {badge_name} with category {category} for resource '
+        #                     f'id {id} and resource_type {resource_type.name} is not added successfully because '
+        #                     'this combination of values is not part of the whitelist'}, \
+        #         HTTPStatus.NOT_FOUND
 
         try:
             self.client.add_badge(id=id,
                                   badge_name=badge_name,
                                   category=category,
-                                  resource_type=resource_type)
+                                  resource_type=resource_type,
+                                  published_tag=published_tag)
             return {'message': f'The badge {badge_name} with category {category} was '
                                f'added successfully to resource with id {id}'}, HTTPStatus.OK
         except Exception as e:

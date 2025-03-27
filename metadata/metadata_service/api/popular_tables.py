@@ -11,6 +11,7 @@ from flask import request
 from flask_restful import Resource
 
 from metadata_service.proxy import get_proxy_client
+from metadata_service.auth import requires_auth
 
 
 class PopularTablesAPI(Resource):
@@ -21,6 +22,7 @@ class PopularTablesAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
+    @requires_auth()
     @swag_from('swagger_doc/popular_tables_get.yml')
     def get(self, user_id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         limit = request.args.get('limit', 10, type=int)
