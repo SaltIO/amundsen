@@ -40,7 +40,7 @@ class SchemaGET(BaseAPI):
             get_proxy_client()
         )
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/schema/schema_get.yml')
     def get(self, *, database: str, cluster: str, schema: str) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster, schema=schema)
@@ -53,7 +53,7 @@ class SchemasGET(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(SchemaSchema, 'schemas', self.client)
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/schema/schemas_get.yml')
     def get(self, *, database: Optional[str] = None, cluster: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster)

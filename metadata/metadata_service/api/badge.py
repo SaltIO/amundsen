@@ -33,7 +33,7 @@ class BadgeAPI(Resource):
         self.client = get_proxy_client()
         super(BadgeAPI, self).__init__()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/badge/badge_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         """

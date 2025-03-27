@@ -40,7 +40,7 @@ class ClusterGET(BaseAPI):
             get_proxy_client()
         )
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/cluster/cluster_get.yml')
     def get(self, *, database: str, cluster: str) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster)
@@ -53,7 +53,7 @@ class ClustersGET(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(ClusterSchema, 'clusters', self.client)
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/cluster/clusters_get.yml')
     def get(self, *, database: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database)

@@ -1,6 +1,4 @@
-# Copyright Contributors to the Amundsen project.
-# SPDX-License-Identifier: Apache-2.0
-
+import logging
 import os
 import distutils.util
 from typing import Callable, Dict, List, Optional, Set  # noqa: F401
@@ -11,6 +9,9 @@ from flask import Flask  # noqa: F401
 from amundsen_application.tests.test_utils import get_test_user
 
 from amundsen_application.client.slack.slack_client import SlackClient
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class MatchRuleObject:
@@ -167,8 +168,7 @@ class Config:
     if SLACK_TOKEN:
         SLACK_CLIENT = SlackClient(token=SLACK_TOKEN)
 
-    LOG_REQUESTS = os.getenv('FRONTEND_API_LOG_REQUESTS', False)
-
+    LOG_REQUESTS = os.getenv('FRONTEND_API_LOG_REQUESTS', 'false').lower() in ('1', 'true', 'yes')
 
 class LocalConfig(Config):
     DEBUG = False

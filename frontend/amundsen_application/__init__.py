@@ -160,3 +160,4 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
             return response
 
     return app
+

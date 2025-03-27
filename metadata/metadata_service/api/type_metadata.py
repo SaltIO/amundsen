@@ -13,10 +13,9 @@ from flask_restful import Resource, reqparse
 
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.exception import NotFoundException
-from metadata_service.permissions.permissions import require_write_access
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
-from metadata_service.auth import requires_auth
+from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,8 +29,7 @@ class TypeMetadataDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(TypeMetadataDescriptionAPI, self).__init__()
 
-    @requires_auth
-    @require_write_access
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/type_metadata/description_put.yml')
     def put(self, type_metadata_key: str) -> Iterable[Union[dict, tuple, int, None]]:
         """
@@ -57,7 +55,7 @@ class TypeMetadataDescriptionAPI(Resource):
             LOGGER.error(f'NotFoundException: {msg}')
             return {'message': msg}, HTTPStatus.NOT_FOUND
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/type_metadata/description_get.yml')
     def get(self, type_metadata_key: str) -> Union[tuple, int, None]:
         """
@@ -87,8 +85,7 @@ class TypeMetadataBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @requires_auth
-    @require_write_access
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/type_metadata/badge_put.yml')
     def put(self, type_metadata_key: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -105,7 +102,7 @@ class TypeMetadataBadgeAPI(Resource):
             published_tag=published_tag
         )
 
-    @requires_auth
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/type_metadata/badge_delete.yml')
     def delete(self, type_metadata_key: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()

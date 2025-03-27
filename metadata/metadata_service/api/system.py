@@ -23,7 +23,7 @@ class Neo4jDetailAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/neo4j/detail_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         last_updated_ts = self.client.get_latest_updated_ts()
@@ -43,7 +43,7 @@ class StatisticsMetricsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/system/statistics_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         statistics = self.client.get_statistics()

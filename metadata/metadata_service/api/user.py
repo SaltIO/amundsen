@@ -20,11 +20,10 @@ from marshmallow.exceptions import ValidationError as SchemaValidationError
 from metadata_service.api import BaseAPI
 from metadata_service.auth.auth import requires_auth
 from metadata_service.exception import NotFoundException
-from metadata_service.permissions.permissions import require_write_access
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.util import UserResourceRel
-from metadata_service.auth import requires_auth
+from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class UserDetailAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(UserSchema, 'user', self.client)
 
-    @requires_auth
+    @requires_auth()
     # @swag_from('swagger_doc/user/detail_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         if app.config['USER_DETAIL_METHOD']:
@@ -59,8 +58,7 @@ class UserPutAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
-    @require_write_access
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/user/detail_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -105,7 +103,7 @@ class UserFollowsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/user/follow_get.yml')
     def get(self, user_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -159,8 +157,7 @@ class UserFollowAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
-    @require_write_access
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/user/follow_put.yml')
     def put(self, user_id: str, resource_type: str, resource_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -193,7 +190,7 @@ class UserFollowAPI(Resource):
                                                                   resource_id,
                                                                   resource_type)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/user/follow_delete.yml')
     def delete(self, user_id: str, resource_type: str, resource_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -228,7 +225,7 @@ class UserOwnsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/user/own_get.yml')
     def get(self, user_id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -276,8 +273,7 @@ class UserOwnAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
-    @require_write_access
+    @requires_auth(required_permission=WRITE_PERMISSION)
     @swag_from('swagger_doc/user/own_put.yml')
     def put(self, user_id: str, resource_type: str, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -307,7 +303,7 @@ class UserOwnAPI(Resource):
                                'is not added successfully'.format(user_id,
                                                                   table_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/user/own_delete.yml')
     def delete(self, user_id: str, resource_type: str, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -330,7 +326,7 @@ class UserReadsAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('swagger_doc/user/read_get.yml')
     def get(self, user_id: str) -> Iterable[Union[Mapping, int, None]]:
         """

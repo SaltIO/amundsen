@@ -7,11 +7,10 @@ import os
 import ast
 from typing import Any, Callable, Dict, List, Optional, Set  # noqa: F401
 
-import boto3
 from flask import Flask  # noqa: F401
 import neo4j
 
-from metadata_service.entity.badge import Badge
+
 
 # PROXY configuration keys
 PROXY_HOST = 'PROXY_HOST'
@@ -93,21 +92,23 @@ class Config:
     SWAGGER = {
         'openapi': '3.0.2',
         'title': 'CMD+RVL Metadata API',
-        'uiversion': 3
+        'uiversion': 3,
+        'favicon': os.path.join('api', 'swagger_doc', 'static', 'images', 'favicon.ico')
     }
+
     SWAGGER_URL_PREFIX = os.getenv('SWAGGER_URL_PREFIX', None)
     if SWAGGER_URL_PREFIX:
         SWAGGER['specs_route'] = SWAGGER_URL_PREFIX
     SWAGGER_VALIDATION = os.getenv("SWAGGER_VALIDATION", "true").lower() in ("true", "1", "yes")
 
-    METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']      # e.g., your-domain.auth0.com
-    METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']  # e.g., neo4j-api or https://neo4j-api.example.com
+    METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']
+    METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']
     METADATA_API_AUTH0_ISSUER = f'https://{METADATA_API_AUTH0_DOMAIN}/'
     METADATA_API_AUTH0_ALGORITHMS = os.environ['METADATA_API_AUTH0_ALGORITHMS']
     if METADATA_API_AUTH0_ALGORITHMS:
         METADATA_API_AUTH0_ALGORITHMS = ast.literal_eval(METADATA_API_AUTH0_ALGORITHMS)
 
-    LOG_REQUESTS = os.environ['METADATA_API_LOG_REQUESTS']
+    LOG_REQUESTS = os.getenv('METADATA_API_LOG_REQUESTS', 'false').lower() in ('1', 'true', 'yes')
 
     READ_ONLY_MODE = os.getenv('METADATA_SERVICE_READ_ONLY_MODE', 'false').lower() in ('1', 'true', 'yes')
 

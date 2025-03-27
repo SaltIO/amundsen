@@ -38,7 +38,7 @@ class SnowflakeTableShareAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth
+    @requires_auth()
     @swag_from('../swagger_doc/snowflake/snowflake_table_share_get.yml')
     def get(self, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
