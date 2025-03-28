@@ -122,13 +122,15 @@ def create_app(*, config_module_class: str) -> Flask:
     api_bp = Blueprint(
         name='api',
         import_name=__name__,
-        url_prefix="/metadata-api"
+        url_prefix=app.config.get("METADATA_API_URL_PREFIX")
     )
     api = Api(api_bp)
 
-    api.add_resource(HealthcheckAPI, '/healthcheck')
+    api.add_resource(HealthcheckAPI,
+                     '/healthcheck')
 
-    api.add_resource(AuthAPI, '/auth/token')
+    api.add_resource(AuthAPI,
+                     '/auth/token/')
 
     # `PopularTablesAPI` is deprecated, and will be removed in version 4.
     api.add_resource(PopularTablesAPI,
@@ -138,7 +140,7 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/popular_resources/',
                      '/popular_resources/<path:user_id>')
     api.add_resource(TableIdGET,
-                     '/table')
+                     '/table/')
     api.add_resource(TableGET,
                      '/table/<path:database>/<path:cluster>/<path:schema>/<path:table>')
     api.add_resource(TablesGET,
@@ -179,7 +181,7 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(TagAPI,
                      '/tags/')
     api.add_resource(TagPATCH,
-                     '/tag')
+                     '/tag/')
     api.add_resource(BadgeAPI,
                      '/badges/')
     api.add_resource(UserDetailAPI,
@@ -240,20 +242,20 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(FileLineageAPI,
                      '/data_source/file/<path:id>/lineage')
     api.add_resource(DatabaseIdGET,
-                     '/database')
+                     '/database/')
     api.add_resource(DatabaseGET,
                     '/database/<path:database>')
     api.add_resource(DatabasesGET,
-                    '/databases')
+                    '/databases/')
     api.add_resource(ClusterIdGET,
-                     '/cluster')
+                     '/cluster/')
     api.add_resource(ClusterGET,
                      '/cluster/<path:database>/<path:cluster>')
     api.add_resource(ClustersGET,
                      '/clusters/',
                      '/clusters/<path:database>')
     api.add_resource(SchemaIdGET,
-                     '/schema')
+                     '/schema/')
     api.add_resource(SchemaGET,
                      '/schema/<path:database>/<path:cluster>/<path:schema>')
     api.add_resource(SchemasGET,

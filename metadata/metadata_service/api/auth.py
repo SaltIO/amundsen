@@ -36,9 +36,14 @@ class AuthAPI(Resource):
             if not data or 'client_id' not in data or 'client_secret' not in data:
                 return {'message': 'client_id and client_secret required'}, 400
 
-            auth_token = auth.get_token(client_id=data['client_id'], client_secret=data['client_secret'])
-            schema = AuthTokenSchema()
-            return schema.dump(auth_token), HTTPStatus.OK
+            auth_token, http_status = auth.get_token(client_id=data['client_id'], client_secret=data['client_secret'])
+
+            if http_status == HTTPStatus.OK:
+                schema = AuthTokenSchema()
+                return schema.dump(auth_token), HTTPStatus.OK
+            else:
+                LOGGER.info(f'NOT OK')
+                return auth_token, http_status
 
         except NotFoundException:
             LOGGER.exception("NotFoundException")

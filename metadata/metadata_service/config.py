@@ -1,6 +1,3 @@
-# Copyright Contributors to the Amundsen project.
-# SPDX-License-Identifier: Apache-2.0
-
 import distutils.util
 import logging
 import os
@@ -11,6 +8,7 @@ from flask import Flask  # noqa: F401
 import neo4j
 
 
+LOGGER = logging.getLogger(__name__)
 
 # PROXY configuration keys
 PROXY_HOST = 'PROXY_HOST'
@@ -64,8 +62,6 @@ class Config:
     # whitelist badges
     # WHITELIST_BADGES: List[Badge] = []
 
-    SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', True)
-
     USER_DETAIL_METHOD = None  # type: Optional[function]
 
     RESOURCE_REPORT_CLIENT = None  # type: Optional[function]
@@ -88,25 +84,36 @@ class Config:
     # Initialize custom flask extensions and routes
     INIT_CUSTOM_EXT_AND_ROUTES = None  # type: Callable[[Flask], None]
 
-    SWAGGER_TEMPLATE_PATH = os.path.join('api', 'swagger_doc', 'template.yml')
-    SWAGGER = {
-        'openapi': '3.0.2',
-        'title': 'CMD+RVL Metadata API',
-        'uiversion': 3,
-        'favicon': os.path.join('api', 'swagger_doc', 'static', 'images', 'favicon.ico')
-    }
-
-    SWAGGER_URL_PREFIX = os.getenv('SWAGGER_URL_PREFIX', None)
-    if SWAGGER_URL_PREFIX:
-        SWAGGER['specs_route'] = SWAGGER_URL_PREFIX
-    SWAGGER_VALIDATION = os.getenv("SWAGGER_VALIDATION", "true").lower() in ("true", "1", "yes")
-
+    # API Config
+    FLASK_OIDC_CLIENT_ID = os.environ['FLASK_OIDC_CLIENT_ID']
+    FLASK_OIDC_CLIENT_SECRET = os.environ['FLASK_OIDC_CLIENT_SECRET']
+    METADATA_API_URL_PREFIX = os.getenv('METADATA_API_URL_PREFIX', '/metadata-api')
     METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']
     METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']
     METADATA_API_AUTH0_ISSUER = f'https://{METADATA_API_AUTH0_DOMAIN}/'
     METADATA_API_AUTH0_ALGORITHMS = os.environ['METADATA_API_AUTH0_ALGORITHMS']
     if METADATA_API_AUTH0_ALGORITHMS:
         METADATA_API_AUTH0_ALGORITHMS = ast.literal_eval(METADATA_API_AUTH0_ALGORITHMS)
+
+    # Allows /user and /user/ to be the same
+    # STRICT_SLASHES = False
+
+    # Swagger
+    SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', True)
+    SWAGGER_TEMPLATE_PATH = os.path.join('api', 'swagger_doc', 'template.yml')
+    SWAGGER = {
+        'openapi': '3.0.2',
+        'title': 'CMD+RVL Metadata API',
+        'uiversion': 3,
+        # 'favicon': os.path.join('api', 'swagger_doc', 'static', 'images', 'favicon.ico'),
+        # 'static_url_path': f"{METADATA_API_URL_PREFIX}/flasgger_static",
+        'url_prefix': METADATA_API_URL_PREFIX
+    }
+
+    # if SWAGGER_URL_PREFIX:
+    #     SWAGGER['specs_route'] = f"{SWAGGER_URL_PREFIX}/docs"
+
+    SWAGGER_VALIDATION = os.getenv("SWAGGER_VALIDATION", "true").lower() in ("true", "1", "yes")
 
     LOG_REQUESTS = os.getenv('METADATA_API_LOG_REQUESTS', 'false').lower() in ('1', 'true', 'yes')
 
