@@ -1,7 +1,7 @@
 openapi: '3.0.2'
 info:
-  title: 'Metadata API'
-  description: 'Used to provide and update metadata, such as table & column description.'
+  title: 'CMD+RVL Metadata API'
+  description: 'API to Manage your Metadata'
   version: '4.0.0'
 
 components:

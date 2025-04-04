@@ -360,18 +360,13 @@ class TableDashboardAPI(BaseAPI):
     """
 
     def __init__(self) -> None:
-        self.client = get_proxy_client()
-        super().__init__(DashboardSummarySchema, 'resources_using_table', self.client)
+        super().__init__(
+            schema=DashboardSummarySchema,
+            str_type='resources_using_table',
+            client=get_proxy_client()
+        )
 
     @requires_auth()
     @swag_from('swagger_doc/table/dashboards_using_table_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
-        """
-        Supports GET operation providing list of Dashboards using a table.
-        :param id: Table URI
-        :return: See Swagger doc for the schema. swagger_doc/table/dashboards_using_table_get.yml
-        """
-        try:
-            return super().get_with_kwargs(id=id, resource_type=ResourceType.Dashboard)
-        except NotFoundException:
-            return {'message': 'table_id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+        return super().get(id=id, resource_type=ResourceType.Dashboard)

@@ -10,7 +10,7 @@ import sys
 from typing import Any, Dict  # noqa: F401
 
 from flasgger import Swagger
-from flask import Blueprint, Flask, request
+from flask import Blueprint, Flask, render_template, request
 from flask_cors import CORS
 from flask_restful import Api
 from werkzeug.utils import import_string
@@ -98,7 +98,9 @@ def create_app(*, config_module_class: str) -> Flask:
         app = class_obj(__name__, **flask_kwargs_dict)
 
     else:
-        app = Flask(__name__)
+        app = Flask(
+            __name__
+        )
 
     if CORS_ENABLED:
         CORS(app)
@@ -271,6 +273,11 @@ def create_app(*, config_module_class: str) -> Flask:
         logging.info('Using cli {}'.format(proxy_cli))
 
     if app.config.get('SWAGGER_ENABLED'):
+        # @api_bp.route('/apidocs/')
+        # def custom_apidocs():
+        #     # return render_template('custom_apidocs.html')  # Loads from api/swagger_docs/static/templates/
+        #     return "This is the custom apidocs page"
+
         Swagger(
             app,
             template_file=os.path.join(ROOT_DIR, app.config.get('SWAGGER_TEMPLATE_PATH')),

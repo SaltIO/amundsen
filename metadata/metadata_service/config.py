@@ -105,13 +105,21 @@ class Config:
         'openapi': '3.0.2',
         'title': 'CMD+RVL Metadata API',
         'uiversion': 3,
-        # 'favicon': os.path.join('api', 'swagger_doc', 'static', 'images', 'favicon.ico'),
-        # 'static_url_path': f"{METADATA_API_URL_PREFIX}/flasgger_static",
-        'url_prefix': METADATA_API_URL_PREFIX
+        'favicon': os.path.join(METADATA_API_URL_PREFIX, 'static', 'img', 'favicon.ico'),
+        # 'static_url_path': os.path.join('api', 'swagger_doc', 'templates'),
+        'url_prefix': METADATA_API_URL_PREFIX,
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": 'apispec.json',
+                "rule_filter": lambda rule: True,  # Include all endpoints
+                "model_filter": lambda tag: True,
+            }
+        ],
+        # "static_url_path": os.path.join(METADATA_API_URL_PREFIX, 'static'),
+        # "swagger_ui": SWAGGER_ENABLED,
+        # "specs_route": os.path.join(METADATA_API_URL_PREFIX, 'apidocs')
     }
-
-    # if SWAGGER_URL_PREFIX:
-    #     SWAGGER['specs_route'] = f"{SWAGGER_URL_PREFIX}/docs"
 
     SWAGGER_VALIDATION = os.getenv("SWAGGER_VALIDATION", "true").lower() in ("true", "1", "yes")
 
