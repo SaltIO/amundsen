@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from typing import Tuple
+import jose
 import requests
 from metadata_service import config
 from amundsen_common.models.auth import AuthToken
@@ -103,6 +104,9 @@ def requires_auth(required_permission: str = READ_PERMISSION):
             except jwt.PyJWKClientError as e:
                 LOGGER.exception("Failed to fetch or match key from JWKS")
                 return {'message': 'Invalid token', 'error': 'No matching key found'}, HTTPStatus.UNAUTHORIZED
+            except jose.exceptions.ExpiredSignatureError as e:
+                LOGGER.exception("Token Expired")
+                return {'message': 'Token Expired', 'error': str(e)}, HTTPStatus.UNAUTHORIZED
             except jwt.exceptions.ExpiredSignatureError as e:
                 LOGGER.exception("Token Expired")
                 return {'message': 'Token Expired', 'error': str(e)}, HTTPStatus.UNAUTHORIZED

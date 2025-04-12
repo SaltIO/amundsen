@@ -238,6 +238,9 @@ class Neo4jCsvPublisher(Publisher):
                 except StopIteration:
                     break
 
+            tx.commit()
+            tx = self._session.begin_transaction()
+
             LOGGER.info('Publishing Relationship files: %s', self._relation_files)
             while True:
                 try:
@@ -297,13 +300,17 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
 
+        LOGGER.info('Publishing Node file: %s', node_file)
+
         with open(node_file, 'r', encoding='utf8') as node_csv:
             for node_record in pandas.read_csv(node_csv,
                                                na_filter=False).to_dict(orient="records"):
-                # LOGGER.info(f'Executing Neo4J MERGE: \n{node_record}')
                 stmt = self.create_node_merge_statement(node_record=node_record)
+                # LOGGER.info(f'Executing Neo4J MERGE: \n{node_record}\n{stmt}')
                 params = self._create_props_param(node_record)
-                tx = self._execute_statement(stmt, tx, params, True)
+                _tx = self._execute_statement(stmt, tx, params, True)
+                if _tx != tx:
+                    tx = _tx
         return tx
 
     def is_create_only_node(self, node_record: dict) -> bool:
@@ -324,7 +331,7 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         template = Template("""
-            MERGE (node:{{ LABEL }} {key: toLower($KEY)})
+            MERGE (node:{{ LABEL }} {key: $KEY})
             ON CREATE SET {{ PROP_BODY }}
             {% if update %} ON MATCH SET {{ PROP_BODY }} {% endif %}
             RETURN node
@@ -350,6 +357,8 @@ class Neo4jCsvPublisher(Publisher):
         :param relation_file:
         :return:
         """
+
+        LOGGER.info('Publishing Relationship file: %s', relation_file)
 
         if self._relation_preprocessor.is_perform_preprocess():
             LOGGER.info('Pre-processing relation with %s', self._relation_preprocessor)
@@ -402,7 +411,7 @@ class Neo4jCsvPublisher(Publisher):
         :return:
         """
         template = Template("""
-            MATCH (n1:{{ START_LABEL }} {key: toLower($START_KEY)}), (n2:{{ END_LABEL }} {key: toLower($END_KEY)})
+            MATCH (n1:{{ START_LABEL }} {key: $START_KEY}), (n2:{{ END_LABEL }} {key: $END_KEY})
             MERGE (n1)-[r1:{{ TYPE }}]->(n2){{ REVERSE_REL }}
             {% if update_prop_body %}
             ON CREATE SET {{ prop_body }}

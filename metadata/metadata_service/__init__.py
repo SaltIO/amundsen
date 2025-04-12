@@ -333,6 +333,12 @@ def create_app(*, config_module_class: str) -> Flask:
 {request.url}
 
 *********************
+*** Response Code ***
+*********************
+
+{response.status_code}
+
+*********************
 *** Response Data ***
 *********************
 
