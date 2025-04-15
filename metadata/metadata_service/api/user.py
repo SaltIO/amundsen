@@ -33,23 +33,22 @@ class UserDetailAPI(BaseAPI):
     User detail API for people resources
     """
 
-    def __init__(self) -> None:
-        self.client = get_proxy_client()
-        super().__init__(UserSchema, 'user', self.client)
+    # def __init__(self) -> None:
+    #     self.client = get_proxy_client()
+    #     super().__init__(UserSchema, 'user', self.client)
 
-    @requires_auth()
-    @swag_from('swagger_doc/user/detail_get.yml')
-    def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
-        if app.config['USER_DETAIL_METHOD']:
-            try:
-                user_data = app.config['USER_DETAIL_METHOD'](id)
-                return UserSchema().dump(user_data), HTTPStatus.OK
-            except Exception:
-                LOGGER.exception('UserDetailAPI GET Failed - Using "USER_DETAIL_METHOD" config variable')
-                return {'message': 'user_id {} fetch failed'.format(id)}, HTTPStatus.NOT_FOUND
-        else:
-            return super().get(id=id)
-
+    # @requires_auth()
+    # @swag_from('swagger_doc/user/detail_get.yml')
+    # def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
+    #     if app.config['USER_DETAIL_METHOD']:
+    #         try:
+    #             user_data = app.config['USER_DETAIL_METHOD'](id)
+    #             return UserSchema().dump(user_data), HTTPStatus.OK
+    #         except Exception:
+    #             LOGGER.exception('UserDetailAPI GET Failed - Using "USER_DETAIL_METHOD" config variable')
+    #             return {'message': 'user_id {} fetch failed'.format(id)}, HTTPStatus.NOT_FOUND
+    #     else:
+    #         return super().get(id=id)
 
     def __init__(self) -> None:
         super().__init__(
@@ -59,7 +58,8 @@ class UserDetailAPI(BaseAPI):
             id_qstring_key='id'
         )
 
-    @swag_from('swagger_doc/schema/schema_id_get.yml')
+    @requires_auth()
+    @swag_from('swagger_doc/user/detail_get.yml')
     def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
         return super().get(**kwargs)
 
