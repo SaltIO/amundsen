@@ -25,6 +25,7 @@ class ClusterIdGET(BaseAPI):
             id_qstring_key='id'
         )
 
+    @requires_auth()
     @swag_from('swagger_doc/cluster/cluster_id_get.yml')
     def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
         return super().get(**kwargs)
