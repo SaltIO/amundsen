@@ -42,7 +42,6 @@ class AuthAPI(Resource):
                 schema = AuthTokenSchema()
                 return schema.dump(auth_token), HTTPStatus.OK
             else:
-                LOGGER.info(f'NOT OK')
                 return auth_token, http_status
 
         except NotFoundException:

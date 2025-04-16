@@ -88,6 +88,9 @@ def requires_auth(required_permission: str = READ_PERMISSION):
                 if unverified_claims.get("scope"):
                     token_scopes = unverified_claims["scope"].split()
 
+                LOGGER.info(f"required_permission={required_permission}")
+                LOGGER.info(f"token_scopes={token_scopes}")
+
                 if not token_scopes:
                     return {'message': 'No authentication token_scopes'}, HTTPStatus.FORBIDDEN
 
