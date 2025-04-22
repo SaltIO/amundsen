@@ -229,8 +229,8 @@ def request_wrapper(
         if app.config['LOG_REQUESTS']:
             LOGGER.debug(f'API Response: \n url={url}\n auth={auth}\n code={response.status_code}\n json={response.json()}')
 
-        if auth and response and response.status_code == 401:
-            LOGGER.warning("Service Request Failed (401).  Retrieving new Auth Token")
+        if auth and response and response.status_code in [HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN]:
+            LOGGER.warning(f"Service Request Failed ({response.status_code}).  Retrieving new Auth Token")
             _get_auth_token()
         else:
             return response

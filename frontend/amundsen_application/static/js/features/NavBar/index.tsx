@@ -39,6 +39,7 @@ const COLOR_DARK = '#292936'; // gray100
 const DEFAULT_PAGE_TOUR_KEY = 'default-key';
 const DEFAULT_FEATURE_TOUR_KEY = 'default-feature-key';
 const PROFILE_LINK_TEXT = 'My Profile';
+const LOGOUT_LINK_TEXT = 'Logout';
 const PRODUCT_TOUR_BUTTON_TEXT = 'Discover Amundsen';
 const APP_SUITE_BUTTON_TEXT = 'Related Apps';
 export const HOMEPAGE_PATH = '/';
@@ -266,6 +267,7 @@ type ProfileMenuProps = {
   loggedInUser: LoggedInUser;
 };
 
+
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({ loggedInUser }) => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   const { user_id, display_name, email } = loggedInUser;
@@ -280,6 +282,33 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ loggedInUser }) => {
   if (!indexUsersEnabled()) {
     return <div className="nav-bar-avatar">{avatar}</div>;
   }
+
+  const handleLogout = async () => {
+    // try {
+    //   // Send a request to the /_force_logout endpoint in the backend
+    //   const response = await fetch('/_force_logout', {
+    //     method: 'POST',  // Assuming you need to make a POST request to logout
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       // Add any necessary authentication headers here
+    //     },
+    //   });
+
+    //   if (response.status === 302) {
+    //     // Redirect manually
+    //     const redirectUrl = response.headers.get('Location');
+    //     if (redirectUrl) {
+    //       window.location.href = redirectUrl; // Follow the redirect
+    //     }
+    //   } else {
+    //     console.error('Logout failed:', response.statusText);
+    //   }
+    // } catch (error) {
+    //   console.error('Error during logout:', error);
+    // }
+
+    window.location.href = '/_force_logout';
+  };
 
   return (
     <Dropdown id="user-dropdown" pullRight>
@@ -299,10 +328,18 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ loggedInUser }) => {
         >
           {PROFILE_LINK_TEXT}
         </MenuItem>
+        <MenuItem
+          // componentClass={Link}
+          id="nav-bar-logout-link"
+          onClick={handleLogout}
+        >
+          {LOGOUT_LINK_TEXT}
+        </MenuItem>
       </Dropdown.Menu>
     </Dropdown>
   );
 };
+
 
 // Props
 interface StateFromProps {

@@ -7,9 +7,11 @@ import logging
 import logging.config
 import os
 import sys
+from urllib.parse import urlencode
 
-from flask import Blueprint, Flask, request
+from flask import Blueprint, Flask, redirect, request, session, url_for
 from flask_restful import Api
+from flask_cors import CORS
 
 from amundsen_application.api import init_routes
 from amundsen_application.api.announcements.v0 import announcements_blueprint
@@ -28,6 +30,8 @@ from amundsen_application.api.notice.v0 import notices_blueprint
 from amundsen_application.api.file_upload.v0 import file_upload_blueprint
 from amundsen_application.api.v0 import blueprint
 from amundsen_application.deprecations import process_deprecations
+
+LOGGER = logging.getLogger(__name__)
 
 # For customized flask use below arguments to override.
 
@@ -52,6 +56,7 @@ static_dir = os.path.join(PROJECT_ROOT, STATIC_ROOT)
 
 
 def create_app(config_module_class: str = None, template_folder: str = None) -> Flask:
+
     """ Support for importing arguments for a subclass of flask.Flask """
     args = ast.literal_eval(FLASK_APP_KWARGS_DICT_STR) if FLASK_APP_KWARGS_DICT_STR else {}
 
@@ -63,6 +68,8 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
         config_module_class = os.getenv('FRONTEND_SVC_CONFIG_MODULE_CLASS')
 
     app.config.from_object(config_module_class)
+
+    CORS(app, origins=app.config.get('FRONTEND_BASE'), supports_credentials=True)
 
     if app.config.get('LOG_CONFIG_FILE'):
         logging.config.fileConfig(app.config['LOG_CONFIG_FILE'], disable_existing_loggers=False)
@@ -105,6 +112,20 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
     # handles the deprecation warnings
     # and process any config/environment variables accordingly
     process_deprecations(app)
+
+    LOGGER.info(f'LOGOUT_URL={app.config.get("LOGOUT_URL")}')
+    if app.config.get("LOGOUT_URL"):
+        LOGGER.info(f"Adding _force_logout route")
+
+        @app.route("/_force_logout")
+        def _force_logout():
+            LOGGER.debug(f"_FORCE_LOGOUT")
+            session.clear()
+            params = {
+                "returnTo": url_for("logout", _external=True, _scheme=app.config.get("SCHEME")),
+                "client_id": app.config.get('CLIENT_ID')
+            }
+            return redirect(app.config.get("LOGOUT_URL") + "?" + urlencode(params))
 
     if app.config.get('LOG_REQUESTS'):
         logging.basicConfig(level=logging.DEBUG)
@@ -149,6 +170,12 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
 ****************************
 
 {request.url}
+
+*********************
+*** Response Code ***
+*********************
+
+{response.status_code}
 
 *********************
 *** Response Data ***

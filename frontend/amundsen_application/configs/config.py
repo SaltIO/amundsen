@@ -29,6 +29,9 @@ class FrontendConfigAuth(OidcConfig):
     SESSION_PERMANENT = os.environ.get('FLASK_SESSION_PERMANENT', None)
     SESSION_COOKIE_NAME = os.environ.get('FLASK_SESSION_COOKIE_NAME', 'amundsen-session')
 
+    LOGOUT_URL = os.environ.get('FLASK_OIDC_LOGOUT_URL', None)
+    CLIENT_ID = os.environ.get('FLASK_OIDC_CLIENT_ID', None)
+
     pass
 
 class FrontendConfig(LocalConfig):
