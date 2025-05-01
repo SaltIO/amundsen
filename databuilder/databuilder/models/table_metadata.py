@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import copy
+import re
 from typing import (
-    TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Set, Union,
+    TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union,
 )
 
 from amundsen_common.utils.atlas import (
@@ -242,6 +243,7 @@ class TableMetadata(GraphSerializable, TableSerializable, AtlasSerializable):
     """
     TABLE_NODE_LABEL = 'Table'
     TABLE_KEY_FORMAT = '{db}://{cluster}.{schema}/{tbl}'
+    TABLE_KEY_FORMAT_PATTERN = r'(?P<db>[\w\-]+)://(?P<cluster>[\w\-]+)\.(?P<schema>[\w\-]+)/(?P<tbl>[\w\s\-\_]+)'
     TABLE_NAME = 'name'
     IS_VIEW = 'is_view'
 
@@ -320,6 +322,16 @@ class TableMetadata(GraphSerializable, TableSerializable, AtlasSerializable):
     def __repr__(self) -> str:
         return f'TableMetadata({self.database!r}, {self.cluster!r}, {self.schema!r}, {self.name!r} ' \
                f'{self.description!r}, {self.columns!r}, {self.is_view!r}, {self.tags!r})'
+
+    def _extract_table_key_components(key: str) -> Tuple[str,str,str,str]:
+        match = re.match(TableMetadata.TABLE_KEY_FORMAT_PATTERN, key)
+
+        if match:
+            # Extract the components as a dictionary
+            components = match.groupdict()
+            return components['db'], components['cluster'], components['schema'], components['tbl']
+        else:
+            raise ValueError(f'Key is not in the appropriate Table Key format: {TableMetadata.TABLE_KEY_FORMAT}')
 
     def _get_table_key(self) -> str:
         return TableMetadata.TABLE_KEY_FORMAT.format(db=self.database,

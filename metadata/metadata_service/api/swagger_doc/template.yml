@@ -98,6 +98,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/DescriptionPut'
+    ColumnStatPutRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColumnStatsPut'
     UpdateFrequencyPutRequest:
       required: false
       content:
@@ -207,6 +213,78 @@ components:
         client_secret:
           description: 'The Auth Client Secret as provided by your Admin'
           type: string
+    TableFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        database:
+          type: string
+          example: "snowflake"
+        cluster:
+          type: string
+          example: "client"
+        schema:
+          type: string
+          example: "public"
+        name:
+          type: string
+          example: "gold_table"
+        key:
+          type: string
+          example: "snowflake://client.public/gold_table"
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+        badges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Badge'
+        # table_readers:
+        #   type: array
+        #   items:
+        #     $ref: '#/components/schemas/Reader'
+        tags:
+          type: string
+          example: "Gold Table"
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnFields'
+        owners:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserFields'
+        watermarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WatermarkFields'
+        watermarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WatermarkFields'
+        table_apps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationFields'
+        last_updated_timestamp:
+          type: integer
+          example: "123456789"
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceFields'
+        is_view:
+          type: boolean
+          example: "True"
+        # programmatic_descriptions:
+        #   type: array
+        #   items:
+        #     $ref: '#/components/schemas/ProgrammaticDescriptionFields'
+        update_frequency:
+          type: string
+          example: "quarterly"
     Description:
       type: object
       required:
@@ -220,10 +298,20 @@ components:
       allOf:
         - $ref: '#/components/schemas/Description'
         - $ref: '#/components/schemas/Publisher'
+    ColumnStatsPut:
+      type: object
+      properties:
+        stats:
+          type: array
+          description: 'A list of column stats'
+          items:
+            $ref: '#/components/schemas/ColumnStatFields'
+      allOf:
+        - $ref: '#/components/schemas/Publisher'
     TableDetailPut:
       type: object
       allOf:
-        - $ref: '#/components/schemas/TableDetail'
+        - $ref: '#/components/schemas/TableFields'
         - $ref: '#/components/schemas/Publisher'
     UpdateFrequency:
       type: object
@@ -423,18 +511,27 @@ components:
           $ref: '#/components/schemas/TypeMetadata'
     ColumnStatFields:
       type: object
+      required:
+        - stat_type
+        - stat_val
+        - start_epoch
+        - end_epoch
       properties:
         stat_type:
           type: string
           description: 'Type of column statistic'
+          example: "max"
         stat_val:
           type: string
           description: 'Value of the statistic'
+          example: "123"
         start_epoch:
           type: integer
           description: 'Start of the statistic (epoch)'
+          example: 1234567
         end_epoch:
           type: integer
+          example: 7654321
           description: 'End of the statistic (epoch)'
     TypeMetadata:
       type: object

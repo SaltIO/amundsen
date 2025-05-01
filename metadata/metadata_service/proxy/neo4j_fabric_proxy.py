@@ -200,6 +200,14 @@ class Neo4jFabricProxy(Neo4jProxy):
             self._prepare_federated_query_statement(statement=super()._get_statistics_query_statement(),
                 resource_type=ResourceType.Table))
 
+    def _get_statistics_query_statement(self) -> str:
+        return self._get_fabric_query_statement(
+            self._database_name,
+            self._prepare_federated_query_statement(
+                statement=super()._get_statistics_query_statement()
+            )
+        )
+
     # def _get_global_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
     #     return self._get_fabric_query_statement(self._database_name, super()._get_global_popular_resources_uris_query_statement(resource_type))
 

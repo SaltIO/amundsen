@@ -76,9 +76,9 @@ def requires_auth(required_permission: str = READ_PERMISSION):
 
                 # Validate the client_id in the payload
                 client_id = payload.get('azp')
-                LOGGER.info(f"payload={payload}")
-                LOGGER.info(f"client_id={client_id}")
-                LOGGER.info(f"FLASK_OIDC_CLIENT_ID={current_app.config.get('FLASK_OIDC_CLIENT_ID')}")
+                LOGGER.debug(f"payload={payload}")
+                LOGGER.debug(f"client_id={client_id}")
+                LOGGER.debug(f"FLASK_OIDC_CLIENT_ID={current_app.config.get('FLASK_OIDC_CLIENT_ID')}")
                 if client_id != current_app.config.get('FLASK_OIDC_CLIENT_ID'):
                     return {'message': 'Token created from invalid client_id'}, HTTPStatus.UNAUTHORIZED
 
@@ -88,8 +88,8 @@ def requires_auth(required_permission: str = READ_PERMISSION):
                 if unverified_claims.get("scope"):
                     token_scopes = unverified_claims["scope"].split()
 
-                LOGGER.info(f"required_permission={required_permission}")
-                LOGGER.info(f"token_scopes={token_scopes}")
+                LOGGER.debug(f"required_permission={required_permission}")
+                LOGGER.debug(f"token_scopes={token_scopes}")
 
                 if not token_scopes:
                     return {'message': 'No authentication token_scopes'}, HTTPStatus.FORBIDDEN
@@ -100,9 +100,7 @@ def requires_auth(required_permission: str = READ_PERMISSION):
 
                 # LOGGER.info(f"READ_ONLY_MODE={current_app.config.get('READ_ONLY_MODE', False)}")
                 if current_app.config.get('READ_ONLY_MODE', False) and required_permission != READ_PERMISSION:
-                    return {
-                        "message": "API is in read-only mode. Write operations are not allowed."
-                    }, HTTPStatus.FORBIDDEN
+                    return {"message": "API is in read-only mode. Write operations are not allowed."}, HTTPStatus.FORBIDDEN
 
             except jwt.PyJWKClientError as e:
                 LOGGER.exception("Failed to fetch or match key from JWKS")

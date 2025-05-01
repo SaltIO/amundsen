@@ -18,7 +18,7 @@ from werkzeug.utils import import_string
 from metadata_service.api.auth import AuthAPI
 from metadata_service.api.badge import BadgeAPI
 from metadata_service.api.column import (ColumnBadgeAPI, ColumnDescriptionAPI,
-                                         ColumnLineageAPI)
+                                         ColumnLineageAPI, ColumnStatsAPI)
 from metadata_service.api.dashboard import (DashboardBadgeAPI,
                                             DashboardDescriptionAPI,
                                             DashboardDetailAPI,
@@ -104,6 +104,7 @@ def create_app(*, config_module_class: str) -> Flask:
 
     if CORS_ENABLED:
         CORS(app)
+
     config_module_class = \
         os.getenv('METADATA_SVC_CONFIG_MODULE_CLASS') or config_module_class
     app.config.from_object(config_module_class)
@@ -170,6 +171,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/table/<path:table_uri>/column/<column_name>/badge/<badge>')
     api.add_resource(ColumnLineageAPI,
                      '/table/<path:table_uri>/column/<column_name>/lineage')
+    api.add_resource(ColumnStatsAPI,
+                     '/table/<path:table_uri>/column/<column_name>/stats')
     api.add_resource(TableUpdateFrequencyAPI,
                      '/table/<path:table_uri>/update_frequency')
     api.add_resource(TypeMetadataDescriptionAPI,

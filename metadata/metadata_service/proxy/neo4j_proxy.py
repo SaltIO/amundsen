@@ -26,7 +26,7 @@ from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import (Application, Badge, Column,
                                           ProgrammaticDescription, Reader,
                                           ResourceReport, Source, SqlJoin,
-                                          SqlWhere, Stat, Table, TableSchema, TableSummary,
+                                          SqlWhere, Stat, StatSchema, Table, TableSchema, TableSummary,
                                           TypeMetadata, User, Watermark)
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.user import UserSchema
@@ -40,11 +40,12 @@ from amundsen_common.models.schema import Schema, SchemaSchema
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.table_metadata import TableMetadata, ColumnMetadata
+from databuilder.models.table_stats import TableColumnStats
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
 from flask import current_app, has_app_context
-from neo4j import GraphDatabase, Record, Result, Transaction  # noqa: F401
+from neo4j import GraphDatabase, Record, Result, Transaction, Session  # noqa: F401
 from neo4j.api import (SECURITY_TYPE_SECURE,
                        SECURITY_TYPE_SELF_SIGNED_CERTIFICATE, parse_neo4j_uri)
 from neo4j.exceptions import ClientError
@@ -70,6 +71,32 @@ _GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC = 11 * 60 * 60 + randint(0, 3600)
 CREATED_EPOCH_MS = 'publisher_created_epoch_ms'
 LAST_UPDATED_EPOCH_MS = 'publisher_last_updated_epoch_ms'
 PUBLISHED_TAG_PROPERTY_NAME = 'published_tag'
+
+# A header for Node label
+NODE_LABEL_KEY = 'LABEL'
+# A header for Node key
+NODE_KEY_KEY = 'KEY'
+# Required columns for Node
+NODE_REQUIRED_KEYS = {NODE_LABEL_KEY, NODE_KEY_KEY}
+
+# Relationship relates two nodes together
+# Start node label
+RELATION_START_LABEL = 'START_LABEL'
+# Start node key
+RELATION_START_KEY = 'START_KEY'
+# End node label
+RELATION_END_LABEL = 'END_LABEL'
+# Node node key
+RELATION_END_KEY = 'END_KEY'
+# Type for relationship (Start Node)->(End Node)
+RELATION_TYPE = 'TYPE'
+# Type for reverse relationship (End Node)->(Start Node)
+RELATION_REVERSE_TYPE = 'REVERSE_TYPE'
+# Required columns for Relationship
+RELATION_REQUIRED_KEYS = {RELATION_START_LABEL, RELATION_START_KEY,
+                          RELATION_END_LABEL, RELATION_END_KEY,
+                          RELATION_TYPE, RELATION_REVERSE_TYPE}
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -369,6 +396,7 @@ class Neo4jProxy(BaseProxy):
                 self._try_create_index(
                     label=node.label,
                     count=count,
+                    session=_session,
                     tx=tx
                 )
 
@@ -382,6 +410,7 @@ class Neo4jProxy(BaseProxy):
                 count, result, tx = self._execute_transaction_statement(
                     stmt=stmt,
                     params=self._create_props_param(node_dict),
+                    session=_session,
                     tx=tx,
                     count=count
                 )
@@ -410,6 +439,7 @@ class Neo4jProxy(BaseProxy):
                 count, result, tx = self._execute_transaction_statement(
                     stmt=stmt,
                     params=self._create_props_param(rel_dict),
+                    session=_session,
                     tx=tx,
                     count=count
                 )
@@ -421,7 +451,7 @@ class Neo4jProxy(BaseProxy):
 
             return table_key, status
         except Exception as e:
-            LOGGER.exception('Failed to put_table. Rolling back.')
+            LOGGER.exception('Failed to create_update_table. Rolling back.')
             if not tx.closed():
                 tx.rollback()
             raise e
@@ -1963,6 +1993,140 @@ class Neo4jProxy(BaseProxy):
             return neo4j_statistics
         return {}
 
+    def _get_column_stats_query_statement(self) -> str:
+        query = textwrap.dedent("""
+            MATCH (t:Table {key: $table_key})-[]->(c:Column {name: $column_name})-[]->(s:Stat)
+            RETURN collect(s) as column_stats;
+        """)
+        return query
+
+    def get_column_stats(self, *,
+                         table_uri: str,
+                         column_name: str) -> List:
+        statement = self._get_column_stats_query_statement()
+        records = self._execute_cypher_query(
+            statement=statement,
+            param_dict={'table_key': table_uri, 'column_name': column_name}
+        )
+        result = get_single_record(records)
+
+        column_stats = StatSchema(many=True).dump(result['column_stats'])
+        # column_stats = []
+        # for record in records:
+        #     stat = Stat(
+        #         stat_type=record['stat_type'],
+        #         stat_val=record['stat_val'],
+        #         start_epoch=record['start_epoch'],
+        #         end_epoch=record['end_epoch'],
+        #         is_metric=(record['is_metric'].lower() in ['true', 'yes', 'y', '1'] if 'is_metric' in record else False)
+        #     )
+        #     column_stats.append(stat)
+
+        return column_stats
+
+    @timer_with_counter
+    def create_update_column_stats(
+        self,
+        *,
+        table_uri: str,
+        column_name: str,
+        stats: List[Stat],
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> bool:
+        """
+        Update column description with input from user
+        :param table_uri:
+        :param column_name:
+        :param stats:
+        :return:
+        """
+        LOGGER.info(f'DREW table_uri={table_uri}')
+        database_name, cluster_name, schema_name, table_name = TableMetadata._extract_table_key_components(key=table_uri)
+        LOGGER.info(f'DREW database_name={database_name}')
+        LOGGER.info(f'DREW cluster_name={cluster_name}')
+        LOGGER.info(f'DREW schema_name={schema_name}')
+        LOGGER.info(f'DREW table_name={table_name}')
+
+        _session = self._driver.session(database=self._database_name)
+
+        try:
+            status = None
+
+            count = 0
+            tx = _session.begin_transaction()
+
+            for stat in stats:
+
+                table_column_stat = TableColumnStats(
+                    table_name=table_name,
+                    col_name=column_name,
+                    stat_name=stat.stat_type,
+                    stat_val=stat.stat_val,
+                    start_epoch=stat.start_epoch,
+                    end_epoch=stat.end_epoch,
+                    db=database_name,
+                    cluster=cluster_name,
+                    schema=schema_name
+                )
+
+                node = table_column_stat.create_next_node()
+                self._try_create_index(
+                    label=node.label,
+                    count=count,
+                    session=_session,
+                    tx=tx
+                )
+
+                node_dict = self._serialize_node(node)
+
+                stmt = self._create_node_merge_statement(
+                    node_record=node_dict,
+                    node_label=node.label,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(node_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+                result_record = result.single()
+                if not result_record:
+                    raise NotCreatedOrUpdatedException(f"During create_update_column_stats(), failed to create or update node {node.label}")
+
+                status = result_record['status']
+
+                rel = table_column_stat.create_next_relation()
+                rel_dict = self._serialize_relationship(rel)
+
+                LOGGER.info(f'rel_dict={rel_dict}')
+
+                stmt = self._create_relationship_merge_statement(
+                    rel_record=rel_dict,
+                    rel_start_label=rel.start_label,
+                    rel_end_label=rel.end_label,
+                    rel_type=rel.type,
+                    rel_reverse_type=rel.reverse_type,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(rel_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+            tx.commit()
+
+            return status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_column_stats. Rolling back.')
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
     def _get_global_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
         # query = textwrap.dedent("""
         #     MATCH ({node_name}:{node_label})-[r:READ_BY]->(u:User)
@@ -2267,7 +2431,12 @@ class Neo4jProxy(BaseProxy):
         :return:
         """
         user_data = UserSchema().dump(user)
-        user_props = self._create_props_body(user_data, 'usr')
+        user_props = self._create_props_body(
+            record_dict=user_data,
+            identifier='usr',
+            excludes=NODE_REQUIRED_KEYS,
+            published_tag=published_tag
+        )
 
         create_update_user_query = textwrap.dedent("""
         MERGE (usr:User {key: toLower($user_id)})
@@ -2316,13 +2485,19 @@ class Neo4jProxy(BaseProxy):
     def _create_props_body(self,
                            record_dict: dict,
                            identifier: str,
+                           excludes: Set = None,
                            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> str:
         """
         Creates a Neo4j property body by converting a dictionary into a comma
         separated string of KEY = VALUE.
         """
+
+        lowercase_excludes = {value.lower() for value in excludes} if excludes else None
+
         props = []
         for k, v in record_dict.items():
+            if lowercase_excludes and k.lower() in lowercase_excludes:
+                continue
             # LOGGER.info(f"_create_props_body\n k={k}\n type(v)={type(v)}\n v={v}")
             if v is not None:
                 if isinstance(v, dict):
@@ -3735,6 +3910,7 @@ class Neo4jProxy(BaseProxy):
         prop_body = self._create_props_body(
             record_dict=node_record,
             identifier='node',
+            excludes=NODE_REQUIRED_KEYS,
             published_tag=published_tag)
 
         return template.render(
@@ -3770,11 +3946,13 @@ class Neo4jProxy(BaseProxy):
             {% endif %}
             RETURN n1.key, n2.key
         """)
+
         reverse_rel_template = Template("-[r2:{{ REVERSE_TYPE }}]->(n1)")
 
         prop_body_r1 = self._create_props_body(
             record_dict=rel_record,
             identifier='r1',
+            excludes=RELATION_REQUIRED_KEYS,
             published_tag=published_tag
         )
 
@@ -3786,6 +3964,7 @@ class Neo4jProxy(BaseProxy):
             prop_body_r2 = self._create_props_body(
                 record_dict=rel_record,
                 identifier='r2',
+                excludes=RELATION_REQUIRED_KEYS,
                 published_tag=published_tag
             )
             prop_body = ' , '.join([prop_body_r1, prop_body_r2])
@@ -3802,6 +3981,7 @@ class Neo4jProxy(BaseProxy):
     def _try_create_index(
             self,
             label: str,
+            session: Session,
             tx: Transaction,
             count: int = 0) -> Tuple[int,Transaction]:
         """
@@ -3824,6 +4004,7 @@ class Neo4jProxy(BaseProxy):
                     WHERE type = 'UNIQUENESS' AND entityType = 'NODE' AND labelsOrTypes = ['{label}'] AND properties = ['key']
                     RETURN count(*) AS constraintExists
                 """,
+                session=session,
                 tx=tx,
                 count=count
             )
@@ -3832,6 +4013,7 @@ class Neo4jProxy(BaseProxy):
             if constraint_exists == 0:
                 count, result, tx = self._execute_transaction_statement(
                     stmt=stmt,
+                    session=session,
                     tx=tx,
                     count=count
                 )
@@ -3845,6 +4027,7 @@ class Neo4jProxy(BaseProxy):
     def _execute_transaction_statement(
             self,
             stmt: str,
+            session: Session,
             tx: Transaction,
             count: int = 0,
             params: dict = None) -> Tuple[int,Result,Transaction]:
@@ -3864,7 +4047,7 @@ class Neo4jProxy(BaseProxy):
             if count > 1 and count % self._transaction_size == 0:
                 tx.commit()
                 LOGGER.info(f'Committed {count} statements so far')
-                return count, result, self._session.begin_transaction()
+                return count, result, session.begin_transaction()
 
             if count > 1 and count % self._progress_report_frequency == 0:
                 LOGGER.info(f'Processed {count} statements so far')

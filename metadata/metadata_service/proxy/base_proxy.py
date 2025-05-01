@@ -12,7 +12,7 @@ from amundsen_common.models.feature import Feature
 from amundsen_common.models.generation_code import GenerationCode
 from amundsen_common.models.lineage import Lineage
 from amundsen_common.models.popular_table import PopularTable
-from amundsen_common.models.table import Table
+from amundsen_common.models.table import Table, Stat
 from amundsen_common.models.data_source import DataProvider, File
 from amundsen_common.models.user import User
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare
@@ -206,6 +206,22 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def get_table_by_user_relation(self, *, user_email: str,
                                    relation_type: UserResourceRel) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def get_column_stats(self, *,
+                         table_uri: str,
+                         column_name: str) -> List:
+        pass
+
+    @abstractmethod
+    def create_update_column_stats(
+            self,
+            *,
+            table_uri: str,
+            column_name: str,
+            stats: List[Stat],
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod

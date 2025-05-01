@@ -127,6 +127,8 @@ class Config:
 
     READ_ONLY_MODE = os.getenv('METADATA_SERVICE_READ_ONLY_MODE', 'false').lower() in ('1', 'true', 'yes')
 
+    DEBUG = bool(distutils.util.strtobool(os.environ.get('FLASK_DEBUG', 'False')))
+
 class LocalConfig(Config):
     DEBUG = True
     TESTING = False
