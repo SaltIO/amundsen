@@ -1,4 +1,4 @@
-Get lineage
+Update Table Lineage
 ---
 security:
   - BearerAuth: []
@@ -7,26 +7,22 @@ tags:
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - $ref: '#/components/parameters/TableIdParameter'
-  - name: direction
-    in: query
-    type: string
-    schema:
-      type: string
-    required: false
-    example: 'upstream'
-  - name: depth
-    in: query
-    type: integer
-    schema:
-      type: integer
-    required: false
-    example: 0
+requestBody:
+  $ref: '#/components/requestBodies/LineagePutRequest'
 responses:
   401:
     $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
   200:
-    description: 'Lineage for requested direction and depth'
+    description: 'Lineage update successfully'
     content:
       application/json:
         schema:
           $ref: '#/components/schemas/Lineage'
+  404:
+    description: 'Table uri not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

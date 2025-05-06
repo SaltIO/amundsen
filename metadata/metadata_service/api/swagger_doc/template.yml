@@ -23,6 +23,14 @@ components:
         type: string
       required: true
       example: 'hive://gold.test_schema/test_table1'
+    TableIdParameter:
+      name: id
+      in: path
+      type: string
+      schema:
+        type: string
+      required: true
+      example: 'hive://gold.test_schema/test_table1'
     ResourceIdParameter:
       name: id
       in: path
@@ -92,6 +100,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/TableDetailPut'
+    LineagePutRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LineagePut'
     DescriptionPutRequest:
       required: false
       content:
@@ -297,6 +311,15 @@ components:
       type: object
       allOf:
         - $ref: '#/components/schemas/Description'
+        - $ref: '#/components/schemas/Publisher'
+    LineagePut:
+      type: object
+      properties:
+        lineage:
+          type: object
+          description: 'Lineage'
+          $ref: '#/components/schemas/LineageBase'
+      allOf:
         - $ref: '#/components/schemas/Publisher'
     ColumnStatsPut:
       type: object
@@ -788,6 +811,19 @@ components:
         last_updated_timestamp:
           type: integer
           description: 'Epoch timestamp of when it was last updated'
+    LineageBase:
+      type: object
+      properties:
+        upstream_entities:
+          type: array
+          description: 'upstream entities from key'
+          items:
+            $ref: '#/components/schemas/LineageBaseItem'
+        downstream_entities:
+          type: array
+          description: 'downstream entities from key'
+          items:
+            $ref: '#/components/schemas/LineageBaseItem'
     Lineage:
       type: object
       properties:
@@ -813,6 +849,13 @@ components:
           description: 'downstream entities from key'
           items:
             $ref: '#/components/schemas/LineageItem'
+    LineageBaseItem:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 'upstream or downstream resource key'
+          example: 'db://cluster.schema/up_table_1'
     LineageItem:
       type: object
       properties:

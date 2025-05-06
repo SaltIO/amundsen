@@ -6,8 +6,9 @@ from http import HTTPStatus
 from typing import Iterable, Mapping, Union
 
 from amundsen_common.entity.resource_type import ResourceType
-from amundsen_common.models.lineage import LineageSchema
+from amundsen_common.models.lineage import LineageSchema, LineageBaseSchema
 from amundsen_common.models.table import StatSchema
+
 from flasgger import swag_from
 from flask import request
 from flask_restful import Resource, reqparse
@@ -49,6 +50,31 @@ class ColumnLineageAPI(Resource):
             return schema.dump(lineage), HTTPStatus.OK
         except Exception as e:
             return {'message': f'Exception raised when getting column lineage: {e}'}, HTTPStatus.NOT_FOUND
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/column/lineage_put.yml')
+    def put(self, table_uri: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            data = json.loads(request.data)
+
+            lineage = data.get('lineage')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+            lineage['key'] = table_uri + "/" + column_name
+
+            lineage_base = LineageBaseSchema().loads(json.dumps(lineage))
+
+            self.client.put_column_lineage(
+                table_uri=table_uri,
+                column_name=column_name,
+                lineage=lineage_base,
+                published_tag=published_tag
+            )
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException:
+            msg = 'table_uri {} with column {} does not exist'.format(table_uri, column_name)
+            return {'message': msg}, HTTPStatus.NOT_FOUND
 
 
 class ColumnDescriptionAPI(Resource):

@@ -1,0 +1,35 @@
+Update Column Lineage
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'lineage'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
+  - name: column_name
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    example: 'test_col_name'
+requestBody:
+  $ref: '#/components/requestBodies/LineagePutRequest'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'Lineage updated successfully'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Lineage'
+  404:
+    description: 'Table uri with this column not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

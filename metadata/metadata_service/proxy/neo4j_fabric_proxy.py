@@ -14,6 +14,7 @@ from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.dashboard import DashboardSummary
 from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import Table
+from amundsen_common.models.lineage import LineageBase
 
 
 from metadata_service.proxy.neo4j_proxy import Neo4jProxy, _CACHE, _GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC
@@ -386,6 +387,23 @@ class Neo4jFabricProxy(Neo4jProxy):
                                  uri: str,
                                  description: str) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_resource_description() is not supported')
+
+    @timer_with_counter
+    def put_column_lineage(
+            self, *,
+            table_uri: str,
+            column_name: str,
+            lineage: LineageBase,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_column_lineage() is not supported')
+
+    @timer_with_counter
+    def put_table_lineage(
+            self, *,
+            table_uri: str,
+            lineage: LineageBase,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_table_lineage() is not supported')
 
     @timer_with_counter
     def put_column_description(self, *,

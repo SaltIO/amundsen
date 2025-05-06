@@ -21,7 +21,7 @@ from amundsen_common.models.api import health_check
 from amundsen_common.models.dashboard import DashboardSummary
 from amundsen_common.models.feature import Feature, FeatureWatermark
 from amundsen_common.models.generation_code import GenerationCode
-from amundsen_common.models.lineage import Lineage, LineageItem
+from amundsen_common.models.lineage import Lineage, LineageItem, LineageBase, LineageBaseItem
 from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import (Application, Badge, Column,
                                           ProgrammaticDescription, Reader,
@@ -1374,6 +1374,132 @@ class Neo4jProxy(BaseProxy):
         return column_description
 
     @timer_with_counter
+    def put_column_lineage(
+            self, *,
+            table_uri: str,
+            column_name: str,
+            lineage: LineageBase,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+
+        column_key = table_uri + '/' + column_name  # type: str
+        current_time_milliseconds = int(time.time() * 1000)
+
+        upsert_col_lineage_query = textwrap.dedent("""
+            MATCH (c:Column {key: $column_key})
+            MATCH (u:Column {key: $upstream_key})
+            WITH c,u
+            MERGE (c)-[r1:HAS_UPSTREAM]->(u)
+            SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+            SET r1.published_tag = $published_tag
+            MERGE (u)-[r2:HAS_DOWNSTREAM]->(c)
+            SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+            SET r2.published_tag = $published_tag
+            RETURN c.key, u.key
+        """)
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            if lineage.upstream_entities:
+                for upstream in lineage.upstream_entities:
+                    result = tx.run(upsert_col_lineage_query, {
+                        'column_key': column_key,
+                        'upstream_key': upstream.key,
+                        'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                        'published_tag': published_tag
+                    })
+
+                    if not result.single():
+                        raise NotFoundException(f'Failed to update the column {column_key} upstream lineage')
+
+            if lineage.downstream_entities:
+                for downstream in lineage.downstream_entities:
+                    result = tx.run(upsert_col_lineage_query, {
+                        'column_key': downstream.key,
+                        'upstream_key': column_key,
+                        'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                        'published_tag': published_tag
+                    })
+
+                    if not result.single():
+                        raise NotFoundException(f'Failed to update the column {column_key} downstream lineage')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+
+            LOGGER.exception('Failed to update column lineage')
+
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate error to api
+            raise e
+
+    @timer_with_counter
+    def put_table_lineage(
+            self, *,
+            table_uri: str,
+            lineage: LineageBase,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+
+        current_time_milliseconds = int(time.time() * 1000)
+
+        upsert_table_lineage_query = textwrap.dedent("""
+            MATCH (t:Table {key: $table_key})
+            MATCH (u:Table {key: $upstream_key})
+            WITH t,u
+            MERGE (t)-[r1:HAS_UPSTREAM]->(u)
+            SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+            SET r1.published_tag = $published_tag
+            MERGE (u)-[r2:HAS_DOWNSTREAM]->(t)
+            SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
+            SET r2.published_tag = $published_tag
+            RETURN t.key, u.key
+        """)
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            if lineage.upstream_entities:
+                for upstream in lineage.upstream_entities:
+                    result = tx.run(upsert_table_lineage_query, {
+                        'table_key': table_uri,
+                        'upstream_key': upstream.key,
+                        'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                        'published_tag': published_tag
+                    })
+
+                    if not result.single():
+                        raise NotFoundException(f'Failed to update the table {table_uri} upstream lineage')
+
+            if lineage.downstream_entities:
+                for downstream in lineage.downstream_entities:
+                    result = tx.run(upsert_table_lineage_query, {
+                        'table_key': downstream.key,
+                        'upstream_key': table_uri,
+                        'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                        'published_tag': published_tag
+                    })
+
+                    if not result.single():
+                        raise NotFoundException(f'Failed to update the table {table_uri} downstream lineage')
+
+            # end neo4j transaction
+            tx.commit()
+
+        except Exception as e:
+
+            LOGGER.exception('Failed to update table lineage')
+
+            if not tx.closed():
+                tx.rollback()
+
+            # propagate error to api
+            raise e
+
+    @timer_with_counter
     def put_column_description(
         self,
         *,
@@ -2011,17 +2137,6 @@ class Neo4jProxy(BaseProxy):
         result = get_single_record(records)
 
         column_stats = StatSchema(many=True).dump(result['column_stats'])
-        # column_stats = []
-        # for record in records:
-        #     stat = Stat(
-        #         stat_type=record['stat_type'],
-        #         stat_val=record['stat_val'],
-        #         start_epoch=record['start_epoch'],
-        #         end_epoch=record['end_epoch'],
-        #         is_metric=(record['is_metric'].lower() in ['true', 'yes', 'y', '1'] if 'is_metric' in record else False)
-        #     )
-        #     column_stats.append(stat)
-
         return column_stats
 
     @timer_with_counter
@@ -2039,12 +2154,7 @@ class Neo4jProxy(BaseProxy):
         :param stats:
         :return:
         """
-        LOGGER.info(f'DREW table_uri={table_uri}')
         database_name, cluster_name, schema_name, table_name = TableMetadata._extract_table_key_components(key=table_uri)
-        LOGGER.info(f'DREW database_name={database_name}')
-        LOGGER.info(f'DREW cluster_name={cluster_name}')
-        LOGGER.info(f'DREW schema_name={schema_name}')
-        LOGGER.info(f'DREW table_name={table_name}')
 
         _session = self._driver.session(database=self._database_name)
 

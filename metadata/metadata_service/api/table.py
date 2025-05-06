@@ -11,7 +11,7 @@ from flask import request
 from flask_restful import Resource, reqparse
 
 from amundsen_common.entity.resource_type import ResourceType
-from amundsen_common.models.lineage import LineageSchema
+from amundsen_common.models.lineage import LineageSchema, LineageBaseSchema
 from amundsen_common.models.table import TableSchema
 from amundsen_common.models.key_status import KeyStatusSchema
 
@@ -130,6 +130,30 @@ class TableLineageAPI(Resource):
             return schema.dump(lineage), HTTPStatus.OK
         except Exception as e:
             return {'message': f'Exception raised when getting table lineage: {e}'}, HTTPStatus.NOT_FOUND
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/table/lineage_put.yml')
+    def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            data = json.loads(request.data)
+
+            lineage = data.get('lineage')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+            lineage['key'] = id
+
+            lineage_base = LineageBaseSchema().loads(json.dumps(lineage))
+
+            self.client.put_table_lineage(
+                table_uri=id,
+                lineage=lineage_base,
+                published_tag=published_tag
+            )
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException:
+            msg = 'table_uri {} with column {} does not exist'.format(table_uri, column_name)
+            return {'message': msg}, HTTPStatus.NOT_FOUND
 
 
 class TableOwnerAPI(Resource):

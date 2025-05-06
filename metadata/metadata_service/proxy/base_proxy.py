@@ -10,7 +10,7 @@ from amundsen_common.models.api.health_check import HealthCheck
 from amundsen_common.models.dashboard import DashboardSummary
 from amundsen_common.models.feature import Feature
 from amundsen_common.models.generation_code import GenerationCode
-from amundsen_common.models.lineage import Lineage
+from amundsen_common.models.lineage import Lineage, LineageBase
 from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import Table, Stat
 from amundsen_common.models.data_source import DataProvider, File
@@ -117,6 +117,14 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def put_table_lineage(
+            self, *,
+            table_uri: str,
+            lineage: LineageBase,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
     def delete_table_update_frequency(self, *,
                                       table_uri: str) -> None:
         pass
@@ -141,6 +149,15 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
     @abstractmethod
     def delete_badge(self, *, id: str, badge_name: str, category: str,
                      resource_type: ResourceType) -> None:
+        pass
+
+    @abstractmethod
+    def put_column_lineage(
+            self, *,
+            table_uri: str,
+            column_name: str,
+            lineage: LineageBase,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod

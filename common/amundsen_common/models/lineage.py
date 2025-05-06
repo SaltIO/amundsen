@@ -10,8 +10,16 @@ from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
 @attr.s(auto_attribs=True, kw_only=True)
-class LineageItem:
+class LineageBaseItem:
     key: str  # down/upstream table/col/task key
+
+class LineageBaseItemSchema(AttrsSchema):
+    class Meta:
+        target = LineageBaseItem
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
+class LineageItem(LineageBaseItem):
     type: str
     level: int  # upstream/downstream distance from current resource
     source: str  # database this resource is from
@@ -29,8 +37,19 @@ class LineageItemSchema(AttrsSchema):
 
 
 @attr.s(auto_attribs=True, kw_only=True)
-class Lineage:
+class LineageBase:
     key: str  # current table/col/task key
+    upstream_entities: List[LineageBaseItem]  # list of upstream entities
+    downstream_entities: List[LineageBaseItem]  # list of downstream entities
+
+
+class LineageBaseSchema(AttrsSchema):
+    class Meta:
+        target = LineageBase
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
+class Lineage(LineageBase):
     direction: str  # upstream/downstream/both
     depth: int  # how many levels up/down 0 == all
     upstream_entities: List[LineageItem]  # list of upstream entities
