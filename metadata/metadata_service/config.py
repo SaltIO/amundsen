@@ -129,6 +129,16 @@ class Config:
 
     DEBUG = bool(distutils.util.strtobool(os.environ.get('FLASK_DEBUG', 'False')))
 
+    AI_GPT_ENABLED = bool(distutils.util.strtobool(os.getenv("AI_GPT_ENABLED", "False")))
+    AI_GPT_CLIENT_API_KEY = os.getenv("AI_GPT_CLIENT_API_KEY")
+    AI_GPT_CLIENT_API_MODEL = os.getenv("AI_GPT_CLIENT_API_MODEL")
+    # AI_GPT_CLIENT_API_DEFAULT_SYSTEM_MESSAGE = os.getenv("AI_GPT_CLIENT_API_DEFAULT_SYSTEM_MESSAGE")
+    # AI_GPT_CLIENT_API_CLASSIFY_MESSAGE = os.getenv("AI_GPT_CLIENT_API_CLASSIFY_MESSAGE")
+
+    SEARCHSERVICE_BASE = os.environ.get('SEARCHSERVICE_BASE')
+    # Request Timeout Configurations in Seconds
+    REQUEST_SESSION_TIMEOUT_SEC = int(os.getenv('REQUEST_SESSION_TIMEOUT_SEC', '3'))
+
 class LocalConfig(Config):
     DEBUG = True
     TESTING = False

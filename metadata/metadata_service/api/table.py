@@ -15,6 +15,7 @@ from amundsen_common.models.lineage import LineageSchema, LineageBaseSchema
 from amundsen_common.models.table import TableSchema
 from amundsen_common.models.key_status import KeyStatusSchema
 
+from marshmallow import ValidationError
 from metadata_service.api import BaseAPI
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.api.tag import TagCommon
@@ -102,6 +103,10 @@ class TablePutAPI(Resource):
             resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
 
             return result, resp_code
+
+        except ValidationError as ve:
+            msg = 'Validation Error: {}'.format(ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
 
         except NotFoundException:
             return {'message': f'Failed to update/create table: {data}'}, HTTPStatus.NOT_FOUND

@@ -17,6 +17,8 @@ parameters:
 requestBody:
   $ref: '#/components/requestBodies/ColumnStatPutRequest'
 responses:
+  400:
+    $ref: '#/components/responses/ValidationErrorResponse'
   401:
     $ref: '#/components/responses/AuthTokenInvalidResponse'
   403:

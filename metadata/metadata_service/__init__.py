@@ -13,6 +13,7 @@ from flasgger import Swagger
 from flask import Blueprint, Flask, render_template, request
 from flask_cors import CORS
 from flask_restful import Api
+from metadata_service.api.reveal import RevealChatAPI, RevealSearchAPI
 from werkzeug.utils import import_string
 
 from metadata_service.api.auth import AuthAPI
@@ -58,6 +59,8 @@ from metadata_service.api.cluster import (ClusterIdGET, ClusterGET, ClustersGET)
 from metadata_service.api.schema import (SchemaIdGET, SchemaGET, SchemasGET)
 from metadata_service.deprecations import process_deprecations
 
+
+LOGGER = logging.getLogger(__name__)
 
 # For customized flask use below arguments to override.
 FLASK_APP_MODULE_NAME = os.getenv('FLASK_APP_MODULE_NAME')
@@ -267,6 +270,14 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/schemas/',
                      '/schemas/<path:database>',
                      '/schemas/<path:database>/<path:cluster>')
+
+    LOGGER.info(f"AI_GPT_ENABLED={app.config.get('AI_GPT_ENABLED')}")
+    if app.config.get('AI_GPT_ENABLED'):
+        api.add_resource(RevealChatAPI,
+                         '/reveal/chat')
+        api.add_resource(RevealSearchAPI,
+                         '/reveal/search/<path:resource>')
+
     app.register_blueprint(api_bp)
 
     # cli registration
@@ -292,7 +303,7 @@ def create_app(*, config_module_class: str) -> Flask:
     process_deprecations(app)
 
     if app.config.get('LOG_REQUESTS'):
-        logging.basicConfig(level=logging.DEBUG)
+        app.logger.setLevel(logging.DEBUG)
         @app.before_request
         def log_request_info():
             msg = f"""
@@ -321,7 +332,6 @@ def create_app(*, config_module_class: str) -> Flask:
 {str(request.get_data()).strip()}
             """
             app.logger.debug(msg)
-            return None
 
         @app.after_request
         def log_response_info(response):

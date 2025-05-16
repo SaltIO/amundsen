@@ -146,6 +146,13 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
             description: 'Auth Token Invalid Response'
+    ValidationErrorResponse:
+      description: 'Payload Validation Error'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+            description: 'Auth Token Invalid Response'
     ReadOnlyModeResponse:
       description: 'API is in read-only mode. Write operations are not allowed.'
       content:

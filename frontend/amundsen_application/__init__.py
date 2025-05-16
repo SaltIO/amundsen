@@ -128,7 +128,7 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
             return redirect(app.config.get("LOGOUT_URL") + "?" + urlencode(params))
 
     if app.config.get('LOG_REQUESTS'):
-        logging.basicConfig(level=logging.DEBUG)
+        app.logger.setLevel(logging.DEBUG)
         @app.before_request
         def log_request_info():
             msg = f"""
@@ -157,7 +157,6 @@ def create_app(config_module_class: str = None, template_folder: str = None) -> 
 {str(request.get_data()).strip()}
             """
             app.logger.debug(msg)
-            return None
 
         @app.after_request
         def log_response_info(response):

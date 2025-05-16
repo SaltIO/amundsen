@@ -61,6 +61,38 @@ class Neo4jSearchDataExtractor(Extractor):
         """
     )
 
+    DEFAULT_NEO4J_COLUMN_CYPHER_QUERY = textwrap.dedent(
+        """
+        MATCH (table:Table)<-[:COLUMN_OF]-(column:Column)
+        {publish_tag_filter}
+        OPTIONAL MATCH (column)-[:DESCRIPTION]->(column_description:Description)
+        OPTIONAL MATCH (column)-[:TAGGED_BY]->(column_tags:Tag) WHERE column_tags.tag_type='default'
+        WITH column, column_description, table, COLLECT(DISTINCT toLower(column_tags.key)) as column_tags
+        OPTIONAL MATCH (column)-[:HAS_BADGE]->(column_badges:Badge)
+        WITH column, column_description, column_tags, table, COLLECT(DISTINCT toLower(column_badges.key)) as column_badges
+        OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
+        OPTIONAL MATCH (table)-[:TAGGED_BY]->(table_tags:Tag) WHERE table_tags.tag_type='default'
+        WITH column, column_description, column_tags, column_badges, table, table_description, COLLECT(DISTINCT toLower(table_tags.key)) as table_tags
+        OPTIONAL MATCH (table)-[:HAS_BADGE]->(table_badges:Badge)
+        WITH column, column_description, column_tags, column_badges, table, table_description, table_tags, COLLECT(DISTINCT toLower(table_badges.key)) as table_badges
+        RETURN
+            column.key AS key,
+            column.name AS name,
+            column.type AS type,
+            column_description.description AS description,
+            column_tags as tags,
+            column_badges as badges,
+            table.name AS table_name,
+            table.key AS table_key,
+            table_description.description AS table_description,
+            table_badges,
+            table_tags
+        ORDER BY
+            table.name,
+            column.name;
+        """
+    )
+
     DEFAULT_NEO4J_USER_CYPHER_QUERY = textwrap.dedent(
         """
         MATCH (user:User)
@@ -192,6 +224,7 @@ class Neo4jSearchDataExtractor(Extractor):
 
     DEFAULT_QUERY_BY_ENTITY = {
         'table': DEFAULT_NEO4J_TABLE_CYPHER_QUERY,
+        'column': DEFAULT_NEO4J_COLUMN_CYPHER_QUERY,
         'user': DEFAULT_NEO4J_USER_CYPHER_QUERY,
         'dashboard': DEFAULT_NEO4J_DASHBOARD_CYPHER_QUERY,
         'feature': DEFAULT_NEO4J_FEATURE_CYPHER_QUERY,
