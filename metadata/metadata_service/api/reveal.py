@@ -21,7 +21,7 @@ from metadata_service.auth import auth
 from amundsen_common.models.search import KnnSearchResponseSchema, KnnSearchResponse
 from amundsen_common.models.ai import (
     ColumnSearchHit, ColumnSearchResponse, ColumnSearchResponseSchema,
-    ChatResponse, ChatResponseSchema, ChatMessage, ChatMessageSchema
+    ChatResponse, ChatResponseSchema, ChatMessage, ChatMessageSchema, ChatRequest, ChatRequestSchema
 )
 
 
@@ -40,31 +40,29 @@ class RevealChatAPI(Resource):
     # @swag_from('swagger_doc/reveal/chat_post.yml')
     def post(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
-            prompts = self.get_prompts()
+            request = self.get_chat_request()
 
-            if not prompts:
-                return {'message': 'prompts required'}, HTTPStatus.BAD_REQUEST
+            if not request:
+                return {'message': 'request required'}, HTTPStatus.BAD_REQUEST
 
-            chat_response: ChatResponse = self.ai_chat_client.chat(prompts)
+            chat_response: ChatResponse = self.ai_chat_client.chat(request=request)
             return ChatResponseSchema().dump(chat_response), HTTPStatus.OK
 
         except Exception:
             LOGGER.exception("Chat API Error: ")
             return {'message': 'internal server error'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    def get_prompts(self) -> List[ChatMessage]:
+    def get_chat_request(self) -> ChatRequest:
         data = request.get_json(force=True)  # Force parsing regardless of Content-Type
         if isinstance(data, str):  # If data is still a string, parse it manually
             data = json.loads(data)
 
-        # LOGGER.info(f"data={data}")
+        LOGGER.info(f"data={data}")
 
-        if not data or 'prompts' not in data:
+        if not data:
             return None
 
-        # return GPTRequestSchema().dump(data['prompts'], many=True)
-        return ChatMessageSchema().load(data['prompts'], many=True)
-        # return [{"role": "user", "content": data['prompt']}]
+        return ChatRequestSchema().load(data)
 
 class RevealSearchAPI(Resource):
     """

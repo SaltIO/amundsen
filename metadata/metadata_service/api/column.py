@@ -231,6 +231,8 @@ class ColumnStatsAPI(Resource):
                     stats=stats,
                     published_tag=published_tag
                 )
+
+                return {}, HTTPStatus.OK
             else:
                 return {'message': f'No stats provided'}, HTTPStatus.BAD_REQUEST
 

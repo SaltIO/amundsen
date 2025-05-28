@@ -2,7 +2,7 @@
 from typing import Dict, List
 from abc import ABC, abstractmethod
 
-from amundsen_common.models.ai import ChatResponse, ChatMessage
+from amundsen_common.models.ai import ChatResponse, ChatMessage, ChatRequest
 
 
 class AIChatClient(ABC):
@@ -11,5 +11,5 @@ class AIChatClient(ABC):
         pass
 
     @abstractmethod
-    def chat(self, prompts: List[ChatMessage]) -> ChatResponse:
+    def chat(self, request: ChatRequest) -> ChatResponse:
         pass

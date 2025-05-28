@@ -1,42 +1,35 @@
-Gets column stats using table_uri and column_name
+Gets table stats using table_uri
 ---
 security:
   - BearerAuth: []
 tags:
-  - 'column'
+  - 'table'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - $ref: '#/components/parameters/TableUriParameter'
-  - name: column_name
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'currency'
 responses:
   401:
     $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
-    description: 'Column Stats'
+    description: 'Table Stats'
     content:
       application/json:
         schema:
           type: object
           properties:
-            column_stats:
+            table_stats:
               type: array
-              description: 'A list of column stats'
+              description: 'A list of table stats'
               items:
                 $ref: '#/components/schemas/StatFields'
   404:
-    description: 'Table uri with this column not found'
+    description: 'Table uri not found'
     content:
       application/json:
         schema:
           $ref: '#/components/schemas/ErrorResponse'
   500:
-    description: 'Internal error fetching the column stats'
+    description: 'Internal error fetching the table stats'
     content:
       application/json:
         schema:

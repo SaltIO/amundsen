@@ -14,6 +14,7 @@ from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.lineage import LineageSchema, LineageBaseSchema
 from amundsen_common.models.table import TableSchema
 from amundsen_common.models.key_status import KeyStatusSchema
+from amundsen_common.models.table import StatSchema
 
 from marshmallow import ValidationError
 from metadata_service.api import BaseAPI
@@ -399,3 +400,69 @@ class TableDashboardAPI(BaseAPI):
     @swag_from('swagger_doc/table/dashboards_using_table_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(id=id, resource_type=ResourceType.Dashboard)
+
+class TableStatsAPI(Resource):
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(TableStatsAPI, self).__init__()
+
+    @requires_auth()
+    @swag_from('swagger_doc/table/stats_get.yml')
+    def get(self, table_uri: str) -> Union[tuple, int, None]:
+        """
+        Gets table stats in Neo4j
+        """
+        try:
+            LOGGER.info(f'TableStatsAPI:GET')
+            stats = self.client.get_table_stats(table_uri=table_uri)
+            LOGGER.info(f'stats={stats}')
+
+            return {'table_stats': stats}, HTTPStatus.OK
+
+        except NotFoundException:
+            msg = 'table_uri {} does not exist'.format(table_uri)
+            return {'message': msg}, HTTPStatus.NOT_FOUND
+
+        except Exception:
+            LOGGER.exception(f'FAILED')
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/table/stats_put.yml')
+    def put(self,
+            table_uri: str) -> Iterable[Union[dict, tuple, int, None]]:
+        """
+        Updates table stats (passed as a request body)
+        :param table_uri:
+        :return:
+        """
+
+        try:
+            data = request.get_json(force=True)
+            _stats = data.get('stats')
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            if _stats and len(_stats) > 0:
+                LOGGER.info(f'_stats={_stats}')
+                stats = []
+                for _stat in _stats:
+                    LOGGER.info(f'_stat={json.dumps(_stat)}')
+                    stats.append(StatSchema().loads(json.dumps(_stat)))
+
+                self.client.create_update_table_stats(
+                    table_uri=table_uri,
+                    stats=stats,
+                    published_tag=published_tag
+                )
+
+                return {}, HTTPStatus.OK
+            else:
+                return {'message': f'No stats provided'}, HTTPStatus.BAD_REQUEST
+
+        except ValidationError as ve:
+            msg = 'Validation Error for table_uri {}: {}'.format(table_uri, ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
+        except NotFoundException:
+            msg = 'table_uri {} does not exist'.format(table_uri)
+            return {'message': msg}, HTTPStatus.NOT_FOUND

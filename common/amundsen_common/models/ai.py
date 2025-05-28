@@ -1,5 +1,5 @@
 
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 import attr
 
@@ -14,9 +14,30 @@ class ChatMessageSchema(AttrsSchema):
         register_as_scheme = True
 
 @attr.s(auto_attribs=True, kw_only=True)
+class ChatFunction:
+    functions: List[Dict[Any,Any]]
+    function_call: Dict[Any,Any]
+
+class ChatFunctionSchema(AttrsSchema):
+    class Meta:
+        target = ChatFunction
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
+class ChatRequest:
+    messages: List[ChatMessage]
+    function: Optional[ChatFunction] = None
+
+class ChatRequestSchema(AttrsSchema):
+    class Meta:
+        target = ChatRequest
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
 class ChatResponse:
     finish_reason: str
     message: Optional[ChatMessage] = None
+    function_call: Optional[Dict[Any,Any]] = None
     error_text: Optional[str] = None
 
 class ChatResponseSchema(AttrsSchema):

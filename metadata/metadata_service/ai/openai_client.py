@@ -12,7 +12,7 @@ from openai import OpenAI
 
 from flask import current_app, make_response
 
-from amundsen_common.models.ai import ChatResponse, ChatMessage, ChatMessageSchema
+from amundsen_common.models.ai import ChatResponse, ChatMessage, ChatMessageSchema, ChatRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,34 +34,45 @@ class OpenAIChatClient(AIChatClient, AIEmbeddingClient):
         LOGGER.info(f'api_key={api_key}')
         LOGGER.info(f'model={self.model}')
 
-    def chat(self, prompts: List[ChatMessage]) -> ChatResponse:
+    def chat(self, request: ChatRequest) -> ChatResponse:
         chat_response: ChatResponse = None
 
-        LOGGER.info(f"prompts={prompts}")
+        LOGGER.info(f"request={request}")
 
-        if not prompts or len(prompts) == 0:
+        if not request or not request.messages or len(request.messages) == 0:
             return make_response({"message": "prompts required"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         if self.default_system_message:
-            prompts.insert(0, ChatMessage(role="system", content=self.default_system_message))
+            request.messages.insert(0, ChatMessage(role="system", content=self.default_system_message))
 
         try:
             chat_completion = self.client.chat.completions.create(
                 model=self.model,
-                messages=ChatMessageSchema().dump(prompts, many=True)
+                messages=ChatMessageSchema().dump(request.messages, many=True),
+                functions=request.function.functions if request.function else None,
+                function_call=request.function.function_call if request.function else None
             )
 
             finish_reason = chat_completion.choices[0].finish_reason
             content = chat_completion.choices[0].message.content
             role = chat_completion.choices[0].message.role
+            function_call = chat_completion.choices[0].message.function_call
 
             LOGGER.info(f"chat_completion={chat_completion}")
             LOGGER.info(f"finish_reason={finish_reason}")
             LOGGER.info(f"content={content}")
             LOGGER.info(f"role={role}")
+            LOGGER.info(f"function_call={function_call}")
 
-            chat_message = ChatMessage(content=content, role=role)
-            chat_response = ChatResponse(finish_reason=finish_reason, message=chat_message)
+            chat_response = ChatResponse(
+                finish_reason=finish_reason,
+                message=ChatMessage(
+                    content=content,
+                    role=role
+                ),
+                function_call=function_call.model_dump() if function_call else None
+            )
+
         except Exception as ex:
             msg = f"Failed to get chat response from Open AI"
             LOGGER.exception(msg)

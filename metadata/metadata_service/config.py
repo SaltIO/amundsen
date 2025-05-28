@@ -85,6 +85,8 @@ class Config:
     INIT_CUSTOM_EXT_AND_ROUTES = None  # type: Callable[[Flask], None]
 
     # API Config
+    METADATA_API_ENABLE_AUTH = bool(distutils.util.strtobool(os.getenv("METADATA_API_ENABLE_AUTH", "True")))
+    LOGGER.warning(f"METADATA_API_ENABLE_AUTH={METADATA_API_ENABLE_AUTH}")
     FLASK_OIDC_CLIENT_ID = os.environ['FLASK_OIDC_CLIENT_ID']
     FLASK_OIDC_CLIENT_SECRET = os.environ['FLASK_OIDC_CLIENT_SECRET']
     METADATA_API_URL_PREFIX = os.getenv('METADATA_API_URL_PREFIX', '/metadata-api')

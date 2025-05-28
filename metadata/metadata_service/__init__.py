@@ -39,7 +39,7 @@ from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
                                         TableDescriptionAPI, TableGET, TablesGET, TableIdGET,
                                         TableLineageAPI, TableOwnerAPI,
                                         TableTagAPI, TableUpdateFrequencyAPI,
-                                        TablePutAPI)
+                                        TablePutAPI, TableStatsAPI)
 from metadata_service.api.tag import TagAPI, TagPATCH
 from metadata_service.api.type_metadata import (TypeMetadataBadgeAPI,
                                                 TypeMetadataDescriptionAPI)
@@ -130,6 +130,7 @@ def create_app(*, config_module_class: str) -> Flask:
         import_name=__name__,
         url_prefix=app.config.get("METADATA_API_URL_PREFIX")
     )
+
     api = Api(api_bp)
 
     api.add_resource(HealthcheckAPI,
@@ -168,6 +169,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/table/<path:table_uri>/owner/<owner>')
     api.add_resource(TableDashboardAPI,
                      '/table/<path:id>/dashboard/')
+    api.add_resource(TableStatsAPI,
+                     '/table/<path:table_uri>/stats')
     api.add_resource(ColumnDescriptionAPI,
                      '/table/<path:table_uri>/column/<column_name>/description')
     api.add_resource(ColumnBadgeAPI,

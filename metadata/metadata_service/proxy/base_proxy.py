@@ -242,6 +242,20 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def get_table_stats(self, *,
+                        table_uri: str) -> List:
+        pass
+
+    @abstractmethod
+    def create_update_table_stats(
+            self,
+            *,
+            table_uri: str,
+            stats: List[Stat],
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
     def get_frequently_used_tables(self, *, user_email: str) -> Dict[str, Any]:
         pass
 
