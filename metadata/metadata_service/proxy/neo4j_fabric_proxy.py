@@ -13,7 +13,7 @@ from amundsen_common.models.table import (User, Reader)
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.dashboard import DashboardSummary
 from amundsen_common.models.popular_table import PopularTable
-from amundsen_common.models.table import Table
+from amundsen_common.models.table import Table, Stat
 from amundsen_common.models.lineage import LineageBase
 
 
@@ -496,3 +496,21 @@ class Neo4jFabricProxy(Neo4jProxy):
             table: Table,
             published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_table() is not supported')
+
+    @timer_with_counter
+    def create_update_column_stats(
+            self,
+            *,
+            table_uri: str,
+            column_name: str,
+            stats: List[Stat],
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_column_stats() is not supported')
+
+    def create_update_table_stats(
+            self,
+            *,
+            table_uri: str,
+            stats: List[Stat],
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_table_stats() is not supported')

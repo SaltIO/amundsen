@@ -19,6 +19,8 @@ from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.auth import requires_auth, WRITE_PERMISSION
 
+from marshmallow import ValidationError
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -229,10 +231,14 @@ class ColumnStatsAPI(Resource):
                     stats=stats,
                     published_tag=published_tag
                 )
+
+                return {}, HTTPStatus.OK
             else:
                 return {'message': f'No stats provided'}, HTTPStatus.BAD_REQUEST
 
-
+        except ValidationError as ve:
+            msg = 'Validation Error for table_uri {} with column {}: {}'.format(table_uri, column_name, ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
         except NotFoundException:
             msg = 'table_uri {} with column {} does not exist'.format(table_uri, column_name)
             return {'message': msg}, HTTPStatus.NOT_FOUND

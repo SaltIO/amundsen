@@ -1,19 +1,12 @@
-Add stats to a column
+Add stats to a table
 ---
 security:
   - BearerAuth: []
 tags:
-  - 'column'
+  - 'table'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
   - $ref: '#/components/parameters/TableUriParameter'
-  - name: column_name
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'currency'
 requestBody:
   $ref: '#/components/requestBodies/StatsPutRequest'
 responses:
@@ -30,7 +23,7 @@ responses:
         schema:
           $ref: '#/components/schemas/MessageResponse'
   404:
-    description: 'Table Column not found'
+    description: 'Table not found'
     content:
       application/json:
         schema:

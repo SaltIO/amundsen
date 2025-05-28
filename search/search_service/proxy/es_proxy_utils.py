@@ -20,10 +20,12 @@ class Resource(Enum):
     USER = 3
     FILE = 4
     DATA_PROVIDER = 5
+    COLUMN = 6
 
 
 RESOURCE_STR_MAPPING = {
     "table": Resource.TABLE,
+    "column": Resource.COLUMN,
     "dashboard": Resource.DASHBOARD,
     "feature": Resource.FEATURE,
     "user": Resource.USER,

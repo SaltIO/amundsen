@@ -77,7 +77,7 @@ class SearchMetadatatoElasticasearchTask(Task):
             raise TypeError(msg)
 
         self.elasticsearch_batch_size = conf.get(
-            SearchMetadatatoElasticasearchTask.ELASTICSEARCH_PUBLISHER_BATCH_SIZE, 10000
+            SearchMetadatatoElasticasearchTask.ELASTICSEARCH_PUBLISHER_BATCH_SIZE, 100
         )
         self.elasticsearch_timeout_sec = conf.get(
             SearchMetadatatoElasticasearchTask.ELASTICSEARCH_TIMEOUT_SEC, 120

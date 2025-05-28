@@ -3,6 +3,7 @@
 
 import os
 from typing import Any, Optional
+import logging
 
 STATS_FEATURE_KEY = 'STATS'
 
@@ -20,11 +21,17 @@ PROXY_CLIENTS = {
 }
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 class Config:
 
     # specify the alias string template under which the ES index exists for each resource
     ES_INDEX_ALIAS_TEMPLATE = '{resource}_search_index_v2_1'
     ES_PROXY_CLIENT = PROXY_CLIENTS[os.environ.get('ES_PROXY_CLIENT', 'ELASTICSEARCH_V2_1')]
+
+    LOG_REQUESTS = os.getenv('SEARCH_API_LOG_REQUESTS', 'false').lower() in ('1', 'true', 'yes')
+    LOGGER.info(f"LOG_REQUESTS={LOG_REQUESTS}")
 
     LOG_FORMAT = '%(asctime)s.%(msecs)03d [%(levelname)s] %(module)s.%(funcName)s:%(lineno)d (%(process)d:'\
                  '%(threadName)s) - %(message)s'
