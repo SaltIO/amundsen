@@ -40,7 +40,7 @@ from amundsen_common.models.schema import Schema, SchemaSchema
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.table_metadata import TableMetadata, ColumnMetadata
-from databuilder.models.table_stats import TableColumnStats
+from databuilder.models.table_stats import TableColumnStats, TableStats
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
@@ -2148,9 +2148,8 @@ class Neo4jProxy(BaseProxy):
         stats: List[Stat],
         published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> bool:
         """
-        Update column description with input from user
+        Update table stats with input from user
         :param table_uri:
-        :param column_name:
         :param stats:
         :return:
         """
@@ -2208,6 +2207,122 @@ class Neo4jProxy(BaseProxy):
                 status = result_record['status']
 
                 rel = table_column_stat.create_next_relation()
+                rel_dict = self._serialize_relationship(rel)
+
+                LOGGER.info(f'rel_dict={rel_dict}')
+
+                stmt = self._create_relationship_merge_statement(
+                    rel_record=rel_dict,
+                    rel_start_label=rel.start_label,
+                    rel_end_label=rel.end_label,
+                    rel_type=rel.type,
+                    rel_reverse_type=rel.reverse_type,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(rel_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+            tx.commit()
+
+            return status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_column_stats. Rolling back.')
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    def _get_table_stats_query_statement(self) -> str:
+        query = textwrap.dedent("""
+            MATCH (t:Table {key: $table_key})-[]->(s:Stat)
+            RETURN collect(s) as table_stats;
+        """)
+        return query
+
+    def get_table_stats(self, *,
+                         table_uri: str) -> List:
+        statement = self._get_table_stats_query_statement()
+        records = self._execute_cypher_query(
+            statement=statement,
+            param_dict={'table_key': table_uri}
+        )
+        result = get_single_record(records)
+
+        table_stats = StatSchema(many=True).dump(result['table_stats'])
+        return table_stats
+
+    @timer_with_counter
+    def create_update_table_stats(
+        self,
+        *,
+        table_uri: str,
+        stats: List[Stat],
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> bool:
+        """
+        Update column stats with input from user
+        :param table_uri:
+        :param column_name:
+        :param stats:
+        :return:
+        """
+        database_name, cluster_name, schema_name, table_name = TableMetadata._extract_table_key_components(key=table_uri)
+
+        _session = self._driver.session(database=self._database_name)
+
+        try:
+            status = None
+
+            count = 0
+            tx = _session.begin_transaction()
+
+            for stat in stats:
+
+                table_stat = TableStats(
+                    table_name=table_name,
+                    stat_name=stat.stat_type,
+                    stat_val=stat.stat_val,
+                    start_epoch=stat.start_epoch,
+                    end_epoch=stat.end_epoch,
+                    db=database_name,
+                    cluster=cluster_name,
+                    schema=schema_name,
+                    is_metric=stat.is_metric
+                )
+
+                node = table_stat.create_next_node()
+                self._try_create_index(
+                    label=node.label,
+                    count=count,
+                    session=_session,
+                    tx=tx
+                )
+
+                node_dict = self._serialize_node(node)
+
+                stmt = self._create_node_merge_statement(
+                    node_record=node_dict,
+                    node_label=node.label,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(node_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+                result_record = result.single()
+                if not result_record:
+                    raise NotCreatedOrUpdatedException(f"During create_update_column_stats(), failed to create or update node {node.label}")
+
+                status = result_record['status']
+
+                rel = table_stat.create_next_relation()
                 rel_dict = self._serialize_relationship(rel)
 
                 LOGGER.info(f'rel_dict={rel_dict}')

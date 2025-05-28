@@ -4,7 +4,7 @@ import os
 import logging
 from typing import Dict, Tuple, Any  # noqa: F401
 
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 # from flask import Response, jsonify, make_response, current_app as app
 from flask import Response, make_response, current_app as app
@@ -60,7 +60,9 @@ class SqlAlchemyBasePreviewClient(FactoryBasePreviewClient):
             sql = self.get_sql(params=params, optionalHeaders=optionalHeaders)
             logging.info(f"sql='{sql}'")
 
-            result = engine.execute(sql).fetchall()
+            with engine.connect() as conn:
+                result = conn.execute(text(sql)).fetchall()
+            # result = engine.execute(sql).fetchall()
             logging.info(f"result='{result}'")
 
             schema = params['schema']

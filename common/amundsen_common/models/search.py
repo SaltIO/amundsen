@@ -63,6 +63,40 @@ class SearchResponseSchema(AttrsSchema):
         target = SearchResponse
         register_as_scheme = True
 
+@attr.s(auto_attribs=True, kw_only=True)
+class KnnSearchRequest:
+    vector: List[float]
+    resource_type: str
+    results_count: Optional[int] = 10
+
+class KnnSearchRequestSchema(AttrsSchema):
+    class Meta:
+        target = KnnSearchRequest
+        register_as_scheme = True
+
+
+@attr.s(auto_attribs=True, kw_only=True)
+class KnnSearchHit:
+    score: float
+    result: Dict[str, Any]
+
+class KnnSearchHitSchema(AttrsSchema):
+    class Meta:
+        target = KnnSearchHit
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
+class KnnSearchResponse:
+    msg: str
+    results: Optional[List[KnnSearchHit]] = None
+    status_code: int
+
+
+class KnnSearchResponseSchema(AttrsSchema):
+    class Meta:
+        target = KnnSearchResponse
+        register_as_scheme = True
+
 
 @attr.s(auto_attribs=True, kw_only=True)
 class UpdateDocumentRequest:

@@ -10,7 +10,7 @@ import sys
 from typing import Any, Dict  # noqa: F401
 
 from flasgger import Swagger
-from flask import Blueprint, Flask
+from flask import Blueprint, Flask, request
 from flask_cors import CORS
 from flask_restful import Api
 
@@ -21,7 +21,7 @@ from search_service.api.document import (
 from search_service.api.document_update import DocumentAPI
 from search_service.api.feature import SearchFeatureAPI, SearchFeatureFilterAPI
 from search_service.api.healthcheck import HealthcheckAPI
-from search_service.api.search import SearchAPI
+from search_service.api.search import KnnSearchAPI, SearchAPI
 from search_service.api.table import SearchTableAPI, SearchTableFilterAPI
 from search_service.api.user import SearchUserAPI
 from search_service.api.data_provider import SearchDataProviderAPI, SearchDataProviderFilterAPI
@@ -34,6 +34,8 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Environment Variable to enable cors
 CORS_ENABLED = os.environ.get('CORS_ENABLED', False)
+
+LOGGER = logging.getLogger(__name__)
 
 
 def create_app(*, config_module_class: str) -> Flask:
@@ -95,6 +97,9 @@ def create_app(*, config_module_class: str) -> Flask:
     # New search endpoint
     api.add_resource(SearchAPI, '/v2/search')
 
+    # New knn search endpoint
+    api.add_resource(KnnSearchAPI, '/v2/knn_search')
+
     # New document update API
     api.add_resource(DocumentAPI, '/v2/document')
 
@@ -133,4 +138,65 @@ def create_app(*, config_module_class: str) -> Flask:
 
     if app.config.get('SWAGGER_ENABLED'):
         Swagger(app, template_file=os.path.join(ROOT_DIR, app.config.get('SWAGGER_TEMPLATE_PATH')), parse=True)
+
+
+    LOGGER.info(f"LOG_REQUESTS={app.config.get('LOG_REQUESTS')}")
+    if app.config.get('LOG_REQUESTS'):
+        app.logger.setLevel(logging.DEBUG)
+        @app.before_request
+        def log_request_info():
+            msg = f"""
+*******************
+*** Request URL ***
+*******************
+
+{request.url}
+
+**********************
+*** Request Method ***
+**********************
+
+{request.method}
+
+***********************
+*** Request Headers ***
+***********************
+
+{str(request.headers).strip()}
+
+********************
+*** Request Body ***
+********************
+
+{str(request.get_data()).strip()}
+            """
+            app.logger.debug(msg)
+
+        @app.after_request
+        def log_response_info(response):
+            if response.direct_passthrough:
+                return response  # ✅ Skip logging body for static files
+
+            msg = f"""
+****************************
+*** Response Request URL ***
+****************************
+
+{request.url}
+
+*********************
+*** Response Code ***
+*********************
+
+{response.status_code}
+
+*********************
+*** Response Data ***
+*********************
+
+{str(response.get_data(as_text=True)).strip()}
+            """
+            app.logger.debug(msg)
+            return response
+
     return app

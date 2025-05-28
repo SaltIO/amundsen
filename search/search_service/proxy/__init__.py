@@ -36,6 +36,7 @@ def get_proxy_client() -> BaseProxy:
 
             LOGGER.info(f"ELASTICSEARCH_CLIENT={current_app.config[config.ELASTICSEARCH_CLIENT]}")
             LOGGER.info(f"ES_PROXY_CLIENT={current_app.config[config.ES_PROXY_CLIENT]}")
+            LOGGER.info(f"LOG_REQUESTS={current_app.config['LOG_REQUESTS']}")
 
             # Gather all the configuration to create a Proxy Client
             host = current_app.config[config.PROXY_ENDPOINT]

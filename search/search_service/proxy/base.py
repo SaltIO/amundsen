@@ -35,6 +35,15 @@ class BaseProxy(metaclass=ABCMeta):
         return HealthCheck(status='ok', checks={f'{type(self).__name__}:connection': {'status': 'not checked'}})
 
     @abstractmethod
+    def knn_search(
+            self,
+            resource_type: Resource,
+            vector: List[float],
+            results_count: int = 10
+        ) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
     def search(self, *,
                query_term: str,
                page_index: int,

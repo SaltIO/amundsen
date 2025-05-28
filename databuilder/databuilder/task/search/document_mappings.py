@@ -4,7 +4,7 @@
 from typing import Dict
 
 from elasticsearch_dsl import (
-    Date, Document, Keyword, MetaField, RankFeatures, Text, analysis, token_filter, tokenizer, normalizer
+    Date, Document, Keyword, MetaField, RankFeatures, Text, analysis, token_filter, tokenizer, normalizer, DenseVector
 )
 
 POSITIONS_OFFSETS = "with_positions_offsets"
@@ -208,6 +208,77 @@ class Table(SearchableResource):
                                },
                                analyzer=Analyzer.english_analyzer,
                                term_vector=POSITIONS_OFFSETS)
+    programmatic_descriptions = Text(
+        multi=True,
+        fields={
+            "alphanumeric": Subfield.alphanumeric_multi,
+            "general": Subfield.general_multi
+        },
+        analyzer=Analyzer.english_analyzer,
+        term_vector=POSITIONS_OFFSETS
+    )
+
+class Column(SearchableResource):
+
+    type = Text(required=True,
+                fields={
+                    "keyword": Subfield.keyword,
+                    "general": Subfield.general,
+                    "ngram": Subfield.get_ngram_subfield(
+                        field_name="type",
+                        max_shingle_size=8,
+                        token_separator="_"
+                    )
+                },
+                analyzer=Analyzer.stemming_analyzer,
+                term_vector=POSITIONS_OFFSETS)
+
+    table_key = Text(
+        required=True,
+        fields={"keyword": Subfield.keyword},
+        analyzer=Analyzer.general_analyzer,
+        term_vector=POSITIONS_OFFSETS
+    )
+
+    table_name = Text(
+        required=True,
+        fields={
+            "keyword": Subfield.keyword,
+            "general": Subfield.general,
+            "ngram": Subfield.get_ngram_subfield(
+                field_name="table_name",
+                max_shingle_size=5,
+                token_separator="_"
+            )
+        },
+        analyzer=Analyzer.stemming_analyzer,
+        term_vector=POSITIONS_OFFSETS
+    )
+
+    table_description = Text(
+        analyzer=Analyzer.english_analyzer,
+        fields={
+            "alphanumeric": Subfield.alphanumeric,
+            "general": Subfield.general
+        },
+        term_vector=POSITIONS_OFFSETS
+    )
+
+    table_badges = Text(
+        multi=True,
+        fields={"keyword": Subfield.keyword},
+        analyzer=Analyzer.general_analyzer,
+        term_vector=POSITIONS_OFFSETS
+    )
+
+    table_tags = Text(
+        multi=True,
+        fields={"keyword": Subfield.keyword},
+        analyzer=Analyzer.general_analyzer,
+        term_vector=POSITIONS_OFFSETS
+    )
+
+    embedding_vector = DenseVector(dims=384)
 
 
 class Dashboard(SearchableResource):
@@ -421,6 +492,7 @@ class File(SearchableResource):
 
 RESOURCE_TO_MAPPING: Dict[str, Document] = {
     'table': Table,
+    'column': Column,
     'dashboard': Dashboard,
     'feature': Feature,
     'user': User,

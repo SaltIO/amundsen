@@ -10,6 +10,8 @@ parameters:
 requestBody:
   $ref: '#/components/requestBodies/TableDetailPutRequest'
 responses:
+  400:
+    $ref: '#/components/responses/ValidationErrorResponse'
   401:
     $ref: '#/components/responses/AuthTokenInvalidResponse'
   403:
@@ -26,12 +28,6 @@ responses:
       application/json:
         schema:
           $ref: '#/components/schemas/KeyStatus'
-  400:
-    description: 'Bad Request'
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
   500:
     description: 'Internal server error'
     content:

@@ -85,6 +85,8 @@ class Config:
     INIT_CUSTOM_EXT_AND_ROUTES = None  # type: Callable[[Flask], None]
 
     # API Config
+    METADATA_API_ENABLE_AUTH = bool(distutils.util.strtobool(os.getenv("METADATA_API_ENABLE_AUTH", "True")))
+    LOGGER.warning(f"METADATA_API_ENABLE_AUTH={METADATA_API_ENABLE_AUTH}")
     FLASK_OIDC_CLIENT_ID = os.environ['FLASK_OIDC_CLIENT_ID']
     FLASK_OIDC_CLIENT_SECRET = os.environ['FLASK_OIDC_CLIENT_SECRET']
     METADATA_API_URL_PREFIX = os.getenv('METADATA_API_URL_PREFIX', '/metadata-api')
@@ -128,6 +130,16 @@ class Config:
     READ_ONLY_MODE = os.getenv('METADATA_SERVICE_READ_ONLY_MODE', 'false').lower() in ('1', 'true', 'yes')
 
     DEBUG = bool(distutils.util.strtobool(os.environ.get('FLASK_DEBUG', 'False')))
+
+    AI_GPT_ENABLED = bool(distutils.util.strtobool(os.getenv("AI_GPT_ENABLED", "False")))
+    AI_GPT_CLIENT_API_KEY = os.getenv("AI_GPT_CLIENT_API_KEY")
+    AI_GPT_CLIENT_API_MODEL = os.getenv("AI_GPT_CLIENT_API_MODEL")
+    # AI_GPT_CLIENT_API_DEFAULT_SYSTEM_MESSAGE = os.getenv("AI_GPT_CLIENT_API_DEFAULT_SYSTEM_MESSAGE")
+    # AI_GPT_CLIENT_API_CLASSIFY_MESSAGE = os.getenv("AI_GPT_CLIENT_API_CLASSIFY_MESSAGE")
+
+    SEARCHSERVICE_BASE = os.environ.get('SEARCHSERVICE_BASE')
+    # Request Timeout Configurations in Seconds
+    REQUEST_SESSION_TIMEOUT_SEC = int(os.getenv('REQUEST_SESSION_TIMEOUT_SEC', '3'))
 
 class LocalConfig(Config):
     DEBUG = True

@@ -112,12 +112,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/DescriptionPut'
-    ColumnStatPutRequest:
+    StatsPutRequest:
       required: true
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ColumnStatsPut'
+            $ref: '#/components/schemas/StatsPut'
     UpdateFrequencyPutRequest:
       required: false
       content:
@@ -141,6 +141,13 @@ components:
             description: 'Auth Token Response'
     AuthTokenInvalidResponse:
       description: 'Auth Token Missing, Invalid or Expired'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+            description: 'Auth Token Invalid Response'
+    ValidationErrorResponse:
+      description: 'Payload Validation Error'
       content:
         application/json:
           schema:
@@ -321,14 +328,14 @@ components:
           $ref: '#/components/schemas/LineageBase'
       allOf:
         - $ref: '#/components/schemas/Publisher'
-    ColumnStatsPut:
+    StatsPut:
       type: object
       properties:
         stats:
           type: array
-          description: 'A list of column stats'
+          description: 'A list of stats'
           items:
-            $ref: '#/components/schemas/ColumnStatFields'
+            $ref: '#/components/schemas/StatFields'
       allOf:
         - $ref: '#/components/schemas/Publisher'
     TableDetailPut:
@@ -522,7 +529,7 @@ components:
         stats:
           type: array
           items:
-            $ref: '#/components/schemas/ColumnStatFields'
+            $ref: '#/components/schemas/StatFields'
         badges:
           type: array
           description: 'Badges associated with the column'
@@ -532,7 +539,7 @@ components:
           type: object
           description: 'Object representing the column type'
           $ref: '#/components/schemas/TypeMetadata'
-    ColumnStatFields:
+    StatFields:
       type: object
       required:
         - stat_type
@@ -542,7 +549,7 @@ components:
       properties:
         stat_type:
           type: string
-          description: 'Type of column statistic'
+          description: 'Type of statistic'
           example: "max"
         stat_val:
           type: string
@@ -1046,7 +1053,7 @@ components:
         message:
           type: string
           description: 'A simple message to give additional information about the result of the request'
-          example: 'Table was created successfully'
+          example: 'Resource was created successfully'
     EmptyResponse:
       type: object
       properties: {}

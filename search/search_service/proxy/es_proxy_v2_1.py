@@ -1,6 +1,7 @@
 # Copyright Contributors to the Amundsen project.
 # SPDX-License-Identifier: Apache-2.0
 
+from http import HTTPStatus
 import json
 import logging
 from typing import (
@@ -9,7 +10,7 @@ from typing import (
 
 from amundsen_common.models.api import health_check
 from amundsen_common.models.search import (
-    Filter, HighlightOptions, SearchResponse,
+    Filter, HighlightOptions, SearchResponse, KnnSearchResponse, KnnSearchResponseSchema, KnnSearchHitSchema
 )
 from elasticsearch import Elasticsearch, TransportError, ApiError
 from elasticsearch_dsl import (
@@ -526,6 +527,69 @@ class ElasticsearchProxyV2_1():
         except Exception as e:
             LOGGER.error(f'Failed to execute ES search queries. {e}')
             return []
+
+    def knn_search(
+            self,
+            resource_type: Resource,
+            vector: List[float],
+            results_count: int = 10
+        ) -> KnnSearchResponse:
+        """
+        Executes a KNN vector search on the given resource type.
+        Assumes the vector field is named 'embedding_vector'.
+        """
+        index = self.get_index_alias_for_resource(resource_type=resource_type)
+        res_index = self.get_index_alias_for_resource(resource_type=resource_type)
+        if self.elasticsearch.indices.exists(index=res_index):
+            query_body = {
+                "size": results_count,
+                "knn": {
+                    "field": "embedding_vector",
+                    "query_vector": vector,
+                    "k": results_count*2,
+                    "num_candidates": results_count*3
+                }
+            }
+
+            try:
+                LOGGER.info(f"KNN query against index={index}: {json.dumps(query_body)}")
+                response = self.elasticsearch.search(index=index, body=query_body)
+                LOGGER.info(f"KNN query results={response}")
+
+                if "hits" in response and "hits" in response["hits"] and len(response["hits"]["hits"]) > 0:
+                    results = [
+                        {
+                            "score": hit["_score"],
+                            "result": hit["_source"]
+                        }
+                        for hit in response["hits"]["hits"]
+                    ]
+                    knn_search_response = KnnSearchResponse(
+                        msg="Success",
+                        results=KnnSearchHitSchema().loads(json.dumps(results), many=True),
+                        status_code = HTTPStatus.OK
+                    )
+                else:
+                    knn_search_response = KnnSearchResponse(
+                        msg="No hits found",
+                        results=None,
+                        status_code = HTTPStatus.NOT_FOUND
+                    )
+
+                return knn_search_response
+
+            except Exception as e:
+                LOGGER.exception(f"Failed KNN search for resource={resource_type}")
+                return KnnSearchResponse(
+                    msg=f"Failed KNN search for resource={resource_type}. Error: {e}",
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
+        else:
+            LOGGER.error(f"Failed KNN search for resource={resource_type}. Resource index {res_index} not found in Elasticsearch")
+            return KnnSearchResponse(
+                msg=f"Failed KNN search for resource={resource_type}. Resource index {res_index} not found in Elasticsearch",
+                status_code=HTTPStatus.BAD_REQUEST
+            )
 
     def search(self, *,
                query_term: str,
