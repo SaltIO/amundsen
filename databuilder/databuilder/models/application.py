@@ -54,7 +54,7 @@ class GenericApplication(GraphSerializable, TableSerializable, AtlasSerializable
                  generates_resource: bool = True,
                  ) -> None:
 
-        if start_label not in GenericApplication.LABELS_PERMITTED_TO_HAVE_USAGE:
+        if start_label and start_label not in GenericApplication.LABELS_PERMITTED_TO_HAVE_USAGE:
             raise Exception(f'applications associated with {start_label} are not supported')
 
         self.start_label = start_label
@@ -70,7 +70,7 @@ class GenericApplication(GraphSerializable, TableSerializable, AtlasSerializable
         self.generates_resource = generates_resource
 
         self._node_iter = self._create_node_iterator()
-        self._relation_iter = self._create_relation_iterator()
+        self._relation_iter = self._create_relation_iterator() if self.start_label and self.start_key else None
         self._record_iter = self._create_record_iterator()
         self._atlas_entity_iterator = self._create_next_atlas_entity()
         self._atlas_relation_iterator = self._create_atlas_relation_iterator()

@@ -12,12 +12,13 @@ from amundsen_common.models.feature import Feature
 from amundsen_common.models.generation_code import GenerationCode
 from amundsen_common.models.lineage import Lineage, LineageBase
 from amundsen_common.models.popular_table import PopularTable
-from amundsen_common.models.table import Table, Stat
+from amundsen_common.models.table import Table, Stat, Application
 from amundsen_common.models.data_source import DataProvider, File
 from amundsen_common.models.user import User
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare
 from amundsen_common.models.database import Database
 from amundsen_common.models.cluster import Cluster
+from amundsen_common.models.custom import CustomMetadata, CustomMetadataNode
 
 from metadata_service.entity.dashboard_detail import \
     DashboardDetail as DashboardDetailEntity
@@ -253,6 +254,27 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
             table_uri: str,
             stats: List[Stat],
             published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def create_update_custom_metadata(
+            self,
+            *,
+            custom_metadata: CustomMetadata,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> List[CustomMetadataNode]:
+        pass
+
+    @abstractmethod
+    def get_application(self, *,
+                        application_uri: str) -> Application:
+        pass
+
+    @abstractmethod
+    def create_update_application(
+            self,
+            *,
+            application: Application,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
         pass
 
     @abstractmethod

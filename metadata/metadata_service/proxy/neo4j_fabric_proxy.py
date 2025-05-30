@@ -13,8 +13,10 @@ from amundsen_common.models.table import (User, Reader)
 from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.dashboard import DashboardSummary
 from amundsen_common.models.popular_table import PopularTable
-from amundsen_common.models.table import Table, Stat
+from amundsen_common.models.table import Table, Stat, Application
 from amundsen_common.models.lineage import LineageBase
+from amundsen_common.models.custom import CustomMetadata, CustomMetadataNode
+
 
 
 from metadata_service.proxy.neo4j_proxy import Neo4jProxy, _CACHE, _GET_POPULAR_RESOURCES_CACHE_EXPIRY_SEC
@@ -470,8 +472,22 @@ class Neo4jFabricProxy(Neo4jProxy):
                    resource_type: ResourceType = ResourceType.Table) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_tag() is not supported')
 
-    def create_update_user(self, *, user: User) -> Tuple[User, bool]:
+    def create_update_user(self, *, user: User, published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[User, bool]:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_user() is not supported')
+
+    def create_update_custom_metadata(
+            self,
+            *,
+            custom_metadata: CustomMetadata,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> List[CustomMetadataNode]:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_custom_metadata() is not supported')
+
+    def create_update_application(
+            self,
+            *,
+            application: Application,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_application() is not supported')
 
     @timer_with_counter
     def add_resource_relation_by_user(self, *,

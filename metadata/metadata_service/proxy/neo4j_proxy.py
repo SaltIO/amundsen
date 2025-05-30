@@ -23,7 +23,7 @@ from amundsen_common.models.feature import Feature, FeatureWatermark
 from amundsen_common.models.generation_code import GenerationCode
 from amundsen_common.models.lineage import Lineage, LineageItem, LineageBase, LineageBaseItem
 from amundsen_common.models.popular_table import PopularTable
-from amundsen_common.models.table import (Application, Badge, Column,
+from amundsen_common.models.table import (Application, ApplicationSchema, Badge, Column,
                                           ProgrammaticDescription, Reader,
                                           ResourceReport, Source, SqlJoin,
                                           SqlWhere, Stat, StatSchema, Table, TableSchema, TableSummary,
@@ -36,11 +36,13 @@ from amundsen_common.models.data_source import (DataProvider, DataChannel, DataL
 from amundsen_common.models.database import Database, DatabaseSchema
 from amundsen_common.models.cluster import Cluster, ClusterSchema
 from amundsen_common.models.schema import Schema, SchemaSchema
+from amundsen_common.models.custom import CustomMetadata, CustomMetadataNode, CustomMetadataRelationship, CustomMetadataNodeKey, DefaultMetadataNodeKey
 
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.table_metadata import TableMetadata, ColumnMetadata
 from databuilder.models.table_stats import TableColumnStats, TableStats
+from databuilder.models.application import GenericApplication
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
@@ -384,21 +386,28 @@ class Neo4jProxy(BaseProxy):
         table_key = table_metadata._get_table_key()
 
         _session = self._driver.session(database=self._database_name)
+        _session_constraint = self._driver.session(database=self._database_name)
+
+        tx = None
+        tx_constraint = None
 
         try:
             status = None
 
             count = 0
             tx = _session.begin_transaction()
+            tx_constraint = _session_constraint.begin_transaction()
 
             node = table_metadata.create_next_node()
             while node:
-                self._try_create_index(
+                _, tx_constraint = self._try_create_index(
                     label=node.label,
                     count=count,
-                    session=_session,
-                    tx=tx
+                    session=_session_constraint,
+                    tx=tx_constraint
                 )
+                tx_constraint.commit()
+                tx_constraint = _session_constraint.begin_transaction()
 
                 node_dict = self._serialize_node(node)
 
@@ -452,6 +461,278 @@ class Neo4jProxy(BaseProxy):
             return table_key, status
         except Exception as e:
             LOGGER.exception('Failed to create_update_table. Rolling back.')
+            if tx and not tx.closed():
+                tx.rollback()
+            if tx_constraint and not tx_constraint.closed():
+                tx_constraint.rollback()
+            raise e
+
+    CORE_NODE_LABELS = ['Application', 'Badge', 'Chart', 'Cluster', 'Column', 'Dashboard', 'Dashboardgroup', 'Database', 'Data_Channel', 'Data_Provider', 'Data_Location', 'Description', 'Execution', 'File', 'File_Table', 'Programmatic_Description', 'Query', 'Schema', 'Score', 'Snowflakelisting', 'Snowflakeshare', 'Source', 'Stat', 'Table', 'Tag', 'Timestamp', 'Update_Frequency', 'User', 'Prospectus_Waterfall_Scheme', 'Watermark']
+    CUSTOM_METADATA_NODE_KEY_FORMAT = "custom://{label}/{name}"
+
+    def _convert_to_label(name: str) -> str:
+        # Ensure first character is uppercase
+        if not name:
+            return ""
+
+        # Insert _ before each uppercase character (except the first)
+        label = re.sub(r'(?<!^)(?=[A-Z])', '_', name)
+
+        # Capitalize first letter of each segment
+        label_parts = label.split('_')
+        label = '_'.join(part.capitalize() for part in label_parts)
+
+        return label
+
+    def create_update_custom_metadata(
+            self,
+            *,
+            custom_metadata: CustomMetadata,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> List[CustomMetadataNode]:
+
+
+        custom_metadata_results = []
+
+        _session = self._driver.session(database=self._database_name)
+        _session_constraint = self._driver.session(database=self._database_name)
+
+        try:
+            status = None
+
+            count = 0
+            tx = _session.begin_transaction()
+            tx_constraint = _session_constraint.begin_transaction()
+
+            for node in custom_metadata.nodes if custom_metadata.nodes else []:
+                if not node.name and \
+                    not node.key and \
+                    (node.properties and 'name' not in node.properties) and \
+                    (node.properties and 'key' not in node.properties):
+
+                    raise Exception('One of node.name, node.key, node.properties["name"] or node.properties["key"] required')
+
+                # Ensure the label matches the neo4j rules
+                node.label = Neo4jProxy._convert_to_label(node.label)
+
+                if node.label in Neo4jProxy.CORE_NODE_LABELS:
+                    raise Exception(f'Custom Metadata node label {node.label} is restricted and cannot be used')
+
+                _, tx_constraint = self._try_create_index(
+                    label=node.label,
+                    count=count,
+                    session=_session_constraint,
+                    tx=tx_constraint
+                )
+                tx_constraint.commit()
+                tx_constraint = _session_constraint.begin_transaction()
+
+                # If key doesn't exist in node.properties, create one
+                if not node.properties:
+                    node.properties = {}
+
+                # Set the top level key
+                if not node.key:
+                    if node.properties.get('key'):
+                        node.key = node.properties.get('key')
+                    else:
+                        node.key = Neo4jProxy.CUSTOM_METADATA_NODE_KEY_FORMAT.format(
+                            label=node.label,
+                            name=node.name if node.name else node.properties['name']
+                        )
+
+                # Set the top level name
+                if not node.name:
+                    # If 'name' not provided, derive it from the key
+                    if not node.properties.get('name'):
+                        node.name = node.key.split('/')[-1]
+                    else:
+                        node.name = node.properties.get('name')
+
+                def _create_graph_node(custom_metadata_node: CustomMetadataNode) -> GraphNode:
+                    attributes = {
+                        "name": custom_metadata_node.name
+                    }
+                    if custom_metadata_node.properties:
+                        for k, v in custom_metadata_node.properties.items():
+                            if k not in attributes:
+                                attributes[k] = v
+
+                    return GraphNode(
+                        key=custom_metadata_node.key,
+                        label=custom_metadata_node.label,
+                        attributes=attributes
+                    )
+
+                node_dict = self._serialize_node(_create_graph_node(node))
+
+                stmt = self._create_node_merge_statement(
+                    node_record=node_dict,
+                    node_label=node.label,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(node_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+                result_record = result.single()
+                if not result_record:
+                    raise NotCreatedOrUpdatedException(f"During create_update_custom_metadata(), failed to create or update node {node.label}:{node.key}")
+
+                custom_metadata_results.append(node)
+
+            for rel in custom_metadata.relationships if custom_metadata.relationships else []:
+
+                def _create_graph_relationship(custom_metadata_rel: CustomMetadataRelationship) -> GraphNode:
+                    attributes = {}
+                    if custom_metadata_rel.properties:
+                        for k, v in custom_metadata_rel.properties.items():
+                            if k not in attributes:
+                                attributes[k] = v
+
+                    start_key = (
+                        custom_metadata_rel.start_node.key
+                        if isinstance(custom_metadata_rel.start_node, DefaultMetadataNodeKey)
+                        else Neo4jProxy.CUSTOM_METADATA_NODE_KEY_FORMAT.format(
+                            label=custom_metadata_rel.start_node.label,
+                            name=custom_metadata_rel.start_node.name
+                        )
+                    )
+                    end_key = (
+                        custom_metadata_rel.end_node.key
+                        if isinstance(custom_metadata_rel.end_node, DefaultMetadataNodeKey)
+                        else Neo4jProxy.CUSTOM_METADATA_NODE_KEY_FORMAT.format(
+                            label=custom_metadata_rel.end_node.label,
+                            name=custom_metadata_rel.end_node.name
+                        )
+                    )
+
+                    relationship = GraphRelationship(
+                        start_key=start_key,
+                        start_label=custom_metadata_rel.start_node.label,
+                        end_key=end_key,
+                        end_label=custom_metadata_rel.end_node.label,
+                        type=custom_metadata_rel.type,
+                        reverse_type=custom_metadata_rel.reverse_type,
+                        attributes=attributes
+                    )
+
+                    return relationship
+
+                rel_dict = self._serialize_relationship(_create_graph_relationship(rel))
+
+                stmt = self._create_relationship_merge_statement(
+                    rel_record=rel_dict,
+                    rel_start_label=rel.start_node.label,
+                    rel_end_label=rel.end_node.label,
+                    rel_type=rel.type,
+                    rel_reverse_type=rel.reverse_type,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(rel_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+                result_record = result.single()
+                if not result_record:
+                    raise NotCreatedOrUpdatedException(f"During create_update_custom_metadata(), failed to create or update relationship \n{rel_dict}")
+
+            tx.commit()
+
+            return custom_metadata_results
+
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_custom_metadata. Rolling back.')
+            if not tx.closed():
+                tx.rollback()
+            raise e
+
+    def _get_application_query_statement(self) -> str:
+        application_query = textwrap.dedent("""
+            MATCH (a:Application {key: $application_key})
+            RETURN a {.*} as application;
+        """)
+        return application_query
+
+    def get_application(self, *,
+                        application_uri: str) -> Application:
+        query = self._get_application_query_statement()
+        record = self._execute_cypher_query(
+            statement=query, param_dict={'application_key': application_uri}
+        )
+
+        result = get_single_record(record, strict=True)
+
+        return ApplicationSchema().dump(result['application'])
+
+    def create_update_application(
+            self,
+            *,
+            application: Application,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+
+        _session = self._driver.session(database=self._database_name)
+        _session_constraint = self._driver.session(database=self._database_name)
+
+        try:
+            status = None
+
+            count = 0
+            tx = _session.begin_transaction()
+            tx_constraint = _session_constraint.begin_transaction()
+
+            app = GenericApplication(
+                application_id=application.id,
+                application_type=application.kind,
+                application_url=application.application_url,
+                application_description=application.description,
+                start_key=None,
+                start_label=None
+            )
+
+            node = app.create_next_node()
+
+            _, tx_constraint = self._try_create_index(
+                label=node.label,
+                count=count,
+                session=_session_constraint,
+                tx=tx_constraint
+            )
+            tx_constraint.commit()
+            tx_constraint = _session_constraint.begin_transaction()
+
+            node_dict = self._serialize_node(node)
+
+            stmt = self._create_node_merge_statement(
+                node_record=node_dict,
+                node_label=node.label,
+                published_tag=published_tag
+            )
+            count, result, tx = self._execute_transaction_statement(
+                stmt=stmt,
+                params=self._create_props_param(node_dict),
+                session=_session,
+                tx=tx,
+                count=count
+            )
+            result_record = result.single()
+            if not result_record:
+                raise NotCreatedOrUpdatedException(f"During create_update_application(), failed to create or update node {node.label}")
+
+            status = result_record['status']
+
+            tx.commit()
+
+            return app.application_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_application. Rolling back.')
             if not tx.closed():
                 tx.rollback()
             raise e
@@ -2156,12 +2437,14 @@ class Neo4jProxy(BaseProxy):
         database_name, cluster_name, schema_name, table_name = TableMetadata._extract_table_key_components(key=table_uri)
 
         _session = self._driver.session(database=self._database_name)
+        _session_constraint = self._driver.session(database=self._database_name)
 
         try:
             status = None
 
             count = 0
             tx = _session.begin_transaction()
+            tx_constraint = _session_constraint.begin_transaction()
 
             for stat in stats:
 
@@ -2178,12 +2461,14 @@ class Neo4jProxy(BaseProxy):
                 )
 
                 node = table_column_stat.create_next_node()
-                self._try_create_index(
+                _, tx_constraint = self._try_create_index(
                     label=node.label,
                     count=count,
-                    session=_session,
-                    tx=tx
+                    session=_session_constraint,
+                    tx=tx_constraint
                 )
+                tx_constraint.commit()
+                tx_constraint = _session_constraint.begin_transaction()
 
                 node_dict = self._serialize_node(node)
 
@@ -2272,12 +2557,14 @@ class Neo4jProxy(BaseProxy):
         database_name, cluster_name, schema_name, table_name = TableMetadata._extract_table_key_components(key=table_uri)
 
         _session = self._driver.session(database=self._database_name)
+        _session_constraint = self._driver.session(database=self._database_name)
 
         try:
             status = None
 
             count = 0
             tx = _session.begin_transaction()
+            tx_constraint = _session_constraint.begin_transaction()
 
             for stat in stats:
 
@@ -2294,12 +2581,15 @@ class Neo4jProxy(BaseProxy):
                 )
 
                 node = table_stat.create_next_node()
-                self._try_create_index(
+
+                _, tx_constraint = self._try_create_index(
                     label=node.label,
                     count=count,
-                    session=_session,
-                    tx=tx
+                    session=_session_constraint,
+                    tx=tx_constraint
                 )
+                tx_constraint.commit()
+                tx_constraint = _session_constraint.begin_transaction()
 
                 node_dict = self._serialize_node(node)
 
@@ -2318,7 +2608,7 @@ class Neo4jProxy(BaseProxy):
 
                 result_record = result.single()
                 if not result_record:
-                    raise NotCreatedOrUpdatedException(f"During create_update_column_stats(), failed to create or update node {node.label}")
+                    raise NotCreatedOrUpdatedException(f"During create_update_table_stats(), failed to create or update node {node.label}")
 
                 status = result_record['status']
 
