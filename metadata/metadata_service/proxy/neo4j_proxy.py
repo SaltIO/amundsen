@@ -668,7 +668,7 @@ class Neo4jProxy(BaseProxy):
             node_ref = f"{node_ref}:{label}"
 
         application_query = textwrap.dedent(f"""
-            MATCH ({node_ref} {{key: $custom_metadata_key}})
+            MATCH (cmr:CustomMetadataRoot)-[HAS_CUSTOM]->({node_ref} {{key: $custom_metadata_key}})
             RETURN cm {{.*}} as custom_metadata;
         """)
         return application_query
