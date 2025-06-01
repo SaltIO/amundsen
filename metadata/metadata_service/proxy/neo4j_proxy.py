@@ -36,7 +36,10 @@ from amundsen_common.models.data_source import (DataProvider, DataChannel, DataL
 from amundsen_common.models.database import Database, DatabaseSchema
 from amundsen_common.models.cluster import Cluster, ClusterSchema
 from amundsen_common.models.schema import Schema, SchemaSchema
-from amundsen_common.models.custom import CustomMetadata, CustomMetadataNode, CustomMetadataRelationship, CustomMetadataNodeKey, DefaultMetadataNodeKey
+from amundsen_common.models.custom import (
+    CustomMetadata, CustomMetadataNode, CustomMetadataRelationship,
+    CustomMetadataNodeKey, DefaultMetadataNodeKey, CustomMetadataNodeSchema
+)
 
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
@@ -512,7 +515,8 @@ class Neo4jProxy(BaseProxy):
                     raise Exception('One of node.name, node.key, node.properties["name"] or node.properties["key"] required')
 
                 # Ensure the label matches the neo4j rules
-                node.label = Neo4jProxy._convert_to_label(node.label)
+                # node.label = Neo4jProxy._convert_to_label(node.label)
+                node.label = node.label.capitalize()
 
                 if node.label in Neo4jProxy.CORE_NODE_LABELS:
                     raise Exception(f'Custom Metadata node label {node.label} is restricted and cannot be used')
@@ -568,7 +572,8 @@ class Neo4jProxy(BaseProxy):
                 stmt = self._create_node_merge_statement(
                     node_record=node_dict,
                     node_label=node.label,
-                    published_tag=published_tag
+                    published_tag=published_tag,
+                    custom_metadata=True
                 )
                 count, result, tx = self._execute_transaction_statement(
                     stmt=stmt,
@@ -653,6 +658,41 @@ class Neo4jProxy(BaseProxy):
             if not tx.closed():
                 tx.rollback()
             raise e
+
+    def _get_custom_metadata_query_statement(self, label: str) -> str:
+
+
+        node_ref = "cm"
+        if label:
+            label = label.capitalize()
+            node_ref = f"{node_ref}:{label}"
+
+        application_query = textwrap.dedent(f"""
+            MATCH ({node_ref} {{key: $custom_metadata_key}})
+            RETURN cm {{.*}} as custom_metadata;
+        """)
+        return application_query
+
+    def get_custom_metadata(self, *,
+                            custom_metadata_uri: str,
+                            label: str = None) -> Application:
+        query = self._get_custom_metadata_query_statement(label=label)
+        record = self._execute_cypher_query(
+            statement=query, param_dict={'custom_metadata_key': custom_metadata_uri}
+        )
+
+        node = get_single_record(record, strict=True)['custom_metadata']
+
+        props = dict(node)
+
+        custom_metadata = CustomMetadataNode(
+            label=label,
+            name=props.get('name'),
+            key=props['key'],
+            properties=props
+        )
+
+        return CustomMetadataNodeSchema().dump(custom_metadata)
 
     def _get_application_query_statement(self) -> str:
         application_query = textwrap.dedent("""
@@ -4400,12 +4440,20 @@ class Neo4jProxy(BaseProxy):
             node_record: dict,
             node_label: str,
             published_tag: str = None,
-            create_only: bool = False) -> str:
+            create_only: bool = False,
+            custom_metadata: bool = False) -> str:
         """
         Creates node merge statement
         :param node_record:
         :return:
         """
+        custom_metadata_stmt = """
+            WITH node, existing
+            MERGE (root:CustomMetadataRoot {key: 'GLOBAL_CUSTOM_ROOT'})
+            MERGE (root)-[:HAS_CUSTOM]->(node)
+            MERGE (root)<-[:CUSTOM]-(node)
+        """
+
         template = Template("""
             OPTIONAL MATCH (existing:{{ LABEL }} {key: $key})
             WITH existing
@@ -4413,6 +4461,8 @@ class Neo4jProxy(BaseProxy):
             MERGE (node:{{ LABEL }} {key: $key})
             ON CREATE SET {{ PROP_BODY }}
             {% if update %} ON MATCH SET {{ PROP_BODY }} {% endif %}
+
+            {{ CUSTOM_METADATA }}
 
             RETURN
                 node,
@@ -4431,6 +4481,7 @@ class Neo4jProxy(BaseProxy):
         return template.render(
             LABEL=node_label,
             PROP_BODY=prop_body,
+            CUSTOM_METADATA=custom_metadata_stmt if custom_metadata else '',
             update=(not create_only)
         )
 

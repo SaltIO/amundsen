@@ -57,7 +57,7 @@ from metadata_service.api.data_source import (DataProviderDetailAPI,
 from metadata_service.api.database import (DatabaseIdGET, DatabaseGET, DatabasesGET)
 from metadata_service.api.cluster import (ClusterIdGET, ClusterGET, ClustersGET)
 from metadata_service.api.schema import (SchemaIdGET, SchemaGET, SchemasGET)
-from metadata_service.api.custom_metadata import (CustomMetadataPutAPI)
+from metadata_service.api.custom_metadata import (CustomMetadataAPI)
 from metadata_service.api.application import (ApplicationAPI)
 from metadata_service.deprecations import process_deprecations
 
@@ -275,8 +275,9 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/schemas/',
                      '/schemas/<path:database>',
                      '/schemas/<path:database>/<path:cluster>')
-    api.add_resource(CustomMetadataPutAPI,
-                     '/custom/')
+    api.add_resource(CustomMetadataAPI,
+                     '/custom/',
+                     '/custom/<path:label>/<path:custom_metadata_uri>')
     api.add_resource(ApplicationAPI,
                      '/application/',
                      '/application/<path:application_uri>')

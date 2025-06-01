@@ -16,6 +16,7 @@ from metadata_service.auth import requires_auth, WRITE_PERMISSION
 from amundsen_common.models.custom import (
     CustomMetadata, CustomMetadataSchema, CustomMetadataNode, CustomMetadataNodeSchema
 )
+from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
 
@@ -23,14 +24,33 @@ from metadata_service.proxy.base_proxy import BaseProxy
 LOGGER = logging.getLogger(__name__)
 
 
-class CustomMetadataPutAPI(Resource):
+class CustomMetadataAPI(Resource):
     """
     Custom Metadata Put API
     """
 
     def __init__(self) -> None:
         self.client = get_proxy_client()
-        super(CustomMetadataPutAPI, self).__init__()
+        super(CustomMetadataAPI, self).__init__()
+
+    @requires_auth()
+    # @swag_from('swagger_doc/custom_metadata/custom_metadata_get.yml')
+    def get(self, custom_metadata_uri: str, label: str) -> Iterable[Union[Mapping, int, tuple, None]]:
+        try:
+            custom_metadata = self.client.get_custom_metadata(
+                custom_metadata_uri=custom_metadata_uri,
+                label=label
+            )
+
+            return {'custom_metadata': custom_metadata}, HTTPStatus.OK
+
+        except NotFoundException:
+            msg = 'custom_metadata_uri {} does not exist'.format(custom_metadata_uri)
+            return {'message': msg}, HTTPStatus.NOT_FOUND
+
+        except Exception:
+            LOGGER.exception("Fail:")
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @requires_auth(required_permission=WRITE_PERMISSION)
     # @swag_from('swagger_doc/reveal/chat_post.yml')
@@ -52,7 +72,8 @@ class CustomMetadataPutAPI(Resource):
                 published_tag=published_tag
 
             )
-            return CustomMetadataNodeSchema().dump(custom_metadata_nodes), HTTPStatus.OK
+
+            return CustomMetadataNodeSchema().dump(custom_metadata_nodes, many=True), HTTPStatus.OK
 
         except Exception:
             LOGGER.exception("Custom Metadata Put API Error: ")

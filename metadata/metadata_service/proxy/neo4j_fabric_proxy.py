@@ -167,6 +167,14 @@ class Neo4jFabricProxy(Neo4jProxy):
             self._prepare_federated_query_statement(statement=super()._get_column_description_query_statement(),
                 resource_type=ResourceType.Table))
 
+    def _get_custom_metadata_query_statement(self, label:str) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_custom_metadata_query_statement(label=label)))
+
+    def _get_application_query_statement(self) -> str:
+        return self._get_fabric_query_statement(self._database_name,
+            self._prepare_federated_query_statement(statement=super()._get_application_query_statement()))
+
     def _get_badge_query_statement(self) -> str:
         table_badge_statement = textwrap.dedent(f"""
             MATCH (table:Table)-[:HAS_BADGE]->(badge:Badge)
