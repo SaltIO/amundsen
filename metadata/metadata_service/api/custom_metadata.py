@@ -35,11 +35,11 @@ class CustomMetadataAPI(Resource):
 
     @requires_auth()
     # @swag_from('swagger_doc/custom_metadata/custom_metadata_get.yml')
-    def get(self, custom_metadata_uri: str, label: str) -> Iterable[Union[Mapping, int, tuple, None]]:
+    def get(self, label: str, custom_metadata_uri: Optional[str] = None) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             custom_metadata = self.client.get_custom_metadata(
-                custom_metadata_uri=custom_metadata_uri,
-                label=label
+                label=label,
+                custom_metadata_uri=custom_metadata_uri
             )
 
             return {'custom_metadata': custom_metadata}, HTTPStatus.OK

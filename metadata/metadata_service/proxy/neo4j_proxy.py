@@ -659,40 +659,62 @@ class Neo4jProxy(BaseProxy):
                 tx.rollback()
             raise e
 
-    def _get_custom_metadata_query_statement(self, label: str) -> str:
-
+    def _get_custom_metadata_query_statement(self, label: str, include_key: bool = True) -> str:
 
         node_ref = "cm"
         if label:
             label = label.capitalize()
             node_ref = f"{node_ref}:{label}"
 
-        application_query = textwrap.dedent(f"""
-            MATCH (cmr:CustomMetadataRoot)-[HAS_CUSTOM]->({node_ref} {{key: $custom_metadata_key}})
-            RETURN cm {{.*}} as custom_metadata;
+        return_stmt = "RETURN {value} as custom_metadata;"
+        if include_key:
+            return_stmt = return_stmt.format(value="cm {.*}")
+        else:
+            return_stmt = return_stmt.format(value="collect(cm)")
+
+        custom_metadata_query = textwrap.dedent(f"""
+            MATCH (cmr:CustomMetadataRoot)-[HAS_CUSTOM]->({node_ref} {'{key: $custom_metadata_key}' if include_key else ''})
+            {return_stmt}
         """)
-        return application_query
+
+        return custom_metadata_query
 
     def get_custom_metadata(self, *,
-                            custom_metadata_uri: str,
-                            label: str = None) -> Application:
-        query = self._get_custom_metadata_query_statement(label=label)
+                            label: str = None,
+                            custom_metadata_uri: Optional[str]) -> Union[CustomMetadataNode,List[CustomMetadataNode]]:
+
+        query = self._get_custom_metadata_query_statement(label=label, include_key=True if custom_metadata_uri else False)
         record = self._execute_cypher_query(
             statement=query, param_dict={'custom_metadata_key': custom_metadata_uri}
         )
 
-        node = get_single_record(record, strict=True)['custom_metadata']
+        result = get_single_record(record, strict=True)['custom_metadata']
 
-        props = dict(node)
+        if isinstance(result, list):
+            custom_metadata_items = []
+            for node in result:
+                props = dict(node)
 
-        custom_metadata = CustomMetadataNode(
-            label=label,
-            name=props.get('name'),
-            key=props['key'],
-            properties=props
-        )
+                custom_metadata = CustomMetadataNode(
+                    label=label,
+                    name=props.get('name'),
+                    key=props['key'],
+                    properties=props
+                )
+                custom_metadata_items.append(custom_metadata)
 
-        return CustomMetadataNodeSchema().dump(custom_metadata)
+            return CustomMetadataNodeSchema(many=True).dump(custom_metadata_items)
+        else:
+            props = dict(result)
+
+            custom_metadata = CustomMetadataNode(
+                label=label,
+                name=props.get('name'),
+                key=props['key'],
+                properties=props
+            )
+
+            return CustomMetadataNodeSchema().dump(custom_metadata)
 
     def _get_application_query_statement(self) -> str:
         application_query = textwrap.dedent("""

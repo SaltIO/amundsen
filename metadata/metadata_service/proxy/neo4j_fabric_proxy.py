@@ -167,9 +167,9 @@ class Neo4jFabricProxy(Neo4jProxy):
             self._prepare_federated_query_statement(statement=super()._get_column_description_query_statement(),
                 resource_type=ResourceType.Table))
 
-    def _get_custom_metadata_query_statement(self, label:str) -> str:
+    def _get_custom_metadata_query_statement(self, label:str, include_key: bool = False) -> str:
         return self._get_fabric_query_statement(self._database_name,
-            self._prepare_federated_query_statement(statement=super()._get_custom_metadata_query_statement(label=label)))
+            self._prepare_federated_query_statement(statement=super()._get_custom_metadata_query_statement(label=label, include_key=include_key)))
 
     def _get_application_query_statement(self) -> str:
         return self._get_fabric_query_statement(self._database_name,

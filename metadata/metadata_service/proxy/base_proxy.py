@@ -266,7 +266,8 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
 
     @abstractmethod
     def get_custom_metadata(self, *,
-                            custom_metadata_uri: str) -> Application:
+                            label: str,
+                            custom_metadata_uri: Optional[str] = None) -> Union[CustomMetadataNode,List[CustomMetadataNode]]:
         pass
 
     @abstractmethod

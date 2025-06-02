@@ -277,6 +277,7 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/schemas/<path:database>/<path:cluster>')
     api.add_resource(CustomMetadataAPI,
                      '/custom/',
+                     '/custom/<path:label>',
                      '/custom/<path:label>/<path:custom_metadata_uri>')
     api.add_resource(ApplicationAPI,
                      '/application/',
