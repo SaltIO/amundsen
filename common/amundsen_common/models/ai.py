@@ -1,7 +1,8 @@
 
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Union
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 import attr
+from amundsen_common.models.util import UnionSchemaField
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ChatMessage:
@@ -16,12 +17,18 @@ class ChatMessageSchema(AttrsSchema):
 @attr.s(auto_attribs=True, kw_only=True)
 class ChatFunction:
     functions: List[Dict[Any,Any]]
-    function_call: Dict[Any,Any]
+    function_call: Union[str,Dict[Any,Any]]
+
 
 class ChatFunctionSchema(AttrsSchema):
     class Meta:
         target = ChatFunction
         register_as_scheme = True
+
+    function_call = UnionSchemaField([str, dict])
+
+# For Union support
+ChatFunction.__marshmallow_schema__ = ChatFunctionSchema
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ChatRequest:
