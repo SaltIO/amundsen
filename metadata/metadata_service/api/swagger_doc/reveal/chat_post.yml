@@ -1,0 +1,35 @@
+Chat interface to an LLM
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'reveal'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
+  - name: column_name
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    example: 'currency'
+requestBody:
+  $ref: '#/components/requestBodies/StatsPutRequest'
+responses:
+  400:
+    $ref: '#/components/responses/ValidationErrorResponse'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    description: 'The chat was processed successfully'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/MessageResponse'
+  500:
+    description: 'Internal error processing the chat'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

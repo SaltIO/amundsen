@@ -508,6 +508,37 @@ components:
       allOf:
         - $ref: '#/components/schemas/UserDetail'
         - $ref: '#/components/schemas/Publisher'
+    ChatRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        function:
+          type: object
+          description: 'Object representing the LLM Function Calls'
+          $ref: '#/components/schemas/ChatFunction'
+    ChatMessage:
+      type: object
+      properties:
+        functions:
+          type: object
+          description: 'The role of the chat message: system, user, etc'
+        content:
+          type: string
+          description: 'The message content'
+    ChatFunction:
+      type: object
+      properties:
+        functions:
+          type: array
+          description: 'The list of LLM function calls'
+          $ref: '#/components/schemas/ChatFunctionCall'
+        function_call:
+          type: object
+          description: 'The function to call'
+          additionalProperties: true
     ColumnFields:
       type: object
       properties:
