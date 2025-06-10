@@ -1,6 +1,6 @@
 alembic==1.15.1
-amundsen-common==0.31.0+foodtruck.8
-amundsen-databuilder==7.4.4+foodtruck.13
+amundsen-common==0.31.0+foodtruck.9
+amundsen-databuilder==7.4.4+foodtruck.14
 amundsen-rds==0.0.8
 aniso8601==10.0.0
 annotated-types==0.7.0

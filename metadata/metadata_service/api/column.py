@@ -187,9 +187,7 @@ class ColumnStatsAPI(Resource):
         Gets column stats in Neo4j
         """
         try:
-            LOGGER.info(f'ColumnStatsAPI:GET')
             stats = self.client.get_column_stats(table_uri=table_uri, column_name=column_name)
-            LOGGER.info(f'stats={stats}')
 
             return {'column_stats': stats}, HTTPStatus.OK
 
@@ -198,7 +196,6 @@ class ColumnStatsAPI(Resource):
             return {'message': msg}, HTTPStatus.NOT_FOUND
 
         except Exception:
-            LOGGER.exception(f'FAILED')
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @requires_auth(required_permission=WRITE_PERMISSION)

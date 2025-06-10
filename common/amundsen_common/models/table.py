@@ -102,12 +102,12 @@ class ColumnSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class Application:
+    id: str
+    kind: str = None
+    key: Optional[str] = None
+    name: Optional[str] = None
     application_url: Optional[str] = None
     description: Optional[str] = None
-    id: str
-    name: Optional[str] = None
-    kind: Optional[str] = None
-
 
 class ApplicationSchema(AttrsSchema):
     class Meta:
