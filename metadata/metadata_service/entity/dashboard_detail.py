@@ -39,7 +39,7 @@ class DashboardDetail:
     recent_view_count: Optional[int] = attr.ib(default=0)
 
 
-class DashboardSchema(AttrsSchema):
+class DashboardDetailSchema(AttrsSchema):
     class Meta:
         target = DashboardDetail
         register_as_scheme = True

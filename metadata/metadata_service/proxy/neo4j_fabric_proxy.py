@@ -11,7 +11,7 @@ import neo4j
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.table import (User, Reader)
 from amundsen_common.models.user import User as UserEntity
-from amundsen_common.models.dashboard import DashboardSummary
+from amundsen_common.models.dashboard import DashboardSummary, Dashboard
 from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import Table, Stat, Application
 from amundsen_common.models.lineage import LineageBase
@@ -538,3 +538,10 @@ class Neo4jFabricProxy(Neo4jProxy):
             stats: List[Stat],
             published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_table_stats() is not supported')
+
+    def create_update_dashboard(
+            self,
+            *,
+            dashboard: Dashboard,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_dashboard() is not supported')

@@ -213,7 +213,8 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(UserReadsAPI,
                      '/user/<path:user_id>/read/')
     api.add_resource(DashboardDetailAPI,
-                     '/dashboard/<path:id>')
+                     '/dashboard/<path:id>',
+                     '/dashboard/')
     api.add_resource(DashboardDescriptionAPI,
                      '/dashboard/<path:id>/description')
     api.add_resource(DashboardTagAPI,

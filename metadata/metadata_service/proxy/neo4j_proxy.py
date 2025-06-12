@@ -18,7 +18,7 @@ from neo4j.exceptions import Neo4jError
 
 from amundsen_common.entity.resource_type import ResourceType, to_resource_type
 from amundsen_common.models.api import health_check
-from amundsen_common.models.dashboard import DashboardSummary
+from amundsen_common.models.dashboard import DashboardSummary, Dashboard
 from amundsen_common.models.feature import Feature, FeatureWatermark
 from amundsen_common.models.generation_code import GenerationCode
 from amundsen_common.models.lineage import Lineage, LineageItem, LineageBase, LineageBaseItem
@@ -46,6 +46,16 @@ from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.table_metadata import TableMetadata, ColumnMetadata
 from databuilder.models.table_stats import TableColumnStats, TableStats
 from databuilder.models.application import GenericApplication
+from databuilder.models.dashboard.dashboard_metadata import DashboardMetadata
+from databuilder.models.dashboard.dashboard_chart import DashboardChart
+from databuilder.models.dashboard.dashboard_query import DashboardQuery
+from databuilder.models.dashboard.dashboard_execution import DashboardExecution
+from databuilder.models.dashboard.dashboard_last_modified import DashboardLastModifiedTimestamp
+from databuilder.models.dashboard.dashboard_owner import DashboardOwner
+from databuilder.models.dashboard.dashboard_query_execution import DashboardQueryExecution
+from databuilder.models.dashboard.dashboard_usage import DashboardUsage
+from databuilder.models.dashboard.dashboard_table import DashboardTable
+from databuilder.models.timestamp import timestamp_constants
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
@@ -469,6 +479,224 @@ class Neo4jProxy(BaseProxy):
             if tx_constraint and not tx_constraint.closed():
                 tx_constraint.rollback()
             raise e
+
+    @timer_with_counter
+    def create_update_dashboard(
+            self,
+            *,
+            dashboard: Dashboard,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+
+
+        dashboard_metadata = DashboardMetadata(
+            dashboard_group=dashboard.dashboard_group_name,
+            dashboard_name=dashboard.dashboard_name,
+            description=dashboard.description,
+            tags=[tag for tag in dashboard.tags] if dashboard.tags else None,
+            cluster=dashboard.cluster,
+            product=dashboard.product,
+            dashboard_group_description=dashboard.dashboard_group.description if dashboard.dashboard_group else None,
+            created_timestamp=dashboard.created_timestamp,
+            dashboard_group_url=dashboard.dashboard_group.url if dashboard.dashboard_group else None,
+            dashboard_url=dashboard.url
+        )
+
+        dashboard_last_modified_timestamp = None
+        if dashboard.dashboard_last_modified_timestamp:
+            dashboard_last_modified_timestamp = DashboardLastModifiedTimestamp(
+                dashboard_group_id=dashboard.dashboard_group_name,
+                dashboard_id=dashboard.dashboard_name,
+                last_modified_timestamp=dashboard.dashboard_last_modified_timestamp.last_modified_timestamp,
+                product=dashboard.product,
+                cluster=dashboard.cluster
+            )
+
+    # dashboard_last_modified_timestamp: Optional[DashboardLastModifiedTimestamp] = None
+        dashboard_owners: List[DashboardOwner] = None
+        if dashboard.owners and len(dashboard.owners) > 0:
+            dashboard_owners: List[DashboardOwner] = []
+            for owner in dashboard.owners:
+                dashboard_owners.append(
+                    DashboardOwner(
+                        dashboard_group_id=dashboard.dashboard_group_name,
+                        dashboard_id=dashboard.dashboard_name,
+                        email=owner.email,
+                        product=dashboard.product,
+                        cluster=dashboard.cluster
+                    )
+                )
+
+        dashboard_queries: List[DashboardQuery] = None
+        dashboard_query_charts: List[DashboardChart] = None
+        if dashboard.dashboard_queries and len(dashboard.dashboard_queries) > 0:
+            dashboard_queries: List[DashboardQuery] = []
+            for query in dashboard.dashboard_queries:
+                dashboard_queries.append(
+                    DashboardQuery(
+                        dashboard_group_id=dashboard.dashboard_group_name,
+                        dashboard_id=dashboard.dashboard_name,
+                        query_name=query.dashboard_query_name,
+                        url=query.query_url,
+                        query_text=query.query_statement,
+                        product=dashboard.product,
+                        cluster=dashboard.cluster
+                    )
+                )
+
+                if query.charts and len(query.charts) > 0:
+                    if not dashboard_query_charts:
+                        dashboard_query_charts: List[DashboardChart] = []
+                    for chart in query.charts:
+                        dashboard_query_charts.append(
+                            DashboardChart(
+                                dashboard_group_id=dashboard.dashboard_group_name,
+                                dashboard_id=dashboard.dashboard_name,
+                                query_id=query.dashboard_query_name,
+                                chart_id=chart.chart_name,
+                                chart_name=chart.chart_name,
+                                chart_type=chart.chart_type,
+                                chart_url=chart.chart_url,
+                                product=dashboard.product,
+                                cluster=dashboard.cluster
+                            )
+                        )
+
+        LOGGER.info(f'dashboard_queries={dashboard_queries}')
+
+        dashboard_key = dashboard_metadata._get_dashboard_key()
+
+        try:
+            status = None
+
+            status = self._execute_databuilder(
+                databuilder=dashboard_metadata,
+                status_label=dashboard_metadata.DASHBOARD_NODE_LABEL,
+                published_tag=published_tag
+            )
+
+            if dashboard_last_modified_timestamp:
+                self._execute_databuilder(
+                    databuilder=dashboard_last_modified_timestamp,
+                    status_label=timestamp_constants.NODE_LABEL,
+                    published_tag=published_tag
+                )
+
+            if dashboard_owners:
+                for owner in dashboard_owners:
+                    self._execute_databuilder(
+                        databuilder=owner,
+                        status_label=User.USER_NODE_LABEL,
+                        published_tag=published_tag
+                    )
+
+            if dashboard_queries:
+                LOGGER.info(f'Executing dashboard_queries')
+                for query in dashboard_queries:
+                    LOGGER.info(f'Executing dashboard_query')
+                    self._execute_databuilder(
+                        databuilder=query,
+                        status_label=DashboardQuery.DASHBOARD_QUERY_LABEL,
+                        published_tag=published_tag
+                    )
+
+            if dashboard_query_charts:
+                for chart in dashboard_query_charts:
+                    self._execute_databuilder(
+                        databuilder=chart,
+                        status_label=DashboardChart.DASHBOARD_CHART_LABEL,
+                        published_tag=published_tag
+                    )
+
+            return dashboard_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_dashboard.')
+            raise e
+
+
+    def _execute_databuilder(self, databuilder, status_label: str, published_tag: str) -> str:
+
+        _session = self._driver.session(database=self._database_name)
+        _session_constraint = self._driver.session(database=self._database_name)
+
+        tx = None
+        tx_constraint = None
+
+        try:
+            status:str = None
+
+            count = 0
+            tx = _session.begin_transaction()
+            tx_constraint = _session_constraint.begin_transaction()
+
+            node = databuilder.create_next_node()
+            while node:
+                _, tx_constraint = self._try_create_index(
+                    label=node.label,
+                    count=count,
+                    session=_session_constraint,
+                    tx=tx_constraint
+                )
+                tx_constraint.commit()
+                tx_constraint = _session_constraint.begin_transaction()
+
+                node_dict = self._serialize_node(node)
+
+                stmt = self._create_node_merge_statement(
+                    node_record=node_dict,
+                    node_label=node.label,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(node_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+                result_record = result.single()
+                if not result_record:
+                    raise NotCreatedOrUpdatedException(f"During _execute_databuilder(), failed to create or update node {node.label}")
+
+                if node.label == status_label:
+                    status = result_record['status']
+
+                node = databuilder.create_next_node()
+
+            rel = databuilder.create_next_relation()
+            while rel:
+                rel_dict = self._serialize_relationship(rel)
+
+                stmt = self._create_relationship_merge_statement(
+                    rel_record=rel_dict,
+                    rel_start_label=rel.start_label,
+                    rel_end_label=rel.end_label,
+                    rel_type=rel.type,
+                    rel_reverse_type=rel.reverse_type,
+                    published_tag=published_tag
+                )
+                count, result, tx = self._execute_transaction_statement(
+                    stmt=stmt,
+                    params=self._create_props_param(rel_dict),
+                    session=_session,
+                    tx=tx,
+                    count=count
+                )
+
+                rel = databuilder.create_next_relation()
+
+            tx.commit()
+            # LOGGER.info('Committed total %i statements', count)
+
+            return status
+        except Exception as e:
+            LOGGER.exception('Failed to _execute_databuilder. Rolling back.')
+            if tx and not tx.closed():
+                tx.rollback()
+            if tx_constraint and not tx_constraint.closed():
+                tx_constraint.rollback()
+            raise e
+
 
     CORE_NODE_LABELS = ['Application', 'Badge', 'Chart', 'Cluster', 'Column', 'Dashboard', 'Dashboardgroup', 'Database', 'Data_Channel', 'Data_Provider', 'Data_Location', 'Description', 'Execution', 'File', 'File_Table', 'Programmatic_Description', 'Query', 'Schema', 'Score', 'Snowflakelisting', 'Snowflakeshare', 'Source', 'Stat', 'Table', 'Tag', 'Timestamp', 'Update_Frequency', 'User', 'Prospectus_Waterfall_Scheme', 'Watermark']
     CUSTOM_METADATA_NODE_KEY_FORMAT = "custom://{label}/{name}"
