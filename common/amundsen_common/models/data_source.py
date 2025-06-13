@@ -152,9 +152,9 @@ class File:
     name: str
     key: Optional[str] = None
     description: Optional[str] = None
-    type: str = None
+    type: str
     category: Optional[str] = None
-    path: str = None
+    path: str
     is_directory: bool = None
     dataLocation: Optional[Union[FilesystemDataLocation, AwsS3DataLocation, DataLocation]] = None
     dataProvider: Optional[DataProvider] = None

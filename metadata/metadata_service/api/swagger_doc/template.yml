@@ -513,7 +513,7 @@ components:
       properties:
         key:
           type: string
-          example: "filesystem"
+          example: "filesystem://text/file.txt"
         name:
           type: string
           example: "test.txt"
@@ -541,6 +541,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TagFields'
+      required:
+        - name
+        - type
+        - path
     DataProviderFields:
       type: object
       properties:
