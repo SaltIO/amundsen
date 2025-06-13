@@ -23,6 +23,7 @@ from metadata_service.api.column import (ColumnBadgeAPI, ColumnDescriptionAPI,
 from metadata_service.api.dashboard import (DashboardBadgeAPI,
                                             DashboardDescriptionAPI,
                                             DashboardDetailAPI,
+                                            DashboardPutAPI,
                                             DashboardTagAPI)
 from metadata_service.api.feature import (FeatureBadgeAPI,
                                           FeatureDescriptionAPI,
@@ -50,6 +51,7 @@ from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
 from metadata_service.api.data_source import (DataProviderDetailAPI,
                                               DataProviderDescriptionAPI,
                                               FileDetailAPI,
+                                              FilePutAPI,
                                               FileTagAPI,
                                               FileDescriptionAPI,
                                               FileOwnerAPI,
@@ -213,7 +215,8 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(UserReadsAPI,
                      '/user/<path:user_id>/read/')
     api.add_resource(DashboardDetailAPI,
-                     '/dashboard/<path:id>',
+                     '/dashboard/<path:id>')
+    api.add_resource(DashboardPutAPI,
                      '/dashboard/')
     api.add_resource(DashboardDescriptionAPI,
                      '/dashboard/<path:id>/description')
@@ -247,6 +250,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/data_source/data_provider/<path:id>/description')
     api.add_resource(FileDetailAPI,
                      '/data_source/file/<path:file_uri>')
+    api.add_resource(FilePutAPI,
+                     '/data_source/file/')
     api.add_resource(FileTagAPI,
                      '/data_source/file/<path:id>/tag/<tag>')
     api.add_resource(FileDescriptionAPI,

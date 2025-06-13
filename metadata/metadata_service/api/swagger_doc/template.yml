@@ -100,6 +100,18 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/TableDetailPut'
+    DashboardDetailPutRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DashboardDetailPut'
+    FilePutRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FilePut'
     LineagePutRequest:
       required: true
       content:
@@ -306,6 +318,317 @@ components:
         update_frequency:
           type: string
           example: "quarterly"
+    DashboardGroupFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        key:
+          type: string
+          example: "count_dashboard://client.group"
+        product:
+          type: string
+          example: "count"
+        cluster:
+          type: string
+          example: "client"
+        dashboard_group_name:
+          type: string
+          example: "dashboard_group"
+        url:
+          type: string
+          example: "http://cmdrvl.com"
+        description:
+          type: string
+          example: "Dashboards are neat"
+    DashboardChartFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        key:
+          type: string
+          example: "count_dashboard://client.group/dashboard/query/query_name/chart/chart_name"
+        product:
+          type: string
+          example: "count"
+        cluster:
+          type: string
+          example: "client"
+        dashboard_group_name:
+          type: string
+          example: "dashboard_group"
+        dashboard_name:
+          type: string
+          example: "dashboard_name"
+        dashboard_query_name:
+          type: string
+          example: "dashboard_query_name"
+        chart_name:
+          type: string
+          example: "chart_name"
+        chart_type:
+          type: string
+          example: "chart_type"
+        chart_url:
+          type: string
+          example: "chart_url"
+    DashboardQueryExecutionFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        key:
+          type: string
+          example: "count_dashboard://client.group/dashboard/query/query_name/execution/_last_successful_execution"
+        product:
+          type: string
+          example: "count"
+        cluster:
+          type: string
+          example: "client"
+        dashboard_group_name:
+          type: string
+          example: "dashboard_group"
+        dashboard_name:
+          type: string
+          example: "dashboard_name"
+        dashboard_query_name:
+          type: string
+          example: "dashboard_query_name"
+        query_execution_timestamp:
+          type: int
+          example: 123456789
+        query_execution_state:
+          type: string
+          example: "query_execution_state"
+        query_execution_name:
+          type: string
+          example: "_last_execution"
+    DashboardQueryFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        key:
+          type: string
+          example: "count_dashboard://client.group/dashboard/query/query_name"
+        product:
+          type: string
+          example: "count"
+        cluster:
+          type: string
+          example: "client"
+        dashboard_group_name:
+          type: string
+          example: "dashboard_group"
+        dashboard_name:
+          type: string
+          example: "dashboard_name"
+        dashboard_query_name:
+          type: string
+          example: "dashboard_query_name"
+        query_statement:
+          type: string
+          example: "SELECT * FROM table;"
+        query_url:
+          type: string
+          example: "https://github.com"
+        charts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardChartFields'
+        last_execution:
+          ref: '#/components/schemas/DashboardQueryExecutionFields'
+    DashboardLastModifiedTimestampFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        key:
+          type: string
+          example: "count_dashboard://client.group/dashboard/_last_modified_timestamp"
+        product:
+          type: string
+          example: "count"
+        cluster:
+          type: string
+          example: "client"
+        dashboard_group_name:
+          type: string
+          example: "dashboard_group"
+        dashboard_name:
+          type: string
+          example: "dashboard"
+        last_modified_timestamp:
+          type: int
+          example: 123456789
+    DashboardFields:
+      type: object
+      # required:
+      #   - description
+      properties:
+        key:
+          type: string
+          example: "count_dashboard://client.group/dashboard"
+        product:
+          type: string
+          example: "count"
+        cluster:
+          type: string
+          example: "client"
+        dashboard_group_name:
+          type: string
+          example: "dashboard_group"
+        dashboard_name:
+          type: string
+          example: "dashboard"
+        url:
+          type: string
+          example: "http://cmdrvl.com"
+        description:
+          type: string
+          example: "Dashboards are neat"
+        created_timestamp:
+          type: int
+          example: 123456789
+        tags:
+          type: array
+          items:
+            type: string
+        owners:
+          type: array
+          items:
+            type: string
+        dashboard_group:
+          $ref: '#/components/schemas/DashboardGroupFields'
+        dashboard_queries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardQueryFields'
+        dashboard_last_modified_timestamp:
+          $ref: '#/components/schemas/DashboardLastModifiedTimestampFields'
+    FileFields:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "filesystem"
+        name:
+          type: string
+          example: "test.txt"
+        description:
+          type: string
+          example: "This is a text text file"
+        type:
+          type: string
+          example: "text"
+        path:
+          type: string
+          example: "/path/to/file"
+        is_directory:
+          type: boolean
+          example: false
+        dashboard_location:
+          "oneOf": [
+                { "$ref": "#/components/schemas/DataLocationFields" },
+                { "$ref": "#/components/schemas/AwsS3DataLocationFields" },
+                { "$ref": "#/components/schemas/FilesystemDataLocationFields" }
+            ]
+        dashboard_provider:
+          $ref: '#/components/schemas/DataProviderFields'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagFields'
+    DataProviderFields:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "data_provider://CMDRVL"
+        name:
+          type: string
+          example: "CMDRVL"
+        website:
+          type: string
+          example: "https://cmdrvl.com"
+        desc:
+          type: string
+          example: "This is a data provider"
+        data_channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataChannelFields'
+      required:
+        - name
+    DataChannelFields:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "cmdrvl://reveal_api/api"
+        name:
+          type: string
+          example: "reveal_api"
+        type:
+          type: string
+          enum: ["data_feed", "data_share", "api", "sftp"]
+        url:
+          type: string
+          example: "https://cmdrvl.com"
+        description:
+          type: string
+          example: "This is a data channel"
+        license:
+          type: string
+          enum: ["Proprietary License", "Public Domain Dedication", "Creative Commons License By Attribution", "Creative Commons License By Attribution-ShareAlike", "Creative Commons License By Attribution-NoDerivatives", "Creative Commons License By Attribution-NonCommercial", "Open Data Commons Attribution License", "Open Data Commons Open Database License", "GNU General Public License", "MIT License", "Apache License", "BSD License"]
+      required:
+        - name
+        - type
+    DataLocationFields:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "filesystem://networkfilesystem"
+        name:
+          type: string
+          example: "NetworkFilesystem"
+        type:
+          type: string
+          example: "filesystem"
+      required:
+        - name
+        - type
+    AwsS3DataLocationFields:
+      allOf:
+        - $ref: '#/components/schemas/DataLocationFields'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: ["aws_s3"]
+              readOnly: true
+            bucket:
+              type: string
+              example: "test_bucket"
+          required:
+            - bucket
+    FilesystemDataLocationFields:
+      allOf:
+        - $ref: '#/components/schemas/DataLocationFields'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: ["filesystem"]
+              readOnly: true
+            drive:
+              type: string
+              example: "C:"
+          required:
+            - bucket
     Description:
       type: object
       required:
@@ -342,6 +665,16 @@ components:
       type: object
       allOf:
         - $ref: '#/components/schemas/TableFields'
+        - $ref: '#/components/schemas/Publisher'
+    DashboardDetailPut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/DashboardFields'
+        - $ref: '#/components/schemas/Publisher'
+    FilePut:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/FileFields'
         - $ref: '#/components/schemas/Publisher'
     UpdateFrequency:
       type: object

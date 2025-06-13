@@ -640,9 +640,6 @@ const configDefault: AppConfig = {
   searchPagination: {
     resultsPerPage: 10,
   },
-  eagleye: {
-    isEnabled: false
-  },
   tableLineage: {
     defaultLineageDepth: 5,
     externalEnabled: false,

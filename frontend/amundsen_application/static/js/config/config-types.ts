@@ -55,7 +55,6 @@ export interface AppConfig {
   tableProfile: TableProfileConfig;
   tableQualityChecks: TableQualityChecksConfig;
   userIdLabel: string /* Temporary configuration due to lacking string customization/translation support */;
-  eagleye: EagleyeConfig;
 }
 
 /**
@@ -106,11 +105,6 @@ export interface AppConfigCustom {
   preview?: PreviewConfig;
   ai?: AIConfig;
   snowflake?: SnowflakeConfig;
-  eagleye?: EagleyeConfig;
-}
-
-export interface EagleyeConfig {
-  isEnabled: boolean;
 }
 
 /**

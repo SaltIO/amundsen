@@ -16,6 +16,7 @@ from amundsen_common.models.popular_table import PopularTable
 from amundsen_common.models.table import Table, Stat, Application
 from amundsen_common.models.lineage import LineageBase
 from amundsen_common.models.custom import CustomMetadata, CustomMetadataNode
+from amundsen_common.models.data_source import File
 
 
 
@@ -545,3 +546,10 @@ class Neo4jFabricProxy(Neo4jProxy):
             dashboard: Dashboard,
             published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_dashboard() is not supported')
+
+    def create_update_file(
+            self,
+            *,
+            file: File,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_file() is not supported')

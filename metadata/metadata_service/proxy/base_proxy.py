@@ -99,6 +99,15 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def create_update_file(
+            self,
+            *,
+            file: File,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+
+    @abstractmethod
     def delete_owner(self, *, table_uri: str, owner: str) -> None:
         pass
 

@@ -34,6 +34,7 @@ class DashboardSummarySchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardGroup:
+    key: Optional[str] = None
     product: str
     cluster: str
     dashboard_group_name: str
@@ -47,6 +48,7 @@ class DashboardGroupSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardChart:
+    key: Optional[str] = None
     product: str
     cluster: str
     dashboard_group_name: str
@@ -63,6 +65,7 @@ class DashboardChartSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardQueryExecution:
+    key: Optional[str] = None
     product: str
     cluster: str
     dashboard_group_name: str
@@ -79,6 +82,7 @@ class DashboardQueryExecutionSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardQuery:
+    key: Optional[str] = None
     product: str
     cluster: str
     dashboard_group_name: str
@@ -119,25 +123,11 @@ class DashboardQuerySchema(AttrsSchema):
             last_execution.setdefault("dashboard_name", dashboard_name)
             last_execution.setdefault("dashboard_query_name", dashboard_query_name)
 
-        # for chart in getattr(data, "charts", None) or []:
-        #     chart.product = data.product
-        #     chart.cluster = data.cluster
-        #     chart.dashboard_group_name = data.dashboard_group_name
-        #     chart.dashboard_name = data.dashboard_name
-        #     chart.dashboard_query_name = data.dashboard_query_name
-
-        # last_execution = getattr(data, "last_execution", None)
-        # if last_execution:
-        #     last_execution.product = data.product
-        #     last_execution.cluster = data.cluster
-        #     last_execution.dashboard_group_name = data.dashboard_group_name
-        #     last_execution.dashboard_name = data.dashboard_name
-        #     last_execution.dashboard_query_name = data.dashboard_query_name
-
         return data
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardLastModifiedTimestamp:
+    key: Optional[str] = None
     product: str
     cluster: str
     dashboard_group_name: str
@@ -151,6 +141,7 @@ class DashboardLastModifiedTimestampSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class Dashboard:
+    key: Optional[str] = None
     product: str
     cluster: str
     dashboard_group_name: str
@@ -159,7 +150,7 @@ class Dashboard:
     description: Optional[str] = None
     created_timestamp: Optional[int] = None,
     tags: Optional[List[str]] = None
-    owners: Optional[List[User]] = None
+    owners: Optional[List[str]] = None
     dashboard_group: Optional[DashboardGroup] = None
     dashboard_queries: Optional[List[DashboardQuery]] = None
     dashboard_last_modified_timestamp: Optional[DashboardLastModifiedTimestamp] = None
@@ -214,24 +205,6 @@ class DashboardSchema(AttrsSchema):
             dashboard_last_modified_timestamp.setdefault("cluster", cluster)
             dashboard_last_modified_timestamp.setdefault("dashboard_group_name", dashboard_group_name)
             dashboard_last_modified_timestamp.setdefault("dashboard_name", dashboard_name)
-
-        # dashboard_group = getattr(data, "dashboard_group", None)
-        # if dashboard_group:
-        #     dashboard_group.product = data.product
-        #     dashboard_group.cluster = data.cluster
-
-        # for query in getattr(data, "dashboard_queries", None) or []:
-        #     query.product = data.product
-        #     query.cluster = data.cluster
-        #     query.dashboard_group_name = data.dashboard_group_name
-        #     query.dashboard_name = data.dashboard_name
-
-        # dashboard_last_modified_timestamp = getattr(data, "dashboard_last_modified_timestamp", None)
-        # if dashboard_last_modified_timestamp:
-        #     dashboard_last_modified_timestamp.product = data.product
-        #     dashboard_last_modified_timestamp.cluster = data.cluster
-        #     dashboard_last_modified_timestamp.dashboard_group_name = data.dashboard_group_name
-        #     dashboard_last_modified_timestamp.dashboard_name = data.dashboard_name
 
         return data
 

@@ -32,7 +32,7 @@ from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.user import UserSchema
 from amundsen_common.models.tag import Tag, TagSchema
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare, SnowflakeListing
-from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable, ProspectusWaterfallScheme, ProspectusScheme)
+from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable)
 from amundsen_common.models.database import Database, DatabaseSchema
 from amundsen_common.models.cluster import Cluster, ClusterSchema
 from amundsen_common.models.schema import Schema, SchemaSchema
@@ -56,6 +56,7 @@ from databuilder.models.dashboard.dashboard_query_execution import DashboardQuer
 from databuilder.models.dashboard.dashboard_usage import DashboardUsage
 from databuilder.models.dashboard.dashboard_table import DashboardTable
 from databuilder.models.timestamp import timestamp_constants
+from databuilder.models.data_source.data_source_metadata import File as FileDataBuilder, DataLocation as DataLocationDataBuilder, AwsS3DataLocation as AwsS3DataLocationDataBuilder, FilesystemDataLocation as FilesystemDataLocationDataBuilder,  DataProvider as DataProviderDataBuilder, DataChannel as DataChannelDataBuilder
 
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
@@ -396,88 +397,20 @@ class Neo4jProxy(BaseProxy):
             is_view=table.is_view,
             tags=tags
         )
+
         table_key = table_metadata._get_table_key()
 
-        _session = self._driver.session(database=self._database_name)
-        _session_constraint = self._driver.session(database=self._database_name)
-
-        tx = None
-        tx_constraint = None
 
         try:
-            status = None
-
-            count = 0
-            tx = _session.begin_transaction()
-            tx_constraint = _session_constraint.begin_transaction()
-
-            node = table_metadata.create_next_node()
-            while node:
-                _, tx_constraint = self._try_create_index(
-                    label=node.label,
-                    count=count,
-                    session=_session_constraint,
-                    tx=tx_constraint
-                )
-                tx_constraint.commit()
-                tx_constraint = _session_constraint.begin_transaction()
-
-                node_dict = self._serialize_node(node)
-
-                stmt = self._create_node_merge_statement(
-                    node_record=node_dict,
-                    node_label=node.label,
-                    published_tag=published_tag
-                )
-                count, result, tx = self._execute_transaction_statement(
-                    stmt=stmt,
-                    params=self._create_props_param(node_dict),
-                    session=_session,
-                    tx=tx,
-                    count=count
-                )
-
-                result_record = result.single()
-                if not result_record:
-                    raise NotCreatedOrUpdatedException(f"During create_update_table(), failed to create or update node {node.label}")
-
-                if node.label == 'Table':
-                    status = result_record['status']
-
-                node = table_metadata.create_next_node()
-
-            rel = table_metadata.create_next_relation()
-            while rel:
-                rel_dict = self._serialize_relationship(rel)
-
-                stmt = self._create_relationship_merge_statement(
-                    rel_record=rel_dict,
-                    rel_start_label=rel.start_label,
-                    rel_end_label=rel.end_label,
-                    rel_type=rel.type,
-                    rel_reverse_type=rel.reverse_type,
-                    published_tag=published_tag
-                )
-                count, result, tx = self._execute_transaction_statement(
-                    stmt=stmt,
-                    params=self._create_props_param(rel_dict),
-                    session=_session,
-                    tx=tx,
-                    count=count
-                )
-
-                rel = table_metadata.create_next_relation()
-
-            tx.commit()
-            # LOGGER.info('Committed total %i statements', count)
+            status = self._execute_databuilder(
+                databuilder=table_metadata,
+                status_label=table_metadata.TABLE_NODE_LABEL,
+                published_tag=published_tag
+            )
 
             return table_key, status
         except Exception as e:
             LOGGER.exception('Failed to create_update_table. Rolling back.')
-            if tx and not tx.closed():
-                tx.rollback()
-            if tx_constraint and not tx_constraint.closed():
-                tx_constraint.rollback()
             raise e
 
     @timer_with_counter
@@ -511,7 +444,6 @@ class Neo4jProxy(BaseProxy):
                 cluster=dashboard.cluster
             )
 
-    # dashboard_last_modified_timestamp: Optional[DashboardLastModifiedTimestamp] = None
         dashboard_owners: List[DashboardOwner] = None
         if dashboard.owners and len(dashboard.owners) > 0:
             dashboard_owners: List[DashboardOwner] = []
@@ -520,7 +452,7 @@ class Neo4jProxy(BaseProxy):
                     DashboardOwner(
                         dashboard_group_id=dashboard.dashboard_group_name,
                         dashboard_id=dashboard.dashboard_name,
-                        email=owner.email,
+                        email=owner,
                         product=dashboard.product,
                         cluster=dashboard.cluster
                     )
@@ -577,7 +509,6 @@ class Neo4jProxy(BaseProxy):
             if dashboard_last_modified_timestamp:
                 self._execute_databuilder(
                     databuilder=dashboard_last_modified_timestamp,
-                    status_label=timestamp_constants.NODE_LABEL,
                     published_tag=published_tag
                 )
 
@@ -585,7 +516,6 @@ class Neo4jProxy(BaseProxy):
                 for owner in dashboard_owners:
                     self._execute_databuilder(
                         databuilder=owner,
-                        status_label=User.USER_NODE_LABEL,
                         published_tag=published_tag
                     )
 
@@ -595,7 +525,6 @@ class Neo4jProxy(BaseProxy):
                     LOGGER.info(f'Executing dashboard_query')
                     self._execute_databuilder(
                         databuilder=query,
-                        status_label=DashboardQuery.DASHBOARD_QUERY_LABEL,
                         published_tag=published_tag
                     )
 
@@ -603,7 +532,6 @@ class Neo4jProxy(BaseProxy):
                 for chart in dashboard_query_charts:
                     self._execute_databuilder(
                         databuilder=chart,
-                        status_label=DashboardChart.DASHBOARD_CHART_LABEL,
                         published_tag=published_tag
                     )
 
@@ -612,8 +540,102 @@ class Neo4jProxy(BaseProxy):
             LOGGER.exception('Failed to create_update_dashboard.')
             raise e
 
+    @timer_with_counter
+    def create_update_file(
+            self,
+            *,
+            file: File,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, bool]:
 
-    def _execute_databuilder(self, databuilder, status_label: str, published_tag: str) -> str:
+        LOGGER.info(f'file={file}')
+
+        data_provider_metadata = None
+        if file.dataProvider:
+            data_provider_metadata = DataProviderDataBuilder(
+                name=file.dataProvider.name,
+                website=file.dataProvider.website,
+                desc=file.dataProvider.description
+            )
+
+        data_channel_metadata = None
+        if file.dataProvider.data_channels and len(file.dataProvider.data_channels) == 1:
+            channel = file.dataProvider.data_channels[0]
+            data_channel_metadata = DataChannelDataBuilder(
+                name=channel.name,
+                type=DataChannelDataBuilder.DataChannelType(channel.type),
+                url=channel.url,
+                desc=channel.description,
+                license=channel.license,
+                data_provider=data_provider_metadata
+            )
+
+        data_location_metadata = None
+        if file.dataLocation:
+            if isinstance(file.dataLocation, AwsS3DataLocation):
+                data_location_metadata = AwsS3DataLocationDataBuilder(
+                    name=file.dataLocation.name,
+                    bucket=file.dataLocation.bucket
+                )
+            elif isinstance(file.dataLocation, FilesystemDataLocation):
+                data_location_metadata = FilesystemDataLocationDataBuilder(
+                    name=file.dataLocation.name,
+                    drive=file.dataLocation.drive
+                )
+
+        file_metadata = FileDataBuilder(
+            name=file.name,
+            type=file.type,
+            category=file.category,
+            path=file.path,
+            is_directory=file.is_directory,
+            description=file.description,
+            data_location=data_location_metadata,
+            data_channel=data_channel_metadata,
+            tags=[tag.tag_name for tag in file.tags]
+        )
+
+        file_key = file_metadata.get_key()
+
+        try:
+            status = None
+
+            # if data_provider_metadata:
+            #     self._execute_databuilder(
+            #         databuilder=data_provider_metadata,
+            #         published_tag=published_tag
+            #     )
+
+            # if data_channel_metadata:
+            #     for channel_metadata in data_channel_metadata:
+            #         self._execute_databuilder(
+            #             databuilder=channel_metadata,
+            #             published_tag=published_tag
+            #         )
+
+            # if data_location_metadata:
+            #     self._execute_databuilder(
+            #         databuilder=data_location_metadata,
+            #         published_tag=published_tag
+            #     )
+
+            # LOGGER.info(f'data_location_metadata={data_location_metadata}')
+
+            status = self._execute_databuilder(
+                databuilder=file_metadata,
+                status_label=file_metadata.FILE_NODE_LABEL,
+                published_tag=published_tag
+            )
+
+            return file_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_file.')
+            raise e
+
+    def _execute_databuilder(
+            self,
+            databuilder,
+            status_label: str = None,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> str:
 
         _session = self._driver.session(database=self._database_name)
         _session_constraint = self._driver.session(database=self._database_name)
@@ -658,7 +680,7 @@ class Neo4jProxy(BaseProxy):
                 if not result_record:
                     raise NotCreatedOrUpdatedException(f"During _execute_databuilder(), failed to create or update node {node.label}")
 
-                if node.label == status_label:
+                if status_label and node.label == status_label:
                     status = result_record['status']
 
                 node = databuilder.create_next_node()
@@ -698,7 +720,7 @@ class Neo4jProxy(BaseProxy):
             raise e
 
 
-    CORE_NODE_LABELS = ['Application', 'Badge', 'Chart', 'Cluster', 'Column', 'Dashboard', 'Dashboardgroup', 'Database', 'Data_Channel', 'Data_Provider', 'Data_Location', 'Description', 'Execution', 'File', 'File_Table', 'Programmatic_Description', 'Query', 'Schema', 'Score', 'Snowflakelisting', 'Snowflakeshare', 'Source', 'Stat', 'Table', 'Tag', 'Timestamp', 'Update_Frequency', 'User', 'Prospectus_Waterfall_Scheme', 'Watermark']
+    CORE_NODE_LABELS = ['Application', 'Badge', 'Chart', 'Cluster', 'Column', 'Dashboard', 'Dashboardgroup', 'Database', 'Data_Channel', 'Data_Provider', 'Data_Location', 'Description', 'Execution', 'File', 'File_Table', 'Programmatic_Description', 'Query', 'Schema', 'Score', 'Snowflakelisting', 'Snowflakeshare', 'Source', 'Stat', 'Table', 'Tag', 'Timestamp', 'Update_Frequency', 'User', 'Watermark']
     CUSTOM_METADATA_NODE_KEY_FORMAT = "custom://{label}/{name}"
 
     def _convert_to_label(name: str) -> str:
@@ -4473,19 +4495,6 @@ class Neo4jProxy(BaseProxy):
         return data_provider
 
     def _get_file_query_statement(self) -> str:
-        # file_query = textwrap.dedent("""
-        #     MATCH (file:File {key: $file_key})
-        #     OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
-        #     OPTIONAL MATCH (file)-[:FILE_OF]->(data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider:Data_Provider)
-        #     OPTIONAL MATCH (data_provider:Data_Provider)-[:DATA_CHANNEL]->(data_channel)
-        #     OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
-        #     OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
-        #     OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
-        #     OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
-        #     OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
-        #     WITH file, file_desc, data_provider, data_channel, data_location, collect(distinct tag) as tags, collect(distinct owner) as owners, collect(distinct file_table) as file_tables, collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
-        #     RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes
-        # """)
         file_query = textwrap.dedent("""
             MATCH (file:File {key: $file_key})
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
@@ -4494,13 +4503,11 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
             OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
             OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
-            OPTIONAL MATCH (file)-[:PROSPECTUS_WATERFALL_SCHEME]->(prospectus_waterfall_scheme:Prospectus_Waterfall_Scheme)
             WITH file, file_desc, data_provider, data_channel, data_location,
                 collect(distinct tag) as tags,
                 collect(distinct owner) as owners,
-                collect(distinct file_table) as file_tables,
-                collect(distinct prospectus_waterfall_scheme) as prospectus_waterfall_schemes
-            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables, prospectus_waterfall_schemes;
+                collect(distinct file_table) as file_tables
+            RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables;
         """)
         return file_query
 
@@ -4558,44 +4565,23 @@ class Neo4jProxy(BaseProxy):
                                        content=file_table_rec["content"])
                 file_tables.append(file_table)
 
-        prospectus_waterfall_schemes_rec = record.get("prospectus_waterfall_schemes", None)
-        prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = None
-        if prospectus_waterfall_schemes_rec and len(prospectus_waterfall_schemes_rec) > 0:
-            prospectus_waterfall_schemes: List[ProspectusWaterfallScheme] = []
-            for prospectus_waterfall_scheme_rec in prospectus_waterfall_schemes_rec:
-
-                schemes = prospectus_waterfall_scheme_rec["scheme"]
-                schemes = ast.literal_eval(schemes)
-
-                prospectus_schemes: List[ProspectusScheme] = None
-                if schemes and len(schemes) > 0:
-                    prospectus_schemes: List[ProspectusScheme] = []
-                    for scheme in schemes:
-                        short_name, details = next(iter(scheme.items()))
-                        prospectus_scheme = ProspectusScheme(shortName=short_name,
-                                                             details=details)
-                        prospectus_schemes.append(prospectus_scheme)
-
-                prospectus_waterfall_scheme = ProspectusWaterfallScheme(name=prospectus_waterfall_scheme_rec["name"],
-                                                                        scheme=prospectus_schemes)
-                prospectus_waterfall_schemes.append(prospectus_waterfall_scheme)
-
         owners = self._create_owners(record['owners'])
 
         file_rec = record["file"]
-        file = File(name=file_rec["name"],
-                    key=file_rec["key"],
-                    description=self._safe_get(record, "file_desc", "description"),
-                    type=file_rec.get("type", None),
-                    category=file_rec.get("category", None),
-                    path=file_rec.get("path", None),
-                    is_directory=file_rec.get("is_directory", None),
-                    dataLocation=data_location,
-                    dataProvider=data_provider,
-                    tags=tags,
-                    owners=owners,
-                    fileTables=file_tables,
-                    prospectusWaterfallSchemes=prospectus_waterfall_schemes)
+        file = File(
+            name=file_rec["name"],
+            key=file_rec["key"],
+            description=self._safe_get(record, "file_desc", "description"),
+            type=file_rec.get("type", None),
+            category=file_rec.get("category", None),
+            path=file_rec.get("path", None),
+            is_directory=file_rec.get("is_directory", None),
+            dataLocation=data_location,
+            dataProvider=data_provider,
+            tags=tags,
+            owners=owners,
+            fileTables=file_tables
+        )
 
         return file
 

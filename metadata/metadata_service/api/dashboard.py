@@ -47,8 +47,16 @@ class DashboardDetailAPI(BaseAPI):
         except NotFoundException:
             return {'message': 'dashboard_id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
+class DashboardPutAPI(BaseAPI):
+    """
+    Dashboard PUT API
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DashboardPutAPI, self).__init__()
+
     @requires_auth(required_permission=WRITE_PERMISSION)
-    # @swag_from('swagger_doc/dashboard/detail_put.yml')
+    @swag_from('swagger_doc/dashboard/detail_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         data = None
         try:
@@ -78,17 +86,6 @@ class DashboardDetailAPI(BaseAPI):
 
         except NotFoundException:
             return {'message': f'Failed to update/create table: {data}'}, HTTPStatus.NOT_FOUND
-
-    # @requires_auth(required_permission=WRITE_PERMISSION)
-    # # @swag_from('swagger_doc/dashboard/detail_delete.yml')
-    # def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
-    #     args = self.parser.parse_args()
-    #     category = args.get('category', '')
-
-    #     return self._badge_common.delete(id=id,
-    #                                      resource_type=ResourceType.Dashboard,
-    #                                      badge_name=badge,
-    #                                      category=category)
 
 
 class DashboardDescriptionAPI(BaseAPI):

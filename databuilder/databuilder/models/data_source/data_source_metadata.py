@@ -59,7 +59,10 @@ class DataProvider(GraphSerializable):
         pass
 
     def _create_node_iterator(self) -> Iterator[GraphNode]:
-        yield GraphNode(
+        yield self.get_node()
+
+    def get_node(self) -> GraphNode:
+        return GraphNode(
             key=self.get_key(),
             label=self.DATA_PROVIDER_NODE_LABEL,
             attributes={
@@ -134,7 +137,11 @@ class DataChannel(GraphSerializable):
             return None
 
     def _create_node_iterator(self) -> Iterator[GraphNode]:
-        yield GraphNode(
+        yield self.data_provider.get_node()
+        yield self.get_node()
+
+    def get_node(self) -> GraphNode:
+        return GraphNode(
             key=self.get_key(),
             label=self.DATA_CHANNEL_NODE_LABEL,
             attributes={
@@ -148,8 +155,8 @@ class DataChannel(GraphSerializable):
 
     def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
         yield GraphRelationship(
-            start_label=self.data_provider.get_key(),
-            start_key=DataProvider.DATA_PROVIDER_NODE_LABEL,
+            start_label=DataProvider.DATA_PROVIDER_NODE_LABEL,
+            start_key=self.data_provider.get_key(),
             end_label=self.DATA_CHANNEL_NODE_LABEL,
             end_key=self.get_key(),
             type=self.DATA_CHANNEL_RELATION_TYPE,
@@ -187,7 +194,7 @@ class DataLocation(GraphSerializable):
         self.type = type
 
         self._node_iter = self._create_node_iterator()
-        self._relation_iter = self._create_relation_iterator()
+        # self._relation_iter = self._create_relation_iterator()
 
     def __repr__(self) -> str:
         return f'Data_Location({self.name!r}, {self.type!r})'
@@ -199,13 +206,17 @@ class DataLocation(GraphSerializable):
             return None
 
     def create_next_relation(self) -> Optional[GraphRelationship]:
-        try:
-            return next(self._relation_iter)
-        except StopIteration:
-            return None
+        # try:
+        #     return next(self._relation_iter)
+        # except StopIteration:
+        #     return None
+        return None
 
     def _create_node_iterator(self) -> Iterator[GraphNode]:
-        yield GraphNode(
+        yield self.get_node()
+
+    def get_node(self) -> GraphNode:
+        return GraphNode(
             key=self.get_key(),
             label=self.DATA_LOCATION_NODE_LABEL,
             attributes=self._get_node_attributes()
@@ -227,7 +238,7 @@ class DataLocation(GraphSerializable):
         #     reverse_type=self.DATA_LOCATION_OF_RELATION_TYPE,
         #     attributes={}
         # )
-        pass
+        return None
 
     def get_key(self) -> str:
         return DataLocation.DataLocationType.DATA_LOCATION_NODE_KEY.format(
@@ -252,10 +263,13 @@ class FilesystemDataLocation(DataLocation):
 
         self.drive = drive
 
+    def __repr__(self) -> str:
+        return f'FilesystemDataLocation(drive={self.drive!r}, {super().__repr__()})'
+
     def _get_node_attributes(self) -> Dict[str,str]:
-        return super()._get_node_attributes().update({
-            self.FILESYSTEM_DATA_LOCATION_ATTR_DRIVE: self.drive
-        })
+        attrs = super()._get_node_attributes()
+        attrs[self.FILESYSTEM_DATA_LOCATION_ATTR_DRIVE] = self.drive
+        return attrs
 
     def get_key(self) -> str:
         return FilesystemDataLocation.DATA_LOCATION_NODE_KEY.format(
@@ -281,10 +295,13 @@ class AwsS3DataLocation(DataLocation):
 
         self.bucket = bucket
 
+    def __repr__(self) -> str:
+        return f'AwsS3DataLocation(bucket={self.bucket!r}, {super().__repr__()})'
+
     def _get_node_attributes(self) -> Dict[str,str]:
-        return super()._get_node_attributes().update({
-            self.AWS_S3_DATA_LOCATION_ATTR_BUCKET: self.bucket
-        })
+        attrs = super()._get_node_attributes()
+        attrs[self.AWS_S3_DATA_LOCATION_ATTR_BUCKET] = self.bucket
+        return attrs
 
     def get_key(self) -> str:
         return AwsS3DataLocation.DATA_LOCATION_NODE_KEY.format(
@@ -309,10 +326,13 @@ class SharepointDataLocation(DataLocation):
 
         self.document_library = document_library
 
+    def __repr__(self) -> str:
+        return f'SharepointDataLocation(document_library={self.document_library!r}, {super().__repr__()})'
+
     def _get_node_attributes(self) -> Dict[str,str]:
-        return super()._get_node_attributes().update({
-            self.SHAREPOINT_DATA_LOCATION_ATTR_DOCUMENT_LIBRARY: self.document_library
-        })
+        attrs = super()._get_node_attributes()
+        attrs[self.SHAREPOINT_DATA_LOCATION_ATTR_DOCUMENT_LIBRARY] = self.document_library
+        return attrs
 
     def get_key(self) -> str:
         return SharepointDataLocation.DATA_LOCATION_NODE_KEY.format(
@@ -388,6 +408,13 @@ class File(GraphSerializable):
             return None
 
     def _create_node_iterator(self) -> Iterator[GraphNode]:
+
+        if self.data_location:
+            yield self.data_location.get_node()
+
+        if self.data_channel:
+            yield from self.data_channel._create_node_iterator()
+
         yield GraphNode(
             key=self.get_key(),
             label=self.FILE_NODE_LABEL,
@@ -424,7 +451,7 @@ class File(GraphSerializable):
 
         if self.data_channel:
             yield GraphRelationship(
-                start_label=DataLocation.DATA_CHANNEL_NODE_LABEL,
+                start_label=DataChannel.DATA_CHANNEL_NODE_LABEL,
                 start_key=self.data_channel.get_key(),
                 end_label=self.FILE_NODE_LABEL,
                 end_key=self.get_key(),
@@ -522,65 +549,3 @@ class FileTable(GraphSerializable):
 
     def get_key(self) -> str:
         return f"{self.file.get_key()}/_filetable/{self.name}"
-
-class ProspectusWaterfallScheme(GraphSerializable):
-
-    PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL = 'Prospectus_Waterfall_Scheme'
-    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME = 'name'
-    PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME = 'scheme'
-
-    PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME'
-    PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE = 'PROSPECTUS_WATERFALL_SCHEME_OF'
-
-    def __init__(self,
-                 name: str,
-                 scheme: str,
-                 file: File,
-                 ) -> None:
-
-        self.name = name
-        self.scheme = scheme
-        self.file = file
-
-        self._node_iter = self._create_node_iterator()
-        self._relation_iter = self._create_relation_iterator()
-
-    def __repr__(self) -> str:
-        return f'ProspectusWaterfallScheme({self.name!r}, {self.content!r})'
-
-    def create_next_node(self) -> Optional[GraphNode]:
-        try:
-            return next(self._node_iter)
-        except StopIteration:
-            return None
-
-    def create_next_relation(self) -> Optional[GraphRelationship]:
-        try:
-            return next(self._relation_iter)
-        except StopIteration:
-            return None
-
-    def _create_node_iterator(self) -> Iterator[GraphNode]:
-        yield GraphNode(
-            key=self.get_key(),
-            label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
-            attributes={
-                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_NAME: self.name,
-                self.PROSPECTUS_WATERFALL_SCHEME_NODE_ATTR_SCHEME: self.scheme,
-            }
-        )
-
-    def _create_relation_iterator(self) -> Iterator[GraphRelationship]:
-        if self.file:
-            yield GraphRelationship(
-                start_label=File.FILE_NODE_LABEL,
-                start_key=self.file.get_key(),
-                end_label=self.PROSPECTUS_WATERFALL_SCHEME_NODE_LABEL,
-                end_key=self.get_key(),
-                type=self.PROSPECTUS_WATERFALL_SCHEME_RELATION_TYPE,
-                reverse_type=self.PROSPECTUS_WATERFALL_SCHEME_OF_RELATION_TYPE,
-                attributes={}
-            )
-
-    def get_key(self) -> str:
-        return f"{self.file.get_key()}/_prospectuswaterfallscheme/{self.name}"
