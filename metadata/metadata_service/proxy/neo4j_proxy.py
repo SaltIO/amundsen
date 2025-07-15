@@ -3390,7 +3390,8 @@ class Neo4jProxy(BaseProxy):
                           other_key_values=other_key_values)
 
     @staticmethod
-    def _get_user_resource_relationship_clause(relation_type: UserResourceRel, id: str = None,
+    def _get_user_resource_relationship_clause(relation_type: UserResourceRel,
+                                               id: str = None,
                                                user_key: str = None,
                                                resource_type: ResourceType = ResourceType.Table) -> str:
         """
@@ -3593,21 +3594,32 @@ class Neo4jProxy(BaseProxy):
         on CREATE SET u={email: $user_email, key: $user_email}
         """)
 
-        rel_clause: str = self._get_user_resource_relationship_clause(relation_type=relation_type,
-                                                                      resource_type=resource_type)
+        merge_clause = ''
+
+        if relation_type == UserResourceRel.follow:
+            merge_clause += f'MERGE (resource)-[r1:FOLLOWED_BY]->(usr)'
+            merge_clause += f'MERGE (usr)-[r2:FOLLOW]->(resource)'
+        elif relation_type == UserResourceRel.own:
+            merge_clause += f'MERGE (resource)-[r1:OWNER]->(usr)'
+            merge_clause += f'MERGE (usr)-[r2:OWNER_OF]->(resource)'
+        elif relation_type == UserResourceRel.read:
+            merge_clause += f'MERGE (resource)-[r1:READ_BY]->(usr)'
+            merge_clause += f'MERGE (usr)-[r2:READ]->(resource)'
+        else:
+            raise NotImplementedError(f'The relation type {relation_type} is not defined!')
 
         upsert_user_relation_query = textwrap.dedent("""
         MATCH (usr:User {{key: $user_key}})
         MATCH (resource:{resource_type} {{key: $resource_key}})
         WITH usr, resource
-        MERGE {rel_clause}
+        {merge_clause}
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
         SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r2.published_tag = $published_tag
         RETURN usr.key, resource.key
         """.format(resource_type=resource_type.name,
-                   rel_clause=rel_clause))
+                   merge_clause=merge_clause))
 
         try:
             tx = self._driver.session(database=self.get_database_name()).begin_transaction()
