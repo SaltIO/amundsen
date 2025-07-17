@@ -25,8 +25,7 @@ import {
   issueTrackingEnabled,
   notificationsEnabled,
   getFileLineageDefaultDepth,
-  isFileListLineageEnabled,
-  isEagleyeEnabled
+  isFileListLineageEnabled
 } from 'config/config-utils';
 
 import BadgeList from 'features/BadgeList';
@@ -214,7 +213,7 @@ export class FilePage extends React.Component<
   };
 
   getDefaultTab() {
-    return getUrlParam(TAB_URL_PARAM) || Constants.PROSPECTUS_FILE_TABS.FILE_TABLES;
+    return getUrlParam(TAB_URL_PARAM);
   }
 
   getDisplayName() {
@@ -346,59 +345,6 @@ export class FilePage extends React.Component<
         key: 'downstream',
         title: downstreamLoadingTitle,
       });
-    }
-
-    if (isEagleyeEnabled()) {
-      if (fileData.fileTables && fileData.fileTables.length > 0) {
-
-        let file_metadata_list: FileMetadataListItemProps[] = []
-        for (const file_table of fileData.fileTables) {
-          file_metadata_list.push({
-            name: file_table.name,
-            content: [{
-              name: '',
-              text: file_table.content,
-              renderHTML: true
-            }]
-          })
-        }
-
-        tabInfo.push({
-          content: (
-            <FileMetadataList file_metadata={file_metadata_list} />
-          ),
-          key: Constants.PROSPECTUS_FILE_TABS.FILE_TABLES,
-          title: `File Tables (${fileData.fileTables.length})`,
-        });
-      }
-
-      if (fileData.prospectusWaterfallSchemes && fileData.prospectusWaterfallSchemes.length > 0) {
-
-        let file_metadata_list: FileMetadataListItemProps[] = [];
-        for (const prospectus_waterfall_scheme of fileData.prospectusWaterfallSchemes) {
-          let content: FileMetadataListItemContentProps[] = [];
-          for (const scheme of prospectus_waterfall_scheme.scheme) {
-            content.push({
-              name: scheme.shortName,
-              text: scheme.details,
-              renderHTML: false
-            });
-          }
-
-          file_metadata_list.push({
-            name: prospectus_waterfall_scheme.name,
-            content: content
-          })
-        }
-
-        tabInfo.push({
-          content: (
-            <FileMetadataList file_metadata={file_metadata_list} />
-          ),
-          key: Constants.PROSPECTUS_FILE_TABS.PROSPECTUS_WATERFALL_SCHEMES,
-          title: `Waterfall Schemes (${fileData.prospectusWaterfallSchemes.length})`,
-        });
-      }
     }
 
     return (

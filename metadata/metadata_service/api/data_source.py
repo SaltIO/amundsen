@@ -4,14 +4,16 @@
 import json
 from http import HTTPStatus
 from typing import Any, Iterable, Mapping, Optional, Union
+import logging
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.data_source import DataProviderSchema, FileSchema
 from amundsen_common.models.lineage import LineageSchema
+from amundsen_common.models.key_status import KeyStatusSchema
 from flasgger import swag_from
 from flask import request
 from flask_restful import Resource, reqparse
-
+from marshmallow import ValidationError
 
 from metadata_service.api import BaseAPI
 from metadata_service.api.badge import BadgeCommon
@@ -21,6 +23,10 @@ from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.auth import requires_auth, WRITE_PERMISSION
+
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DataProviderDetailAPI(Resource):
@@ -99,15 +105,55 @@ class FileDetailAPI(Resource):
         self.client = get_proxy_client()
 
     @requires_auth()
-    # @swag_from('swagger_doc/data_source/data_provider_get.yml')
+    @swag_from('swagger_doc/data_source/file_get.yml')
     def get(self, file_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             file = self.client.get_file(file_uri=file_uri)
-            schema = FileSchema()
-            return schema.dump(file), HTTPStatus.OK
+            return FileSchema().dump(file), HTTPStatus.OK
 
         except NotFoundException:
             return {'message': 'data_prfile_uriovider_uri {} does not exist'.format(file_uri)}, HTTPStatus.NOT_FOUND
+
+
+class FilePutAPI(Resource):
+    """
+    FilePutAPI that supports PUT and DELETE operation
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(FilePutAPI, self).__init__()
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/data_source/file_put.yml')
+    def put(self) -> Iterable[Union[Mapping, int, None]]:
+        data = None
+        try:
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            file = FileSchema().loads(json.dumps(data))
+
+            file_key_key, status = self.client.create_update_file(
+                file=file,
+                published_tag=published_tag
+            )
+
+            result = KeyStatusSchema().dump({
+                'key': file_key_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
+
+        except ValidationError as ve:
+            msg = 'Validation Error: {}'.format(ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
+
+        except NotFoundException:
+            return {'message': f'Failed to update/create file: {data}'}, HTTPStatus.NOT_FOUND
 
 class FileTagAPI(Resource):
     """

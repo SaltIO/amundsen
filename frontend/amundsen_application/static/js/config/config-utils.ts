@@ -603,13 +603,6 @@ export function isColumnListLineageEnabled() {
 }
 
 /**
- * Returns whether the eagleye ui are enabled
- */
-export function isEagleyeEnabled() {
-  return AppConfig.eagleye.isEnabled;
-}
-
-/**
  * Returns whether the in-app column lineage page is enabled.
  */
 export function isColumnLineagePageEnabled() {

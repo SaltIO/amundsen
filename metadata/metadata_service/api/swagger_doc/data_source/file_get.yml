@@ -1,0 +1,30 @@
+Gets file details
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'data_source'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: file_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    example: 'filesystem://text/test.txt'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    description: 'File details'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/FileFields'
+  404:
+    description: 'File not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

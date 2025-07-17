@@ -2,23 +2,32 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import logging
 from http import HTTPStatus
 from typing import Iterable, Mapping, Optional, Union
 
-from amundsen_common.entity.resource_type import ResourceType
 from flasgger import swag_from
 from flask import request
 from flask_restful import Resource, reqparse
 
+from marshmallow import ValidationError
+
+from amundsen_common.entity.resource_type import ResourceType
+from amundsen_common.models.dashboard import DashboardSchema
+from amundsen_common.models.key_status import KeyStatusSchema
+
 from metadata_service.api import BaseAPI
 from metadata_service.api.badge import BadgeCommon
 from metadata_service.api.tag import TagCommon
-from metadata_service.entity.dashboard_detail import DashboardSchema
+from metadata_service.entity.dashboard_detail import DashboardDetailSchema
 from metadata_service.entity.description import DescriptionSchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
 from metadata_service.auth import requires_auth, WRITE_PERMISSION
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DashboardDetailAPI(BaseAPI):
@@ -28,7 +37,7 @@ class DashboardDetailAPI(BaseAPI):
 
     def __init__(self) -> None:
         self.client = get_proxy_client()
-        super().__init__(DashboardSchema, 'dashboard', self.client)
+        super().__init__(DashboardDetailSchema, 'dashboard', self.client)
 
     @requires_auth()
     @swag_from('swagger_doc/dashboard/detail_get.yml')
@@ -37,6 +46,46 @@ class DashboardDetailAPI(BaseAPI):
             return super().get(id=id)
         except NotFoundException:
             return {'message': 'dashboard_id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+
+class DashboardPutAPI(BaseAPI):
+    """
+    Dashboard PUT API
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DashboardPutAPI, self).__init__()
+
+    @requires_auth(required_permission=WRITE_PERMISSION)
+    @swag_from('swagger_doc/dashboard/detail_put.yml')
+    def put(self) -> Iterable[Union[Mapping, int, None]]:
+        data = None
+        try:
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            dashboard = DashboardSchema().loads(json.dumps(data))
+            LOGGER.info(f'dashboard={dashboard}')
+
+            dashboard_key, status = self.client.create_update_dashboard(
+                dashboard=dashboard,
+                published_tag=published_tag
+            )
+
+            result = KeyStatusSchema().dump({
+                'key': dashboard_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
+
+        except ValidationError as ve:
+            msg = 'Validation Error: {}'.format(ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
+
+        except NotFoundException:
+            return {'message': f'Failed to update/create table: {data}'}, HTTPStatus.NOT_FOUND
 
 
 class DashboardDescriptionAPI(BaseAPI):
