@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.api.health_check import HealthCheck
-from amundsen_common.models.dashboard import DashboardSummary
+from amundsen_common.models.dashboard import DashboardSummary, Dashboard
 from amundsen_common.models.feature import Feature
 from amundsen_common.models.generation_code import GenerationCode
 from amundsen_common.models.lineage import Lineage, LineageBase
@@ -89,6 +89,23 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
             table: Table,
             published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
+
+    @abstractmethod
+    def create_update_dashboard(
+            self,
+            *,
+            dashboard: Dashboard,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def create_update_file(
+            self,
+            *,
+            file: File,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
 
     @abstractmethod
     def delete_owner(self, *, table_uri: str, owner: str) -> None:

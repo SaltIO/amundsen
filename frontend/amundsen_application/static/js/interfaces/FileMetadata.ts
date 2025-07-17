@@ -14,16 +14,6 @@ export interface FileTable {
   content: string
 }
 
-export interface ProspectusScheme {
-  shortName: string
-  details: string
-}
-
-export interface ProspectusWaterfallScheme {
-  name: string
-  scheme: ProspectusScheme[]
-}
-
 export interface FileMetadata {
   badges: Badge[];
   key: string;
@@ -36,7 +26,6 @@ export interface FileMetadata {
   dataProvider?: ProviderMetadata;
   tags?:  Tag[];
   fileTables?: FileTable[]
-  prospectusWaterfallSchemes?: ProspectusWaterfallScheme[];
   is_editable: boolean;
 }
 

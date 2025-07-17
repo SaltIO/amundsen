@@ -18,8 +18,3 @@ export const ESC_BUTTON_KEY = 'Escape';
 export const MIN_WIDTH_DISPLAY_BTN = 1100;
 export const MIN_WIDTH_DISPLAY_BTN_WITH_OPEN_PANEL = 1350;
 export const NO_LINEAGE_INFO = 'No lineage info available';
-
-export enum PROSPECTUS_FILE_TABS {
-  FILE_TABLES = 'file_tables',
-  PROSPECTUS_WATERFALL_SCHEMES = 'prospectus_waterfall_schemes',
-}

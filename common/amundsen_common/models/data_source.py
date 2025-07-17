@@ -10,9 +10,11 @@ from enum import Enum
 from amundsen_common.models.user import User
 from amundsen_common.models.badge import Badge
 from amundsen_common.models.tag import Tag
+
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 from marshmallow import fields
 import marshmallow
+
 
 
 class DataLicense:
@@ -37,10 +39,10 @@ class DataLicenseType(Enum):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DataLocation:
-    name: str
     key: Optional[str] = None
-    type: Optional[str] = None
-
+    name: str
+    type: str = None
+    key: Optional[str] = None
 
 class DataLocationSchema(AttrsSchema):
     class Meta:
@@ -54,6 +56,11 @@ class FilesystemDataLocation(DataLocation):
 
 
 class FilesystemDataLocationSchema(AttrsSchema):
+    type = fields.Function(
+        serialize=lambda obj: "filesystem",
+        deserialize=lambda val: "filesystem"
+    )
+
     class Meta:
         target = FilesystemDataLocation
         register_as_scheme = True
@@ -64,12 +71,18 @@ class AwsS3DataLocation(DataLocation):
     bucket: Optional[str] = None
 
 class AwsS3DataLocationSchema(AttrsSchema):
+    type = fields.Function(
+        serialize=lambda obj: "aws_s3",
+        deserialize=lambda val: "aws_s3"
+    )
+
     class Meta:
         target = AwsS3DataLocation
         register_as_scheme = True
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DataChannel:
+    key: Optional[str] = None
     name: str
     key: Optional[str] = None
     description: Optional[str] = None
@@ -109,6 +122,7 @@ class DataChannelSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DataProvider:
+    key: Optional[str] = None
     name: str
     key: Optional[str] = None
     description: Optional[str] = None
@@ -124,6 +138,7 @@ class DataProviderSchema(AttrsSchema):
 
 @attr.s(auto_attribs=True, kw_only=True)
 class FileTable:
+    key: Optional[str] = None
     name: str
     content: str
 
@@ -133,39 +148,17 @@ class FileTableSchema(AttrsSchema):
         register_as_scheme = True
 
 @attr.s(auto_attribs=True, kw_only=True)
-class ProspectusScheme:
-    shortName: str
-    details: str
-
-class ProspectusSchemeSchema(AttrsSchema):
-
-    class Meta:
-        target = ProspectusScheme
-        register_as_scheme = True
-
-@attr.s(auto_attribs=True, kw_only=True)
-class ProspectusWaterfallScheme:
-    name: str
-    scheme: List[ProspectusScheme]
-
-class ProspectusWaterfallSchemeSchema(AttrsSchema):
-    class Meta:
-        target = ProspectusWaterfallScheme
-        register_as_scheme = True
-
-@attr.s(auto_attribs=True, kw_only=True)
 class File:
     name: str
     key: Optional[str] = None
     description: Optional[str] = None
-    type: str = None
+    type: str
     category: Optional[str] = None
-    path: str = None
+    path: str
     is_directory: bool = None
     dataLocation: Optional[Union[FilesystemDataLocation, AwsS3DataLocation, DataLocation]] = None
     dataProvider: Optional[DataProvider] = None
     fileTables: Optional[List[FileTable]] = None
-    prospectusWaterfallSchemes: Optional[List[ProspectusWaterfallScheme]] = None
     tags: Optional[List[Tag]] = None
     owners: Optional[List[User]] = None
     # badges: List[Badge] = []
