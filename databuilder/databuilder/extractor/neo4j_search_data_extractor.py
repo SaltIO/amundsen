@@ -78,7 +78,7 @@ class Neo4jSearchDataExtractor(Extractor):
         RETURN
             column.key AS key,
             column.name AS name,
-            column.type AS type,
+            column.col_type AS data_type,
             column_description.description AS description,
             column_tags as tags,
             column_badges as badges,

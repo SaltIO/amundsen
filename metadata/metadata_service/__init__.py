@@ -13,7 +13,7 @@ from flasgger import Swagger
 from flask import Blueprint, Flask, render_template, request
 from flask_cors import CORS
 from flask_restful import Api
-from metadata_service.api.reveal import RevealChatAPI #, RevealSearchAPI
+from metadata_service.api.reveal import RevealChatAPI, RevealSearchAPI #, RevealSearchAPI
 from werkzeug.utils import import_string
 
 from metadata_service.api.auth import AuthAPI
@@ -294,8 +294,8 @@ def create_app(*, config_module_class: str) -> Flask:
     if app.config.get('AI_GPT_ENABLED'):
         api.add_resource(RevealChatAPI,
                          '/reveal/chat')
-        # api.add_resource(RevealSearchAPI,
-        #                  '/reveal/search/<path:resource>')
+        api.add_resource(RevealSearchAPI,
+                         '/reveal/search/<path:resource>')
 
     app.register_blueprint(api_bp)
 

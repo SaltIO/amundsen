@@ -64,80 +64,92 @@ class RevealChatAPI(Resource):
 
         return ChatRequestSchema().load(data)
 
-# class RevealSearchAPI(Resource):
-#     """
-#     Reveal Search API
-#     """
+class RevealSearchAPI(Resource):
+    """
+    Reveal Search API
+    """
 
-#     def __init__(self) -> None:
-#         self.ai_chat_client: AIChatClient = OpenAIChatClient()
-#         self.ai_embedding_client: AIEmbeddingClient = STEmbeddingClient()
-#         self.search_service_base = current_app.config['SEARCHSERVICE_BASE']
+    def __init__(self) -> None:
+        self.ai_chat_client: AIChatClient = OpenAIChatClient()
+        self.ai_embedding_client: AIEmbeddingClient = STEmbeddingClient()
+        self.search_service_base = current_app.config['SEARCHSERVICE_BASE']
 
-#     @auth.requires_auth()
-#     # @swag_from('swagger_doc/reveal/chat_post.yml')
-#     def post(self, resource:str) -> Iterable[Union[Mapping, int, tuple, None]]:
-#         try:
-#             column_search_text: List[str] = self.get_column_search_text()
+    @auth.requires_auth()
+    # @swag_from('swagger_doc/reveal/chat_post.yml')
+    def post(self, resource:str) -> Iterable[Union[Mapping, int, tuple, None]]:
+        try:
+            if resource == 'column':
+                data = request.get_json(force=True)  # Force parsing regardless of Content-Type
+                if isinstance(data, str):  # If data is still a string, parse it manually
+                    data = json.loads(data)
 
-#             if not column_search_text:
-#                 return {'message': 'column_search_text required'}, HTTPStatus.BAD_REQUEST
+                # LOGGER.info(f"data={data}")
 
-#             column_search_responses = []
-#             for search_text in column_search_text:
+                if not data or 'column_search_text' not in data:
+                    return {'message': 'column_search_text required'}, HTTPStatus.BAD_REQUEST
 
-#                 search_text_embedding = self.ai_embedding_client.create_embedding(embedding_input=search_text)
+                column_search_text = data['column_search_text']
 
-#                 search_payload = {
-#                     "vector": search_text_embedding,
-#                     "resource_type": resource.lower(),
-#                     "results_count": 5
-#                 }
+                filters = []
+                if 'search_filters' in data:
+                    for filter in data['search_filters']:
+                        filters.append({
+                            "name": filter['name'],
+                            "values": filter['values'],
+                            "operation": filter['operation']
+                        })
 
-#                 search_response = request_search(
-#                     url=f"{self.search_service_base}/v2/knn_search",
-#                     method="POST",
-#                     json=search_payload
-#                 )
 
-#                 search_response: KnnSearchResponse = KnnSearchResponseSchema().loads(json.dumps(search_response.json()))
+                column_search_responses = []
+                for search_text in column_search_text:
 
-#                 if search_response.status_code == HTTPStatus.OK:
-#                     column_search_hits = []
-#                     for hit in search_response.results:
-#                         column_search_hits.append(
-#                             ColumnSearchHit(
-#                                 score=hit.score,
-#                                 key=hit.result['key'],
-#                                 name=hit.result['name'],
-#                                 table_key=hit.result['table_key'],
-#                                 table_name=hit.result['table_name']
-#                             )
-#                         )
+                    search_text_embedding = self.ai_embedding_client.create_embedding(embedding_input=search_text)
 
-#                     column_search_responses.append(
-#                         ColumnSearchResponse(
-#                             search_text=search_text,
-#                             hits=column_search_hits
-#                         )
-#                     )
-#                 else:
-#                     raise Exception(f"Failed to search: {search_response.msg}")
+                    search_payload = {
+                        "vector": search_text_embedding,
+                        "resource_type": resource.lower(),
+                        "filters": filters,
+                        "results_count": 5
+                    }
 
-#             return ColumnSearchResponseSchema().dump(column_search_responses, many=True), HTTPStatus.OK
+                    search_response = request_search(
+                        url=f"{self.search_service_base}/v2/knn_search",
+                        method="POST",
+                        json=search_payload
+                    )
 
-#         except Exception as e:
-#             LOGGER.exception("Exception")
-#             return {'message': 'internal server error'}, HTTPStatus.INTERNAL_SERVER_ERROR
+                    search_response: KnnSearchResponse = KnnSearchResponseSchema().loads(json.dumps(search_response.json()))
 
-#     def get_column_search_text(self) -> List[str]:
-#         data = request.get_json(force=True)  # Force parsing regardless of Content-Type
-#         if isinstance(data, str):  # If data is still a string, parse it manually
-#             data = json.loads(data)
+                    if search_response.status_code == HTTPStatus.OK:
+                        column_search_hits = []
+                        for hit in search_response.results:
+                            column_search_hits.append(
+                                ColumnSearchHit(
+                                    score=hit.score,
+                                    key=hit.result['key'],
+                                    name=hit.result['name'],
+                                    data_type=hit.result.get('data_type', None),
+                                    description=hit.result.get('description', None),
+                                    table_key=hit.result['table_key'],
+                                    table_name=hit.result['table_name'],
+                                    table_description=hit.result.get('table_description', None),
+                                )
+                            )
 
-#         # LOGGER.info(f"data={data}")
+                        column_search_responses.append(
+                            ColumnSearchResponse(
+                                search_text=search_text,
+                                hits=column_search_hits
+                            )
+                        )
+                    else:
+                        raise Exception(f"Failed to search: {search_response.msg}")
 
-#         if not data or 'column_search_text' not in data:
-#             return None
+                return ColumnSearchResponseSchema().dump(column_search_responses, many=True), HTTPStatus.OK
+            else:
+                raise ValueError(f'Unknown resource type {resource}')
 
-#         return data['column_search_text']
+        except Exception as e:
+            LOGGER.exception("Exception")
+            return {'message': 'internal server error'}, HTTPStatus.INTERNAL_SERVER_ERROR
+

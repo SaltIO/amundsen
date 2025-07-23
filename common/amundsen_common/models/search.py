@@ -67,6 +67,7 @@ class SearchResponseSchema(AttrsSchema):
 class KnnSearchRequest:
     vector: List[float]
     resource_type: str
+    filters: Optional[List[Filter]] = None
     results_count: Optional[int] = 10
 
 class KnnSearchRequestSchema(AttrsSchema):

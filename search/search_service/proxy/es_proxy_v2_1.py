@@ -25,6 +25,7 @@ from werkzeug.exceptions import InternalServerError
 from search_service import config
 from search_service.proxy.es_proxy_utils import Resource, create_search_response
 
+
 LOGGER = logging.getLogger(__name__)
 
 # ES query constants
@@ -60,6 +61,14 @@ class ElasticsearchProxyV2_1():
         'column': 'column_names.keyword',
         'database': 'database.keyword',
         'cluster': 'cluster.keyword',
+    }
+
+    COLUMN_MAPPING = {
+        **GENERAL_MAPPING,
+        'name': 'name.keyword',
+        'table_name': 'table_name.keyword',
+        'table_key': 'table_key.keyword',
+        'table_tags': 'table_tags.keyword',
     }
 
     DASHBOARD_MAPPING = {
@@ -125,6 +134,7 @@ class ElasticsearchProxyV2_1():
 
     RESOURCE_TO_MAPPING = {
         Resource.TABLE: TABLE_MAPPING,
+        Resource.COLUMN: COLUMN_MAPPING,
         Resource.DASHBOARD: DASHBOARD_MAPPING,
         Resource.FEATURE: FEATURE_MAPPING,
         Resource.USER: USER_MAPPING,
@@ -532,6 +542,7 @@ class ElasticsearchProxyV2_1():
             self,
             resource_type: Resource,
             vector: List[float],
+            filters: List[Filter] = None,
             results_count: int = 10
         ) -> KnnSearchResponse:
         """
@@ -541,6 +552,7 @@ class ElasticsearchProxyV2_1():
         index = self.get_index_alias_for_resource(resource_type=resource_type)
         res_index = self.get_index_alias_for_resource(resource_type=resource_type)
         if self.elasticsearch.indices.exists(index=res_index):
+
             query_body = {
                 "size": results_count,
                 "knn": {
@@ -550,6 +562,27 @@ class ElasticsearchProxyV2_1():
                     "num_candidates": results_count*3
                 }
             }
+
+            # query_body= {
+            #     "size": results_count,
+            #     "query": {
+            #         "bool": {
+            #             "must": {
+            #                 "knn": {
+            #                     "field": "embedding_vector",
+            #                     "query_vector": vector,
+            #                     "k": results_count * 2,
+            #                     "num_candidates": results_count * 3
+            #                 }
+            #             }
+            #         }
+            #     }
+            # }
+
+            if filters and len(filters) > 0:
+                filter_q_objects = self._build_filters(resource=resource_type, filters=filters)
+                filter_clauses = [q.to_dict() for q in filter_q_objects]
+                query_body["knn"]["filter"] = filter_clauses
 
             try:
                 LOGGER.info(f"KNN query against index={index}: {json.dumps(query_body)}")

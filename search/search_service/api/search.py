@@ -96,6 +96,7 @@ class KnnSearchAPI(Resource):
             knn_search_results = self.search_proxy.knn_search(
                 vector=request_data.vector,
                 resource_type=RESOURCE_STR_MAPPING.get(request_data.resource_type),
+                filters=request_data.filters,
                 results_count=request_data.results_count
             )
             LOGGER.info(f"knn_search_results={knn_search_results}")
@@ -104,3 +105,4 @@ class KnnSearchAPI(Resource):
             err_msg = f'Exception encountered while processing KNN search request {e}'
             LOGGER.error(f"err_msg={err_msg}")
             return {'message': err_msg}, HTTPStatus.INTERNAL_SERVER_ERROR
+

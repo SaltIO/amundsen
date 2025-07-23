@@ -39,6 +39,7 @@ class BaseProxy(metaclass=ABCMeta):
             self,
             resource_type: Resource,
             vector: List[float],
+            filters: List[Filter] = None,
             results_count: int = 10
         ) -> List[Dict[str, Any]]:
         pass

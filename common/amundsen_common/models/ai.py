@@ -57,8 +57,11 @@ class ColumnSearchHit:
     score: float
     key: str
     name: str
+    data_type: Optional[str] = None
+    description: Optional[str] = None
     table_key: str
     table_name: str
+    table_description: Optional[str] = None
 
 class ColumnSearchHitSchema(AttrsSchema):
     class Meta:
