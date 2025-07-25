@@ -173,15 +173,17 @@ def request_wrapper(
     global METADATA_API_AUTH_TOKEN, SEARCH_API_AUTH_TOKEN
 
     if auth:
-        if api_name == 'metadata' and not METADATA_API_AUTH_TOKEN:
-            _get_auth_token(api_name=api_name)
-        elif api_name == 'search' and not SEARCH_API_AUTH_TOKEN:
-            _get_auth_token(api_name=api_name)
-
         if not headers:
             headers = {}
 
-        headers["Authorization"] = f"Bearer {METADATA_API_AUTH_TOKEN}"
+        if api_name == 'metadata':
+            if not METADATA_API_AUTH_TOKEN:
+                _get_auth_token(api_name=api_name)
+            headers["Authorization"] = f"Bearer {METADATA_API_AUTH_TOKEN}"
+        elif api_name == 'search':
+            if not SEARCH_API_AUTH_TOKEN:
+                _get_auth_token(api_name=api_name)
+            headers["Authorization"] = f"Bearer {SEARCH_API_AUTH_TOKEN}"
 
     # If no timeout specified, use the one from the configurations.
     timeout_sec = timeout_sec or app.config['REQUEST_SESSION_TIMEOUT_SEC']

@@ -139,7 +139,7 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(DocumentFeaturesAPI, '/document_feature')
     api.add_resource(DocumentFeatureAPI, '/document_feature/<document_id>')
 
-    api.add_resource(AuthTokenAPI, '/auth/token')
+    api.add_resource(AuthTokenAPI, '/auth/token/')
 
     app.register_blueprint(api_bp)
 
