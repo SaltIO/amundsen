@@ -10,7 +10,7 @@ from amundsen_common.models.schema import SchemaSchema
 from metadata_service.api import BaseAPI
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
-from metadata_service.auth import requires_auth
+from ddp_auth.flask import require_auth
 
 
 class SchemaIdGET(BaseAPI):
@@ -25,7 +25,7 @@ class SchemaIdGET(BaseAPI):
             id_qstring_key='id'
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/schema/schema_id_get.yml')
     def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
         return super().get(**kwargs)
@@ -41,7 +41,7 @@ class SchemaGET(BaseAPI):
             get_proxy_client()
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/schema/schema_get.yml')
     def get(self, *, database: str, cluster: str, schema: str) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster, schema=schema)
@@ -54,7 +54,7 @@ class SchemasGET(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(SchemaSchema, 'schemas', self.client)
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/schema/schemas_get.yml')
     def get(self, *, database: Optional[str] = None, cluster: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster)

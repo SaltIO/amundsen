@@ -11,6 +11,7 @@ from flask_restful import Resource, request
 
 from search_service.proxy import get_proxy_client
 from search_service.proxy.es_proxy_utils import RESOURCE_STR_MAPPING
+from ddp_auth.flask import require_auth
 
 
 class DocumentAPI(Resource):
@@ -19,6 +20,7 @@ class DocumentAPI(Resource):
         self.proxy = get_proxy_client()
         self.request = UpdateDocumentRequestSchema().loads(json.dumps(request.get_json()))
 
+    @require_auth()
     @swag_from('swagger_doc/search/document_post.yml')
     def post(self) -> Tuple[Any, int]:
         try:
@@ -32,6 +34,7 @@ class DocumentAPI(Resource):
             err_msg = f'Failed to update the field value: {e}'
             return {'message': err_msg}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @require_auth()
     def delete(self) -> Tuple[Any, int]:
         try:
             resp = self.proxy.delete_document_by_key(resource_key=self.request.resource_key,
@@ -42,3 +45,5 @@ class DocumentAPI(Resource):
         except Exception as e:
             err_msg = f'Failed to delete the field value: {e}'
             return {'message': err_msg}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+

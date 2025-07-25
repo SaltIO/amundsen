@@ -12,6 +12,7 @@ from search_service.api.base import BaseFilterAPI
 from search_service.exception import NotFoundException
 from search_service.models.dashboard import SearchDashboardResultSchema
 from search_service.proxy import get_proxy_client
+from ddp_auth.flask import require_auth
 
 DASHBOARD_INDEX = 'dashboard_search_index'
 
@@ -34,6 +35,7 @@ class SearchDashboardAPI(Resource):
 
         super(SearchDashboardAPI, self).__init__()
 
+    @require_auth()
     @swag_from('swagger_doc/dashboard/search_dashboard.yml')
     def get(self) -> Iterable[Any]:
         """
@@ -71,6 +73,8 @@ class SearchDashboardFilterAPI(BaseFilterAPI):
         super().__init__(schema=SearchDashboardResultSchema,
                          index=DASHBOARD_INDEX)
 
+
+    @require_auth()
     @swag_from('swagger_doc/dashboard/search_dashboard_filter.yml')
     def post(self) -> Iterable[Any]:
         try:

@@ -14,7 +14,7 @@ from metadata_service.entity.badge import Badge
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
-from metadata_service.auth import requires_auth
+from ddp_auth.flask import require_auth
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class BadgeAPI(Resource):
         self.client = get_proxy_client()
         super(BadgeAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/badge/badge_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         """

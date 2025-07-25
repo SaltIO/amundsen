@@ -10,6 +10,7 @@ from flask_restful import Resource, reqparse
 from search_service.api.base import BaseFilterAPI
 from search_service.models.file import SearchFileResultSchema
 from search_service.proxy import get_proxy_client
+from ddp_auth.flask import require_auth
 
 FILE_INDEX = 'file_search_index'
 
@@ -30,6 +31,7 @@ class SearchFileAPI(Resource):
 
         super(SearchFileAPI, self).__init__()
 
+    @require_auth()
     @swag_from('swagger_doc/file/search_file.yml')
     def get(self) -> Iterable[Any]:
         """
@@ -65,6 +67,7 @@ class SearchFileFilterAPI(BaseFilterAPI):
         super().__init__(schema=SearchFileResultSchema,
                          index=FILE_INDEX)
 
+    @require_auth()
     @swag_from('swagger_doc/table/search_file_filter.yml')
     def post(self) -> Iterable[Any]:
         try:

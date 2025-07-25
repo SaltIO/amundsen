@@ -17,7 +17,7 @@ from metadata_service.api.badge import BadgeCommon
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
-from metadata_service.auth import requires_auth, WRITE_PERMISSION
+from ddp_auth.flask import require_auth
 
 from marshmallow import ValidationError
 
@@ -36,7 +36,7 @@ class ColumnLineageAPI(Resource):
         self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(ColumnLineageAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/column/lineage_get.yml')
     def get(self, table_uri: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -53,7 +53,7 @@ class ColumnLineageAPI(Resource):
         except Exception as e:
             return {'message': f'Exception raised when getting column lineage: {e}'}, HTTPStatus.NOT_FOUND
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/column/lineage_put.yml')
     def put(self, table_uri: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -88,7 +88,7 @@ class ColumnDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(ColumnDescriptionAPI, self).__init__()
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/column/description_put.yml')
     def put(self,
             table_uri: str,
@@ -117,7 +117,7 @@ class ColumnDescriptionAPI(Resource):
             msg = 'table_uri {} with column {} does not exist'.format(table_uri, column_name)
             return {'message': msg}, HTTPStatus.NOT_FOUND
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/column/description_get.yml')
     def get(self, table_uri: str, column_name: str) -> Union[tuple, int, None]:
         """
@@ -146,7 +146,7 @@ class ColumnBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/column/badge_put.yml')
     def put(self, table_uri: str, badge: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -163,7 +163,7 @@ class ColumnBadgeAPI(Resource):
             published_tag=published_tag
         )
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/column/badge_delete.yml')
     def delete(self, table_uri: str, badge: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -180,7 +180,7 @@ class ColumnStatsAPI(Resource):
         self.client = get_proxy_client()
         super(ColumnStatsAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/column/stats_get.yml')
     def get(self, table_uri: str, column_name: str) -> Union[tuple, int, None]:
         """
@@ -198,7 +198,7 @@ class ColumnStatsAPI(Resource):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/column/stats_put.yml')
     def put(self,
             table_uri: str,

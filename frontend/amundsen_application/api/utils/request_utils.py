@@ -3,7 +3,7 @@
 
 from http import HTTPStatus
 import json as JSON
-from typing import Dict
+from typing import Dict, Literal
 import logging
 
 import requests
@@ -15,7 +15,8 @@ import traceback
 LOGGER = logging.getLogger(__name__)
 
 AUTH_TOKEN_ENDPOINT = '/auth/token'
-AUTH_TOKEN = None
+METADATA_API_AUTH_TOKEN = None
+SEARCH_API_AUTH_TOKEN = None
 
 
 def get_query_param(args: Dict, param: str, error_msg: str = None) -> str:
@@ -51,14 +52,18 @@ def request_metadata(*,     # type: ignore
         headers.update(app.config['REQUEST_HEADERS_METHOD'](app))
     elif app.config['METADATASERVICE_REQUEST_HEADERS']:
         headers.update(app.config['METADATASERVICE_REQUEST_HEADERS'])
-    return request_wrapper(method=method,
-                           url=url,
-                           client=app.config['METADATASERVICE_REQUEST_CLIENT'],
-                           headers=headers,
-                           timeout_sec=timeout_sec,
-                           data=data,
-                           json=json,
-                           auth=auth)
+
+    return request_wrapper(
+        api_name='metadata',
+        method=method,
+        url=url,
+        client=app.config['METADATASERVICE_REQUEST_CLIENT'],
+        headers=headers,
+        timeout_sec=timeout_sec,
+        data=data,
+        json=json,
+        auth=auth
+    )
 
 
 def request_search(*,     # type: ignore
@@ -87,37 +92,56 @@ def request_search(*,     # type: ignore
     elif app.config['SEARCHSERVICE_REQUEST_HEADERS']:
         headers.update(app.config['SEARCHSERVICE_REQUEST_HEADERS'])
 
-    return request_wrapper(method=method,
-                           url=url,
-                           client=app.config['SEARCHSERVICE_REQUEST_CLIENT'],
-                           headers=headers,
-                           timeout_sec=timeout_sec,
-                           data=data,
-                           json=json,
-                           auth=auth)
+    return request_wrapper(
+        api_name='search',
+        method=method,
+        url=url,
+        client=app.config['SEARCHSERVICE_REQUEST_CLIENT'],
+        headers=headers,
+        timeout_sec=timeout_sec,
+        data=data,
+        json=json,
+        auth=auth
+    )
 
 
-def _get_auth_token():
-    global AUTH_TOKEN
+def _get_auth_token(api_name: Literal['search', 'metadata']):
+    global METADATA_API_AUTH_TOKEN, SEARCH_API_AUTH_TOKEN
 
     LOGGER.info("_get_auth_token")
 
     try:
-        url = app.config['METADATASERVICE_BASE'] + AUTH_TOKEN_ENDPOINT
+        if not api_name or api_name not in ['search', 'metadata']:
+            raise Exception('Invalid API name')
+
+        url = app.config['METADATASERVICE_BASE'] if api_name == 'metadata' else app.config['SEARCHSERVICE_BASE']
+        url += AUTH_TOKEN_ENDPOINT
         payload = {
-            'client_id': app.config['METADATA_API_AUTH_CLIENT_ID'],
-            'client_secret': app.config['METADATA_API_AUTH_CLIENT_SECRET']
+            'client_id': app.config['API_AUTH_CLIENT_ID'],
+            'client_secret': app.config['API_AUTH_CLIENT_SECRET']
         }
 
-        response = request_metadata(
-            method="POST",
-            url=url,
-            json=payload,
-            auth=False)
+        response = None
+        if api_name == 'metadata':
+            response = request_metadata(
+                method="POST",
+                url=url,
+                json=payload,
+                auth=False)
+        elif api_name == 'search':
+            response = request_search(
+                method="POST",
+                url=url,
+                json=payload,
+                auth=False)
+
         status_code = response.status_code
 
         if status_code == HTTPStatus.OK:
-            AUTH_TOKEN = response.json().get('access_token')
+            if api_name == 'metadata':
+                METADATA_API_AUTH_TOKEN = response.json().get('access_token')
+            elif api_name == 'search':
+                SEARCH_API_AUTH_TOKEN = response.json().get('access_token')
             LOGGER.info("Successfully retreived Auth Token")
         else:
             raise Exception('Auth Token Service Unavailable')
@@ -127,6 +151,7 @@ def _get_auth_token():
 
 # TODO: Define an interface for envoy_client
 def request_wrapper(
+        api_name: str,
         method: str,
         url: str,
         client,
@@ -145,16 +170,18 @@ def request_wrapper(
     :param data: Optional request payload
     :return:
     """
-    global AUTH_TOKEN
+    global METADATA_API_AUTH_TOKEN, SEARCH_API_AUTH_TOKEN
 
     if auth:
-        if not AUTH_TOKEN:
-            _get_auth_token()
+        if api_name == 'metadata' and not METADATA_API_AUTH_TOKEN:
+            _get_auth_token(api_name=api_name)
+        elif api_name == 'search' and not SEARCH_API_AUTH_TOKEN:
+            _get_auth_token(api_name=api_name)
 
         if not headers:
             headers = {}
 
-        headers["Authorization"] = f"Bearer {AUTH_TOKEN}"
+        headers["Authorization"] = f"Bearer {METADATA_API_AUTH_TOKEN}"
 
     # If no timeout specified, use the one from the configurations.
     timeout_sec = timeout_sec or app.config['REQUEST_SESSION_TIMEOUT_SEC']

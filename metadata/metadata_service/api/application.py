@@ -11,7 +11,7 @@ from flasgger import swag_from
 from flask import request, current_app
 from flask_restful import Resource
 
-from metadata_service.auth import requires_auth, WRITE_PERMISSION
+from ddp_auth.flask import require_auth
 
 from amundsen_common.models.table import (
     Application, ApplicationSchema
@@ -35,7 +35,7 @@ class ApplicationAPI(Resource):
         self.client = get_proxy_client()
         super(ApplicationAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     # @swag_from('swagger_doc/application/application_get.yml')
     def get(self, application_uri: str) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
@@ -50,7 +50,7 @@ class ApplicationAPI(Resource):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     # @swag_from('swagger_doc/application/application_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:

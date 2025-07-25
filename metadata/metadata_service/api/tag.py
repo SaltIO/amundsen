@@ -15,7 +15,7 @@ from amundsen_common.models.tag import Tag, TagSchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
-from metadata_service.auth import requires_auth, WRITE_PERMISSION
+from ddp_auth.flask import require_auth
 
 
 LOGGER = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class TagAPI(Resource):
         self.client = get_proxy_client()
         super(TagAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/tag/tag_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -52,7 +52,7 @@ class TagPATCH(Resource):
         self.client = get_proxy_client()
         super(TagPATCH, self).__init__()
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/tag/tag_patch.yml')
     def patch(self) -> Iterable[Union[Mapping, int, None]]:
         """

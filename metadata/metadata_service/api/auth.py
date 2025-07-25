@@ -13,7 +13,7 @@ from flask import request
 from flask_restful import Resource, reqparse
 
 from metadata_service.exception import NotFoundException
-from metadata_service.auth import auth
+from ddp_auth.jwt import get_auth0_token
 
 
 LOGGER = logging.getLogger(__name__)
@@ -36,13 +36,11 @@ class AuthAPI(Resource):
             if not data or 'client_id' not in data or 'client_secret' not in data:
                 return {'message': 'client_id and client_secret required'}, 400
 
-            auth_token, http_status = auth.get_token(client_id=data['client_id'], client_secret=data['client_secret'])
-
-            if http_status == HTTPStatus.OK:
-                schema = AuthTokenSchema()
-                return schema.dump(auth_token), HTTPStatus.OK
-            else:
-                return auth_token, http_status
+            try:
+                token_response = get_auth0_token(client_id=data['client_id'], client_secret=data['client_secret'])
+                return token_response, HTTPStatus.OK
+            except Exception as e:
+                return {'message': str(e)}, HTTPStatus.UNAUTHORIZED
 
         except NotFoundException:
             LOGGER.exception("NotFoundException")

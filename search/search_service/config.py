@@ -44,6 +44,8 @@ class Config:
     LOG_CONFIG_FILE = None
     SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', False)
 
+    SEARCH_API_URL_PREFIX = os.getenv('SEARCH_API_URL_PREFIX', '/search-api')
+
 
 class LocalConfig(Config):
     DEBUG = False

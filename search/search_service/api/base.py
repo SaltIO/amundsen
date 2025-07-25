@@ -10,6 +10,7 @@ from flask_restful import Resource, reqparse
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 from search_service.proxy import get_proxy_client
+from ddp_auth.flask import require_auth
 
 
 class BaseFilterAPI(Resource):
@@ -31,6 +32,7 @@ class BaseFilterAPI(Resource):
 
         super(BaseFilterAPI, self).__init__()
 
+    @require_auth()
     def post(self) -> Iterable[Any]:
         """
         Fetch search results based on the page_index, query_term, and

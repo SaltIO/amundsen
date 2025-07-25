@@ -25,6 +25,7 @@ from search_service.api.search import KnnSearchAPI, SearchAPI
 from search_service.api.table import SearchTableAPI, SearchTableFilterAPI
 from search_service.api.user import SearchUserAPI
 from search_service.api.data_provider import SearchDataProviderAPI, SearchDataProviderFilterAPI
+from search_service.api.auth import AuthTokenAPI
 
 # For customized flask use below arguments to override.
 FLASK_APP_MODULE_NAME = os.getenv('FLASK_APP_MODULE_NAME')
@@ -88,7 +89,11 @@ def create_app(*, config_module_class: str) -> Flask:
                  .format(config_module_class))
     logging.info('Created app with config name {}'.format(config_module_class))
 
-    api_bp = Blueprint('api', __name__)
+    api_bp = Blueprint(
+        name='api',
+        import_name=__name__,
+        url_prefix=app.config.get("SEARCH_API_URL_PREFIX")
+    )
     api = Api(api_bp)
 
     # Health Check
@@ -133,6 +138,8 @@ def create_app(*, config_module_class: str) -> Flask:
 
     api.add_resource(DocumentFeaturesAPI, '/document_feature')
     api.add_resource(DocumentFeatureAPI, '/document_feature/<document_id>')
+
+    api.add_resource(AuthTokenAPI, '/auth/token')
 
     app.register_blueprint(api_bp)
 

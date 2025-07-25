@@ -170,6 +170,9 @@ class Config:
 
     LOG_REQUESTS = os.getenv('FRONTEND_API_LOG_REQUESTS', 'false').lower() in ('1', 'true', 'yes')
 
+    API_AUTH_CLIENT_ID = os.environ.get('FLASK_OIDC_CLIENT_ID')
+    API_AUTH_CLIENT_SECRET = os.environ.get('FLASK_OIDC_CLIENT_SECRET')
+
 class LocalConfig(Config):
     DEBUG = False
     TESTING = False
@@ -203,9 +206,6 @@ class LocalConfig(Config):
                                               LOCAL_HOST=LOCAL_HOST,
                                               PORT=METADATA_PORT)
                                           )
-
-    METADATA_API_AUTH_CLIENT_ID = os.environ.get('FLASK_OIDC_CLIENT_ID')
-    METADATA_API_AUTH_CLIENT_SECRET = os.environ.get('FLASK_OIDC_CLIENT_SECRET')
 
 
 class TestConfig(LocalConfig):

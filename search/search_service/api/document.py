@@ -18,6 +18,7 @@ from search_service.models.table import TableSchema
 from search_service.models.user import UserSchema
 from search_service.proxy import get_proxy_client
 from search_service.proxy.base import BaseProxy
+from ddp_auth.flask import require_auth
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class BaseDocumentAPI(Resource):
         self.parser = reqparse.RequestParser(bundle_errors=True)
         super(BaseDocumentAPI, self).__init__()
 
+    @require_auth()
     def delete(self, *, document_id: str) -> Tuple[Any, int]:
         """
         Uses the Elasticsearch bulk API to delete existing documents by id
@@ -54,6 +56,7 @@ class BaseDocumentsAPI(Resource):
         self.parser = reqparse.RequestParser(bundle_errors=True)
         super(BaseDocumentsAPI, self).__init__()
 
+    @require_auth()
     def post(self) -> Tuple[Any, int]:
         """
          Uses the Elasticsearch bulk API to load data from JSON. Uses Elasticsearch
@@ -80,6 +83,7 @@ class BaseDocumentsAPI(Resource):
             LOGGER.error(err_msg + str(e))
             return {'message': err_msg}, HTTPStatus.INTERNAL_SERVER_ERROR
 
+    @require_auth()
     def put(self) -> Tuple[Any, int]:
         """
         Uses the Elasticsearch bulk API to update existing documents by id. Will
@@ -114,6 +118,8 @@ class DocumentTableAPI(BaseDocumentAPI):
         super().__init__(schema=TableSchema, proxy=get_proxy_client())
         self.parser.add_argument('index', required=False, default=TABLE_INDEX, type=str)
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/table_delete.yml')
     def delete(self, *, document_id: str) -> Tuple[Any, int]:
         return super().delete(document_id=document_id)
@@ -125,10 +131,14 @@ class DocumentTablesAPI(BaseDocumentsAPI):
         super().__init__(schema=TableSchema, proxy=get_proxy_client())
         self.parser.add_argument('index', required=False, default=TABLE_INDEX, type=str)
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/table_post.yml')
     def post(self) -> Tuple[Any, int]:
         return super().post()
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/table_put.yml')
     def put(self) -> Tuple[Any, int]:
         return super().put()
@@ -140,6 +150,8 @@ class DocumentUserAPI(BaseDocumentAPI):
         super().__init__(schema=UserSchema, proxy=get_proxy_client())
         self.parser.add_argument('index', required=False, default=USER_INDEX, type=str)
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/user_delete.yml')
     def delete(self, *, document_id: str) -> Tuple[Any, int]:
         return super().delete(document_id=document_id)
@@ -151,10 +163,14 @@ class DocumentUsersAPI(BaseDocumentsAPI):
         super().__init__(schema=UserSchema, proxy=get_proxy_client())
         self.parser.add_argument('index', required=False, default=USER_INDEX, type=str)
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/user_post.yml')
     def post(self) -> Tuple[Any, int]:
         return super().post()
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/user_put.yml')
     def put(self) -> Tuple[Any, int]:
         return super().put()
@@ -166,6 +182,7 @@ class DocumentFeatureAPI(BaseDocumentAPI):
         super().__init__(schema=FeatureSchema, proxy=get_proxy_client())
         self.parser.add_argument('index', required=False, default=FEATURE_INDEX, type=str)
 
+    @require_auth()
     @swag_from('swagger_doc/document/feature_delete.yml')
     def delete(self, *, document_id: str) -> Tuple[Any, int]:
         return super().delete(document_id=document_id)
@@ -177,10 +194,14 @@ class DocumentFeaturesAPI(BaseDocumentsAPI):
         super().__init__(schema=FeatureSchema, proxy=get_proxy_client())
         self.parser.add_argument('index', required=False, default=FEATURE_INDEX, type=str)
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/feature_post.yml')
     def post(self) -> Tuple[Any, int]:
         return super().post()
 
+
+    @require_auth()
     @swag_from('swagger_doc/document/feature_put.yml')
     def put(self) -> Tuple[Any, int]:
         return super().put()
