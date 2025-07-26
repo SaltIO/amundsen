@@ -313,7 +313,7 @@ class CloudJiraClient(BaseIssueTrackerClient):
         """
         users = []
         for user_id in user_ids:
-            url = '{0}{1}/{2}'.format(app.config['METADATASERVICE_BASE'], USER_ENDPOINT, user_id)
+            url = '{0}/{1}'.format(USER_ENDPOINT, user_id)
             response = request_metadata(url=url)
             if response.status_code == HTTPStatus.OK:
                 user = load_user(response.json())

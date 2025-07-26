@@ -72,7 +72,6 @@ class RevealSearchAPI(Resource):
     def __init__(self) -> None:
         self.ai_chat_client: AIChatClient = OpenAIChatClient()
         self.ai_embedding_client: AIEmbeddingClient = STEmbeddingClient()
-        self.search_service_base = current_app.config['SEARCHSERVICE_BASE']
 
     @require_auth()
     # @swag_from('swagger_doc/reveal/chat_post.yml')
@@ -113,7 +112,7 @@ class RevealSearchAPI(Resource):
                     }
 
                     search_response = request_search(
-                        url=f"{self.search_service_base}/v2/knn_search",
+                        url="/v2/knn_search",
                         method="POST",
                         json=search_payload
                     )
