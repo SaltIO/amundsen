@@ -9,7 +9,8 @@ from typing import (  # noqa: F401
 )
 
 from amundsen_common.models.search import (
-    HighlightOptions, SearchRequestSchema, SearchResponseSchema, KnnSearchRequestSchema, KnnSearchResponseSchema
+    HighlightOptions, SearchRequestSchema, SearchResponseSchema, KnnSearchRequestSchema, KnnSearchResponseSchema,
+    HybridSearchRequestSchema, HybridSearchResponseSchema, HybridSearchHit
 )
 from flasgger import swag_from
 from flask_restful import Resource, request
@@ -106,6 +107,62 @@ class KnnSearchAPI(Resource):
             return KnnSearchResponseSchema().dump(knn_search_results), HTTPStatus.OK
         except RuntimeError as e:
             err_msg = f'Exception encountered while processing KNN search request {e}'
+            LOGGER.error(f"err_msg={err_msg}")
+            return {'message': err_msg}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class HybridSearchAPI(Resource):
+    """
+    Hybrid Search API handles combined KNN and text search requests
+    """
+
+    def __init__(self) -> None:
+        self.search_proxy = get_proxy_client()
+
+    @require_auth()
+    # @swag_from('swagger_doc/search/hybrid_search.yml')
+    def post(self) -> Iterable[Any]:
+        """
+        Fetch hybrid search results combining KNN and text search
+        :return: json payload of schema
+        """
+        request_json = request.get_json(force=True)
+        LOGGER.info(f"HybridSearchAPI:post()\n{request.json}")
+        if not isinstance(request_json, dict):  # Ensure it's a dictionary
+            request_json = json.loads(request_json)
+        request_data = HybridSearchRequestSchema().load(request_json, partial=False)
+        LOGGER.info(f"request_data={request_data}")
+
+        # Validate resource types
+        resources: List[AmundsenResource] = []
+        highlight_options: Dict[AmundsenResource, HighlightOptions] = {}
+
+        for r in request_data.resource_types:
+            resource = RESOURCE_STR_MAPPING.get(r)
+            if resource:
+                resources.append(resource)
+                if request_data.highlight_options.get(r):
+                    highlight_options[resource] = request_data.highlight_options.get(r)
+            else:
+                err_msg = f'Search for invalid resource "{r}" requested'
+                LOGGER.error(f"err_msg={err_msg}")
+                return {'message': err_msg}, HTTPStatus.BAD_REQUEST
+
+        try:
+            hybrid_search_results = self.search_proxy.hybrid_search(
+                text_queries=request_data.text_queries,
+                knn_vectors=request_data.knn_vectors,
+                resource_types=resources,
+                page_index=request_data.page_index,
+                results_per_page=request_data.results_per_page,
+                filters=request_data.filters,
+                highlight_options=highlight_options,
+                knn_results_count=request_data.knn_results_count
+            )
+            LOGGER.info(f"hybrid_search_results={hybrid_search_results}")
+            return HybridSearchResponseSchema().dump(hybrid_search_results), HTTPStatus.OK
+        except RuntimeError as e:
+            err_msg = f'Exception encountered while processing hybrid search request {e}'
             LOGGER.error(f"err_msg={err_msg}")
             return {'message': err_msg}, HTTPStatus.INTERNAL_SERVER_ERROR
 

@@ -10,7 +10,8 @@ from typing import (
 
 from amundsen_common.models.api import health_check
 from amundsen_common.models.search import (
-    Filter, HighlightOptions, SearchResponse, KnnSearchResponse, KnnSearchResponseSchema, KnnSearchHitSchema
+    Filter, HighlightOptions, SearchResponse, KnnSearchResponse, KnnSearchResponseSchema, KnnSearchHitSchema,
+    HybridSearchResponse, HybridSearchHitSchema
 )
 from elasticsearch import Elasticsearch, TransportError, ApiError
 from elasticsearch_dsl import (
@@ -622,6 +623,131 @@ class ElasticsearchProxyV2_1():
             return KnnSearchResponse(
                 msg=f"Failed KNN search for resource={resource_type}. Resource index {res_index} not found in Elasticsearch",
                 status_code=HTTPStatus.BAD_REQUEST
+            )
+
+    def hybrid_search(
+            self,
+            text_queries: List[str],
+            knn_vectors: List[List[float]],
+            resource_types: List[Resource],
+            page_index: int,
+            results_per_page: int,
+            filters: List[Filter] = None,
+            highlight_options: Dict[Resource, HighlightOptions] = None,
+            knn_results_count: int = 10
+        ) -> HybridSearchResponse:
+        """
+        Executes a hybrid search combining KNN and text search across multiple resource types.
+        Uses ES multi-search to execute both search types and consolidates results.
+        """
+        if not resource_types:
+            # if resource types are not defined then search all resources
+            resource_types = self.PRIMARY_ENTITIES
+
+        multisearch = MultiSearch(using=self.elasticsearch)
+
+        for resource in resource_types:
+            res_index = self.get_index_alias_for_resource(resource_type=resource)
+            if not self.elasticsearch.indices.exists(index=res_index):
+                LOGGER.warn(f"Index for resource {resource} does not exist. Not including in MultiSearch")
+                continue
+
+            # Add text search queries
+            for query in text_queries:
+                # Build text search query
+                text_query = self._build_elasticsearch_query(resource=resource,
+                                                           query_term=query,
+                                                           filters=filters or [])
+                search = Search(index=res_index).query(text_query)
+
+                # Add highlighting if requested
+                if highlight_options and resource in highlight_options:
+                    search = self._search_highlight(resource=resource,
+                                                  search=search,
+                                                  highlight_options=highlight_options)
+
+                # Add pagination
+                start_from = page_index * results_per_page
+                end = results_per_page * (page_index + 1)
+                search = search[start_from:end]
+
+                multisearch = multisearch.add(search)
+
+            # Add KNN search queries
+            for vector in knn_vectors:
+                # Build KNN search query
+                knn_query_body = {
+                    "size": knn_results_count,
+                    "knn": {
+                        "field": "embedding_vector",
+                        "query_vector": vector,
+                        "k": knn_results_count * 2,
+                        "num_candidates": knn_results_count * 3
+                    }
+                }
+
+                # Add filters if provided
+                if filters and len(filters) > 0:
+                    filter_q_objects = self._build_filters(resource=resource, filters=filters)
+                    filter_clauses = [q.to_dict() for q in filter_q_objects]
+                    knn_query_body["knn"]["filter"] = filter_clauses
+
+                # Create search object for KNN
+                search = Search(index=res_index).update_from_dict(knn_query_body)
+                multisearch = multisearch.add(search)
+
+        try:
+            LOGGER.info(f"Executing hybrid multi-search across {len(resource_types)} resource types")
+            responses = self.execute_multisearch_query(multisearch=multisearch)
+
+            # Process and consolidate results
+            consolidated_results = []
+            seen_keys = set()  # For deduplication
+
+            for i, response in enumerate(responses):
+                if "hits" in response and "hits" in response["hits"]:
+                    for hit in response["hits"]["hits"]:
+                        result_key = hit["_source"].get("key")
+
+                        # Deduplicate based on result key
+                        if result_key and result_key not in seen_keys:
+                            seen_keys.add(result_key)
+
+                            # Determine search type based on position in responses
+                            # Text searches come first, then KNN searches
+                            search_type = "text" if i < len(text_queries) * len(resource_types) else "knn"
+
+                            consolidated_results.append({
+                                "score": hit["_score"],
+                                "result": hit["_source"],
+                                "search_type": search_type
+                            })
+
+            # Sort by score (highest first) and limit to requested page size
+            consolidated_results.sort(key=lambda x: x["score"], reverse=True)
+            start_from = page_index * results_per_page
+            end = start_from + results_per_page
+            paginated_results = consolidated_results[start_from:end]
+
+            # Convert to schema objects
+            hybrid_hits = HybridSearchHitSchema().loads(json.dumps(paginated_results), many=True)
+
+            return HybridSearchResponse(
+                msg="Success",
+                results=hybrid_hits,
+                page_index=page_index,
+                results_per_page=results_per_page,
+                status_code=HTTPStatus.OK
+            )
+
+        except Exception as e:
+            LOGGER.exception(f"Failed hybrid search across resources {resource_types}")
+            return HybridSearchResponse(
+                msg=f"Failed hybrid search. Error: {e}",
+                results=None,
+                page_index=page_index,
+                results_per_page=results_per_page,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
     def search(self, *,

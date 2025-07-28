@@ -21,7 +21,7 @@ from search_service.api.document import (
 from search_service.api.document_update import DocumentAPI
 from search_service.api.feature import SearchFeatureAPI, SearchFeatureFilterAPI
 from search_service.api.healthcheck import HealthcheckAPI
-from search_service.api.search import KnnSearchAPI, SearchAPI
+from search_service.api.search import SearchAPI, KnnSearchAPI, HybridSearchAPI
 from search_service.api.table import SearchTableAPI, SearchTableFilterAPI
 from search_service.api.user import SearchUserAPI
 from search_service.api.data_provider import SearchDataProviderAPI, SearchDataProviderFilterAPI
@@ -104,6 +104,9 @@ def create_app(*, config_module_class: str) -> Flask:
 
     # New knn search endpoint
     api.add_resource(KnnSearchAPI, '/v2/knn_search')
+
+    # New hybrid search endpoint
+    api.add_resource(HybridSearchAPI, '/v2/hybrid_search')
 
     # New document update API
     api.add_resource(DocumentAPI, '/v2/document')
