@@ -8,6 +8,8 @@ from typing import (
     Any, Dict, List, Union
 )
 
+from search_service.embedding_service import get_embedding_service
+
 from amundsen_common.models.api import health_check
 from amundsen_common.models.search import (
     Filter, HighlightOptions, SearchResponse, KnnSearchResponse, KnnSearchResponseSchema, KnnSearchHitSchema,
@@ -628,21 +630,27 @@ class ElasticsearchProxyV2_1():
     def hybrid_search(
             self,
             text_queries: List[str],
-            knn_vectors: List[List[float]],
             resource_types: List[Resource],
             page_index: int,
             results_per_page: int,
             filters: List[Filter] = None,
-            highlight_options: Dict[Resource, HighlightOptions] = None,
-            knn_results_count: int = 10
+            highlight_options: Dict[Resource, HighlightOptions] = None
         ) -> HybridSearchResponse:
         """
         Executes a hybrid search combining KNN and text search across multiple resource types.
         Uses ES multi-search to execute both search types and consolidates results.
+        Generates embeddings from text queries internally.
         """
         if not resource_types:
             # if resource types are not defined then search all resources
             resource_types = self.PRIMARY_ENTITIES
+
+        # Generate embeddings from text queries
+        embedding_service = get_embedding_service()
+        knn_vectors = embedding_service.encode(text_queries)
+
+        # Set default KNN results count
+        knn_results_count = min(results_per_page, 10)  # Use results_per_page or max 10
 
         multisearch = MultiSearch(using=self.elasticsearch)
 
@@ -707,7 +715,7 @@ class ElasticsearchProxyV2_1():
             for i, response in enumerate(responses):
                 if "hits" in response and "hits" in response["hits"]:
                     for hit in response["hits"]["hits"]:
-                        result_key = hit["_source"].get("key")
+                        result_key = getattr(hit["_source"], "key", None)
 
                         # Deduplicate based on result key
                         if result_key and result_key not in seen_keys:
@@ -729,8 +737,22 @@ class ElasticsearchProxyV2_1():
             end = start_from + results_per_page
             paginated_results = consolidated_results[start_from:end]
 
+            # Convert AttrDict objects to regular dictionaries for JSON serialization
+            def convert_attrdict_to_dict(obj):
+                if hasattr(obj, 'to_dict'):
+                    return obj.to_dict()
+                elif isinstance(obj, dict):
+                    return {k: convert_attrdict_to_dict(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_attrdict_to_dict(item) for item in obj]
+                else:
+                    return obj
+
+            # Convert paginated_results to JSON-serializable format
+            serializable_results = convert_attrdict_to_dict(paginated_results)
+
             # Convert to schema objects
-            hybrid_hits = HybridSearchHitSchema().loads(json.dumps(paginated_results), many=True)
+            hybrid_hits = HybridSearchHitSchema().loads(json.dumps(serializable_results), many=True)
 
             return HybridSearchResponse(
                 msg="Success",

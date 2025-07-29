@@ -109,10 +109,6 @@ class HybridSearchRequest:
     filters: List[Filter] = []
     highlight_options: Optional[Dict[str, HighlightOptions]] = {}
 
-    # KNN search parameters
-    knn_vectors: List[List[float]]  # List of vectors to search with
-    knn_results_count: Optional[int] = 10  # Number of KNN results per vector
-
 
 class HybridSearchRequestSchema(AttrsSchema):
     class Meta:

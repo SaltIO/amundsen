@@ -151,13 +151,11 @@ class HybridSearchAPI(Resource):
         try:
             hybrid_search_results = self.search_proxy.hybrid_search(
                 text_queries=request_data.text_queries,
-                knn_vectors=request_data.knn_vectors,
                 resource_types=resources,
                 page_index=request_data.page_index,
                 results_per_page=request_data.results_per_page,
                 filters=request_data.filters,
-                highlight_options=highlight_options,
-                knn_results_count=request_data.knn_results_count
+                highlight_options=highlight_options
             )
             LOGGER.info(f"hybrid_search_results={hybrid_search_results}")
             return HybridSearchResponseSchema().dump(hybrid_search_results), HTTPStatus.OK
