@@ -46,6 +46,17 @@ TERMS_QUERY = 'terms'
 
 class ElasticsearchProxyV2_1():
 
+    # Primary entities for search
+    PRIMARY_ENTITIES = [
+        Resource.TABLE,
+        Resource.DASHBOARD,
+        Resource.FEATURE,
+        Resource.USER,
+        Resource.FILE,
+        Resource.DATA_PROVIDER,
+        Resource.COLUMN,
+    ]
+
     # map the field name in FE to the field used to filter in ES
     # note: ES needs keyword field types to filter
 
@@ -488,7 +499,7 @@ class ElasticsearchProxyV2_1():
 
                 multisearch = multisearch.add(search)
             else:
-                LOGGER.warn(f"Indice for resource {resource} does not exist.  Not including in MultiSearch")
+                LOGGER.warning(f"Indice for resource {resource} does not exist.  Not including in MultiSearch")
         try:
             response = multisearch.execute()
             return response
@@ -657,7 +668,7 @@ class ElasticsearchProxyV2_1():
         for resource in resource_types:
             res_index = self.get_index_alias_for_resource(resource_type=resource)
             if not self.elasticsearch.indices.exists(index=res_index):
-                LOGGER.warn(f"Index for resource {resource} does not exist. Not including in MultiSearch")
+                LOGGER.warning(f"Index for resource {resource} does not exist. Not including in MultiSearch")
                 continue
 
             # Add text search queries
@@ -811,7 +822,7 @@ class ElasticsearchProxyV2_1():
                 LOGGER.info(f"resource={resource};search={json.dumps(search.to_dict())}")
                 multisearch = multisearch.add(search)
             else:
-                LOGGER.warn(f"Indice for resource {resource} does not exist.  Not including in MultiSearch")
+                LOGGER.warning(f"Indice for resource {resource} does not exist.  Not including in MultiSearch")
 
         LOGGER.info(f"multisearch={json.dumps(multisearch.to_dict())}")
         responses = self.execute_multisearch_query(multisearch=multisearch)
