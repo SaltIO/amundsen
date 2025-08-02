@@ -256,6 +256,19 @@ class ElasticsearchProxyV2_1():
 
         return alias
 
+    def get_embedding_index_alias_for_resource(self, resource_type: Resource) -> str:
+        resource_str = resource_type.name.lower()
+        alias_config = current_app.config.get(
+            config.ES_EMBEDDING_INDEX_ALIAS_TEMPLATE
+        )
+
+        if alias_config is None:
+            return f'{resource_str}_embedding_index_v2_1'
+
+        alias = str(alias_config).format(resource=resource_str)
+
+        return alias
+
     def _build_must_query(self, resource: Resource, query_term: str) -> List[Q]:
         """
         Builds the query object for the inputed search term
@@ -563,79 +576,83 @@ class ElasticsearchProxyV2_1():
         Executes a KNN vector search on the given resource type.
         Assumes the vector field is named 'embedding_vector'.
         """
-        index = self.get_index_alias_for_resource(resource_type=resource_type)
-        res_index = self.get_index_alias_for_resource(resource_type=resource_type)
-        if self.elasticsearch.indices.exists(index=res_index):
+        search_index = self.get_index_alias_for_resource(resource_type=resource_type)
+        embedding_index = self.get_embedding_index_alias_for_resource(resource_type=resource_type)
 
-            query_body = {
-                "size": results_count,
-                "knn": {
-                    "field": "embedding_vector",
-                    "query_vector": vector,
-                    "k": results_count*2,
-                    "num_candidates": results_count*3
-                }
-            }
+        embedding_exists = self.elasticsearch.indices.exists(index=embedding_index)
+        search_exists = self.elasticsearch.indices.exists(index=search_index)
 
-            # query_body= {
-            #     "size": results_count,
-            #     "query": {
-            #         "bool": {
-            #             "must": {
-            #                 "knn": {
-            #                     "field": "embedding_vector",
-            #                     "query_vector": vector,
-            #                     "k": results_count * 2,
-            #                     "num_candidates": results_count * 3
-            #                 }
-            #             }
-            #         }
-            #     }
-            # }
-
-            if filters and len(filters) > 0:
-                filter_q_objects = self._build_filters(resource=resource_type, filters=filters)
-                filter_clauses = [q.to_dict() for q in filter_q_objects]
-                query_body["knn"]["filter"] = filter_clauses
-
-            try:
-                LOGGER.info(f"KNN query against index={index}: {json.dumps(query_body)}")
-                response = self.elasticsearch.search(index=index, body=query_body)
-                LOGGER.info(f"KNN query results={response}")
-
-                if "hits" in response and "hits" in response["hits"] and len(response["hits"]["hits"]) > 0:
-                    results = [
-                        {
-                            "score": hit["_score"],
-                            "result": hit["_source"]
-                        }
-                        for hit in response["hits"]["hits"]
-                    ]
-                    knn_search_response = KnnSearchResponse(
-                        msg="Success",
-                        results=KnnSearchHitSchema().loads(json.dumps(results), many=True),
-                        status_code = HTTPStatus.OK
-                    )
-                else:
-                    knn_search_response = KnnSearchResponse(
-                        msg="No hits found",
-                        results=None,
-                        status_code = HTTPStatus.NOT_FOUND
-                    )
-
-                return knn_search_response
-
-            except Exception as e:
-                LOGGER.exception(f"Failed KNN search for resource={resource_type}")
-                return KnnSearchResponse(
-                    msg=f"Failed KNN search for resource={resource_type}. Error: {e}",
-                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-        else:
-            LOGGER.error(f"Failed KNN search for resource={resource_type}. Resource index {res_index} not found in Elasticsearch")
+        if not embedding_exists or not search_exists:
+            LOGGER.error(f"Failed KNN search for resource={resource_type}. Resource index {embedding_index} or {search_index} not found in Elasticsearch")
             return KnnSearchResponse(
-                msg=f"Failed KNN search for resource={resource_type}. Resource index {res_index} not found in Elasticsearch",
+                msg=f"Failed KNN search for resource={resource_type}. Resource index {embedding_index} or {search_index} not found in Elasticsearch",
                 status_code=HTTPStatus.BAD_REQUEST
+            )
+
+        query_body = {
+            "size": results_count,
+            "knn": {
+                "field": "embedding_vector",
+                "query_vector": vector,
+                "k": results_count*2,
+                "num_candidates": results_count*3
+            }
+        }
+
+        if filters and len(filters) > 0:
+            filter_q_objects = self._build_filters(resource=resource_type, filters=filters)
+            filter_clauses = [q.to_dict() for q in filter_q_objects]
+            query_body["knn"]["filter"] = filter_clauses
+
+        try:
+            LOGGER.info(f"KNN query against index={embedding_index}: {json.dumps(query_body)}")
+            response = self.elasticsearch.search(index=embedding_index, body=query_body)
+            LOGGER.info(f"KNN query results={response}")
+
+            if "hits" in response and "hits" in response["hits"] and len(response["hits"]["hits"]) > 0:
+                ids = [hit["_id"] for hit in response["hits"]["hits"]]
+
+                mget_response = self.elasticsearch.mget(
+                    index=search_index,
+                    body={"ids": ids}
+                )
+
+                # Build lookup dict of found documents
+                id_to_doc = {
+                    doc["_id"]: doc["_source"]
+                    for doc in mget_response["docs"]
+                    if doc.get("found")
+                }
+
+                # Rebuild results using full documents (when found)
+                results = []
+                for hit in response["hits"]["hits"]:
+                    _id = hit["_id"]
+                    if _id in id_to_doc:
+                        results.append({
+                            "score": hit["_score"],
+                            "result": id_to_doc[_id]
+                        })
+
+                knn_search_response = KnnSearchResponse(
+                    msg="Success",
+                    results=KnnSearchHitSchema().loads(json.dumps(results), many=True),
+                    status_code = HTTPStatus.OK
+                )
+            else:
+                knn_search_response = KnnSearchResponse(
+                    msg="No hits found",
+                    results=None,
+                    status_code = HTTPStatus.NOT_FOUND
+                )
+
+            return knn_search_response
+
+        except Exception as e:
+            LOGGER.exception(f"Failed KNN search for resource={resource_type}")
+            return KnnSearchResponse(
+                msg=f"Failed KNN search for resource={resource_type}. Error: {e}",
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
     def hybrid_search(
@@ -649,8 +666,8 @@ class ElasticsearchProxyV2_1():
         ) -> HybridSearchResponse:
         """
         Executes a hybrid search combining KNN and text search across multiple resource types.
-        Uses ES multi-search to execute both search types and consolidates results.
-        Generates embeddings from text queries internally.
+        KNN search is performed on dedicated embedding indices, then full documents are looked up
+        from text search indices. Results are deduplicated using document _id (key).
         """
         if not resource_types:
             # if resource types are not defined then search all resources
@@ -661,88 +678,136 @@ class ElasticsearchProxyV2_1():
         knn_vectors = embedding_service.encode(text_queries)
 
         # Set default KNN results count
-        knn_results_count = min(results_per_page, 10)  # Use results_per_page or max 10
-
-        multisearch = MultiSearch(using=self.elasticsearch)
-
-        for resource in resource_types:
-            res_index = self.get_index_alias_for_resource(resource_type=resource)
-            if not self.elasticsearch.indices.exists(index=res_index):
-                LOGGER.warning(f"Index for resource {resource} does not exist. Not including in MultiSearch")
-                continue
-
-            # Add text search queries
-            for query in text_queries:
-                # Build text search query
-                text_query = self._build_elasticsearch_query(resource=resource,
-                                                           query_term=query,
-                                                           filters=filters or [])
-                search = Search(index=res_index).query(text_query)
-
-                # Add highlighting if requested
-                if highlight_options and resource in highlight_options:
-                    search = self._search_highlight(resource=resource,
-                                                  search=search,
-                                                  highlight_options=highlight_options)
-
-                # Add pagination
-                start_from = page_index * results_per_page
-                end = results_per_page * (page_index + 1)
-                search = search[start_from:end]
-
-                multisearch = multisearch.add(search)
-
-            # Add KNN search queries
-            for vector in knn_vectors:
-                # Build KNN search query
-                knn_query_body = {
-                    "size": knn_results_count,
-                    "knn": {
-                        "field": "embedding_vector",
-                        "query_vector": vector,
-                        "k": knn_results_count * 2,
-                        "num_candidates": knn_results_count * 3
-                    }
-                }
-
-                # Add filters if provided
-                if filters and len(filters) > 0:
-                    filter_q_objects = self._build_filters(resource=resource, filters=filters)
-                    filter_clauses = [q.to_dict() for q in filter_q_objects]
-                    knn_query_body["knn"]["filter"] = filter_clauses
-
-                # Create search object for KNN
-                search = Search(index=res_index).update_from_dict(knn_query_body)
-                multisearch = multisearch.add(search)
+        knn_results_count = min(results_per_page * 2, 20)  # Get more KNN results for better deduplication
 
         try:
-            LOGGER.info(f"Executing hybrid multi-search across {len(resource_types)} resource types")
-            responses = self.execute_multisearch_query(multisearch=multisearch)
+            # Step 1: Execute text searches
+            text_results = {}
+            text_document_ids = set()
 
-            # Process and consolidate results
-            consolidated_results = []
-            seen_keys = set()  # For deduplication
+            for resource in resource_types:
+                res_index = self.get_index_alias_for_resource(resource_type=resource)
+                if not self.elasticsearch.indices.exists(index=res_index):
+                    LOGGER.warning(f"Text search index for resource {resource} does not exist. Skipping.")
+                    continue
 
-            for i, response in enumerate(responses):
-                if "hits" in response and "hits" in response["hits"]:
-                    for hit in response["hits"]["hits"]:
-                        result_key = getattr(hit["_source"], "key", None)
+                for query in text_queries:
+                    # Build text search query
+                    text_query = self._build_elasticsearch_query(resource=resource,
+                                                               query_term=query,
+                                                               filters=filters or [])
+                    search = Search(index=res_index).query(text_query)
 
-                        # Deduplicate based on result key
-                        if result_key and result_key not in seen_keys:
-                            seen_keys.add(result_key)
+                    # Add highlighting if requested
+                    if highlight_options and resource in highlight_options:
+                        search = self._search_highlight(resource=resource,
+                                                      search=search,
+                                                      highlight_options=highlight_options)
 
-                            # Determine search type based on position in responses
-                            # Text searches come first, then KNN searches
-                            search_type = "text" if i < len(text_queries) * len(resource_types) else "knn"
+                    # Add pagination
+                    start_from = page_index * results_per_page
+                    end = results_per_page * (page_index + 1)
+                    search = search[start_from:end]
 
-                            consolidated_results.append({
+                    # Execute text search
+                    response = search.execute()
+
+                    if "hits" in response and "hits" in response["hits"]:
+                        for hit in response["hits"]["hits"]:
+                            doc_id = hit["_id"]
+                            text_document_ids.add(doc_id)
+                            text_results[doc_id] = {
                                 "score": hit["_score"],
                                 "result": hit["_source"],
-                                "search_type": search_type
-                            })
+                                "search_type": "text",
+                                "resource_type": resource
+                            }
 
-            # Sort by score (highest first) and limit to requested page size
+            # Step 2: Execute KNN searches on embedding indices and lookup full documents
+            knn_results = {}
+            knn_document_ids = set()
+
+            for resource in resource_types:
+                embedding_index = self.get_embedding_index_alias_for_resource(resource_type=resource)
+                search_index = self.get_index_alias_for_resource(resource_type=resource)
+
+                if not self.elasticsearch.indices.exists(index=embedding_index):
+                    LOGGER.warning(f"Embedding index for resource {resource} does not exist. Skipping KNN search.")
+                    continue
+
+                if not self.elasticsearch.indices.exists(index=search_index):
+                    LOGGER.warning(f"Search index for resource {resource} does not exist. Skipping KNN search.")
+                    continue
+
+                for vector in knn_vectors:
+                    # Build KNN search query
+                    knn_query_body = {
+                        "size": knn_results_count,
+                        "knn": {
+                            "field": "embedding_vector",
+                            "query_vector": vector,
+                            "k": knn_results_count * 2,
+                            "num_candidates": knn_results_count * 3
+                        }
+                    }
+
+                    # Add filters if provided
+                    if filters and len(filters) > 0:
+                        filter_q_objects = self._build_filters(resource=resource, filters=filters)
+                        filter_clauses = [q.to_dict() for q in filter_q_objects]
+                        knn_query_body["knn"]["filter"] = filter_clauses
+
+                    try:
+                        # Execute KNN search
+                        response = self.elasticsearch.search(index=embedding_index, body=knn_query_body)
+
+                        if "hits" in response and "hits" in response["hits"] and len(response["hits"]["hits"]) > 0:
+                            ids = [hit["_id"] for hit in response["hits"]["hits"]]
+
+                            # Lookup full documents from text search index
+                            mget_response = self.elasticsearch.mget(
+                                index=search_index,
+                                body={"ids": ids}
+                            )
+
+                            # Build lookup dict of found documents
+                            id_to_doc = {
+                                doc["_id"]: doc["_source"]
+                                for doc in mget_response["docs"]
+                                if doc.get("found")
+                            }
+
+                            # Process KNN results with original _id
+                            for hit in response["hits"]["hits"]:
+                                _id = hit["_id"]
+                                if _id in id_to_doc:
+                                    knn_document_ids.add(_id)
+                                    knn_results[_id] = {
+                                        "score": hit["_score"],
+                                        "result": id_to_doc[_id],
+                                        "search_type": "knn",
+                                        "resource_type": resource
+                                    }
+
+                    except Exception as e:
+                        LOGGER.error(f"Failed KNN search for resource {resource}: {e}")
+                        continue
+
+            # Step 3: Consolidate and deduplicate results
+            consolidated_results = []
+
+            # Add text search results
+            for doc_id, result in text_results.items():
+                consolidated_results.append(result)
+
+            # Add KNN results (only those with valid documents)
+            for doc_id, result in knn_results.items():
+                if result["result"] is not None:  # Only include if we have the full document
+                    # If this ID already exists in text results, skip (text takes precedence)
+                    if doc_id not in text_results:
+                        consolidated_results.append(result)
+
+            # Step 4: Sort by score and paginate
             consolidated_results.sort(key=lambda x: x["score"], reverse=True)
             start_from = page_index * results_per_page
             end = start_from + results_per_page

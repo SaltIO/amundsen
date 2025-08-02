@@ -28,6 +28,7 @@ class Config:
 
     # specify the alias string template under which the ES index exists for each resource
     ES_INDEX_ALIAS_TEMPLATE = '{resource}_search_index_v2_1'
+    ES_EMBEDDING_INDEX_ALIAS_TEMPLATE = '{resource}_embedding_index_v2_1'
     ES_PROXY_CLIENT = PROXY_CLIENTS[os.environ.get('ES_PROXY_CLIENT', 'ELASTICSEARCH_V2_1')]
 
     LOG_REQUESTS = os.getenv('SEARCH_API_LOG_REQUESTS', 'false').lower() in ('1', 'true', 'yes')

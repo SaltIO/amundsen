@@ -99,10 +99,20 @@ class SearchMetadatatoElasticasearchTask(Task):
                 # Move on if the transformer filtered the record out
                 record = self.extractor.extract()
                 continue
-            document = self.to_document(metadata=record).to_dict(True)
-            document['_source']['resource_type'] = self.entity
 
-            yield document
+            if hasattr(record, "items"):
+                metadata = dict(record.items())
+            else:
+                metadata = dict(record)
+            metadata.setdefault('resource_type', self.entity)
+
+            document = self.to_document(metadata=metadata)
+
+            if 'key' in metadata:
+                document.meta.id = metadata["key"]
+
+            yield document.to_dict(True)
+
             record = self.extractor.extract()
 
     def _get_old_index(self, connection: Connections) -> List[str]:
@@ -114,7 +124,7 @@ class SearchMetadatatoElasticasearchTask(Task):
             indices = connection.indices.get_alias(name=self.elasticsearch_alias).keys()
             return indices
         except NotFoundError:
-            LOGGER.warn("Received index not found error from Elasticsearch. " +
+            LOGGER.warning("Received index not found error from Elasticsearch. " +
                         "The index doesn't exist for a newly created ES. It's OK on first run.")
             # return empty list on exception
             return []
@@ -167,7 +177,7 @@ class SearchMetadatatoElasticasearchTask(Task):
                                                chunk_size=self.elasticsearch_batch_size,
                                                request_timeout=self.elasticsearch_timeout_sec):
                 if not success:
-                    LOGGER.warn(f"There was an error while indexing a document to ES: {info}")
+                    LOGGER.warning(f"There was an error while indexing a document to ES: {info}")
                 else:
                     cnt += 1
                 if cnt == self.elasticsearch_batch_size:
