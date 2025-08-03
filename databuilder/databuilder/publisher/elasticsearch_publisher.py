@@ -70,7 +70,7 @@ class ElasticsearchPublisher(Publisher):
         :return: list of elasticsearch indices
         """
         try:
-            indices = self.elasticsearch_client.indices.get_alias(self.elasticsearch_alias).keys()
+            indices = self.elasticsearch_client.indices.get_alias(name=self.elasticsearch_alias).keys()
             return indices
         except NotFoundError:
             LOGGER.warn("Received index not found error from Elasticsearch. " +
@@ -133,7 +133,7 @@ class ElasticsearchPublisher(Publisher):
         update_action = {"actions": actions}
 
         # perform alias update and index delete in single atomic operation
-        self.elasticsearch_client.indices.update_aliases(update_action)
+        self.elasticsearch_client.indices.update_aliases(body=update_action)
 
     def close(self) -> None:
         """

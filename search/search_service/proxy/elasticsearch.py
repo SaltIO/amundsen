@@ -873,7 +873,7 @@ class ElasticsearchProxy(BaseProxy):
         :return: list of elasticsearch indices
         """
         try:
-            indices = self.elasticsearch.indices.get_alias(index=alias).keys()
+            indices = self.elasticsearch.indices.get_alias(name=alias).keys()
             return indices
         except NotFoundError:
             LOGGING.warn('Received index not found error from Elasticsearch', exc_info=True)

@@ -8,7 +8,8 @@ from typing import (
 )
 from uuid import uuid4
 
-from elasticsearch.exceptions import NotFoundError
+import elasticsearch
+from elasticsearch.exceptions import NotFoundError, ApiError
 from elasticsearch.helpers import parallel_bulk
 from elasticsearch_dsl.connections import Connections, connections
 from elasticsearch_dsl.document import Document
@@ -141,6 +142,62 @@ class SearchMetadatatoElasticasearchTask(Task):
             "alias": self.elasticsearch_alias}})
         connection.indices.update_aliases(body={"actions": alias_updates})
 
+    def _update_alias_and_delete_old_index(self, connection: Connections, document_index: Index) -> None:
+        # STEP 1: Get the index currently associated with the alias (before updating it)
+        try:
+            alias_info = connection.indices.get_alias(name=self.elasticsearch_alias)
+            old_index = list(alias_info.keys())[0]  # assuming one-to-one mapping
+        except elasticsearch.exceptions.NotFoundError:
+            old_index = None
+
+        # STEP 2: Move alias to new index
+        alias_actions = []
+        if old_index and old_index != self.elasticsearch_new_index:
+            alias_actions.append({
+                "remove": {"index": old_index, "alias": self.elasticsearch_alias}
+            })
+        alias_actions.append({
+            "add": {"index": self.elasticsearch_new_index, "alias": self.elasticsearch_alias}
+        })
+
+        LOGGER.info(f"Updating alias {self.elasticsearch_alias} to point to {self.elasticsearch_new_index}")
+        connection.indices.update_aliases(body={"actions": alias_actions})
+
+        # STEP 3: Delete only the previously aliased index, if it still exists and is not locked
+        if old_index and old_index != self.elasticsearch_new_index:
+            try:
+                LOGGER.info(f"Attempting to delete old index: {old_index}")
+                connection.indices.delete(index=old_index)
+                LOGGER.info(f"Successfully deleted old index: {old_index}")
+            except elasticsearch.exceptions.AuthorizationException as e:
+                if "cluster_block_exception" in str(e):
+                    LOGGER.warning(f"Delete blocked by index.blocks.delete on {old_index}")
+                else:
+                    raise
+
+    def _delete_unaliased_indices(self):
+        try:
+            all_indices = self.elasticsearch_client.indices.get(index=f"{self.elasticsearch_alias}*")
+        except NotFoundError:
+            LOGGER.info("No indices found with that prefix.")
+            return
+
+        for index_name in all_indices:
+            try:
+                alias_info = self.elasticsearch_client.indices.get_alias(index=index_name)
+                if alias_info.get(index_name, {}).get("aliases"):
+                    LOGGER.info(f"Skipping index {index_name}: has alias.")
+                    continue
+            except NotFoundError:
+                # If the index doesn't exist anymore
+                continue
+
+            try:
+                LOGGER.info(f"Deleting index: {index_name}")
+                self.elasticsearch_client.indices.delete(index=index_name)
+            except ApiError as e:
+                LOGGER.warning(f"Failed to delete {index_name}: {e.info}")
+
     def run(self) -> None:
         LOGGER.info('Running search metadata to Elasticsearch task')
         try:
@@ -184,9 +241,10 @@ class SearchMetadatatoElasticasearchTask(Task):
                     LOGGER.info(f'Published {str(cnt*self.elasticsearch_batch_size)} records to ES')
 
             # delete old index
-            self._delete_old_index(connection=connection,
-                                   document_index=index)
+            self._update_alias_and_delete_old_index(connection=connection,
+                                                    document_index=index)
 
+            self._delete_unaliased_indices()
             LOGGER.info("Elasticsearch Indexing completed")
         finally:
             self._closer.close()
