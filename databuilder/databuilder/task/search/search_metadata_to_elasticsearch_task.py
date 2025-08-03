@@ -166,9 +166,15 @@ class SearchMetadatatoElasticasearchTask(Task):
         # STEP 3: Delete only the previously aliased index, if it still exists and is not locked
         if old_index and old_index != self.elasticsearch_new_index:
             try:
-                LOGGER.info(f"Attempting to delete old index: {old_index}")
-                connection.indices.delete(index=old_index)
-                LOGGER.info(f"Successfully deleted old index: {old_index}")
+                settings = self.elasticsearch_client.indices.get_settings(index=old_index)
+                index_settings = settings.get(old_index, {}).get('settings', {}).get('index', {})
+                is_read_only = index_settings.get('blocks', {}).get('read_only', 'false') == 'true'
+                if is_read_only:
+                    LOGGER.info(f"Attempting to delete old index: {old_index}")
+                    connection.indices.delete(index=old_index)
+                    LOGGER.info(f"Successfully deleted old index: {old_index}")
+                else:
+                    LOGGER.info(f"Delete lock set on index {old_index}...skipping")
             except elasticsearch.exceptions.AuthorizationException as e:
                 if "cluster_block_exception" in str(e):
                     LOGGER.warning(f"Delete blocked by index.blocks.delete on {old_index}")
