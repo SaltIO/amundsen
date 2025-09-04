@@ -120,7 +120,7 @@ class BasePostgresMetadataExtractor(Extractor):
         except StopIteration:
             if self.lineage_extracts:
                 lineage_extract = self.lineage_extracts.pop(0)  # Remove first element
-                LOGGER.info(f'Extracting lineage: {lineage_extract}')
+                LOGGER.debug(f'Extracting lineage: {lineage_extract}')
                 return lineage_extract
             return None  # No more data left
 
@@ -188,7 +188,7 @@ class BasePostgresMetadataExtractor(Extractor):
                 #             view_row = results.fetchone()
                 #             view_def = view_row[0] if view_row else None
 
-                LOGGER.info(f"Found View: schema={last_row['schema']}, view_name={last_row['name']}, view_def={view_def}")
+                LOGGER.debug(f"Found View: schema={last_row['schema']}, view_name={last_row['name']}, view_def={view_def}")
                 if view_def:
                     try:
                         column_lineage = SQLMetadata.extract_column_lineage(
