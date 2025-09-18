@@ -172,10 +172,8 @@ def generate_query_json(*, filters: Dict = {}, page_index: int, search_term: str
 
 
 def execute_search_document_request(request_json: str, method: str) -> int:
-    search_service_base = app.config['SEARCHSERVICE_BASE']
-    search_document_url = f'{search_service_base}/v2/document'
     update_response = request_search(
-        url=search_document_url,
+        url='/v2/document',
         method=method,
         headers={'Content-Type': 'application/json'},
         data=request_json,

@@ -23,7 +23,7 @@ from metadata_service.api.tag import TagCommon
 from metadata_service.entity.dashboard_summary import DashboardSummarySchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client, BaseProxy
-from metadata_service.auth import requires_auth, WRITE_PERMISSION
+from ddp_auth.flask import require_auth
 
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class TableIdGET(BaseAPI):
             id_qstring_key='id'
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/table_id_get.yml')
     def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
         return super().get(**kwargs)
@@ -59,7 +59,7 @@ class TableGET(BaseAPI):
             client=get_proxy_client()
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/table_get.yml')
     def get(self, *, database: str, cluster: str, schema: str, table: str) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster, schema=schema, table=table)
@@ -72,7 +72,7 @@ class TablesGET(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(TableSchema, 'tables', self.client)
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/tables_get.yml')
     def get(self, *, database: Optional[str] = None, cluster: Optional[str] = None, schema: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster, schema=schema)
@@ -84,7 +84,7 @@ class TablePutAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/detail_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         data = None
@@ -121,7 +121,7 @@ class TableLineageAPI(Resource):
         self.parser.add_argument('depth', type=int, location="args", required=False, default=1)
         super(TableLineageAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/lineage_get.yml')
     def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -137,7 +137,7 @@ class TableLineageAPI(Resource):
         except Exception as e:
             return {'message': f'Exception raised when getting table lineage: {e}'}, HTTPStatus.NOT_FOUND
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/lineage_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -170,7 +170,7 @@ class TableOwnerAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/owner_put.yml')
     def put(self, table_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -186,7 +186,7 @@ class TableOwnerAPI(Resource):
                                'is not added successfully'.format(owner,
                                                                   table_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/owner_delete.yml')
     def delete(self, table_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -209,7 +209,7 @@ class TableDescriptionAPI(Resource):
         self.client = get_proxy_client()
         super(TableDescriptionAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/description_get.yml')
     def get(self, id: str) -> Iterable[Any]:
         """
@@ -225,7 +225,7 @@ class TableDescriptionAPI(Resource):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/description_put.yml')
     def put(self, id: str) -> Iterable[Any]:
         """
@@ -254,7 +254,7 @@ class TableUpdateFrequencyAPI(Resource):
         self.client = get_proxy_client()
         super(TableUpdateFrequencyAPI, self).__init__()
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/update_frequency_put.yml')
     def put(self, table_uri: str) -> Iterable[Any]:
         """
@@ -273,7 +273,7 @@ class TableUpdateFrequencyAPI(Resource):
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/update_frequency_delete.yml')
     def delete(self, table_uri: str) -> Iterable[Any]:
         """
@@ -302,7 +302,7 @@ class TableTagAPI(Resource):
 
         self._tag_common = TagCommon(client=self.client)
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -327,7 +327,7 @@ class TableTagAPI(Resource):
             published_tag=published_tag
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -355,7 +355,7 @@ class TableBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -372,7 +372,7 @@ class TableBadgeAPI(Resource):
             published_tag=published_tag
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -396,7 +396,7 @@ class TableDashboardAPI(BaseAPI):
             client=get_proxy_client()
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/dashboards_using_table_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(id=id, resource_type=ResourceType.Dashboard)
@@ -407,7 +407,7 @@ class TableStatsAPI(Resource):
         self.client = get_proxy_client()
         super(TableStatsAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/table/stats_get.yml')
     def get(self, table_uri: str) -> Union[tuple, int, None]:
         """
@@ -428,7 +428,7 @@ class TableStatsAPI(Resource):
             LOGGER.exception(f'FAILED')
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/table/stats_put.yml')
     def put(self,
             table_uri: str) -> Iterable[Union[dict, tuple, int, None]]:

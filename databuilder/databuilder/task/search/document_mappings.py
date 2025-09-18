@@ -218,6 +218,8 @@ class Table(SearchableResource):
         term_vector=POSITIONS_OFFSETS
     )
 
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
+
 class Column(SearchableResource):
 
     type = Text(required=True,
@@ -278,7 +280,8 @@ class Column(SearchableResource):
         term_vector=POSITIONS_OFFSETS
     )
 
-    embedding_vector = DenseVector(dims=384)
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
+
 
 
 class Dashboard(SearchableResource):
@@ -320,6 +323,7 @@ class Dashboard(SearchableResource):
                        analyzer=Analyzer.stemming_analyzer,
                        term_vector=POSITIONS_OFFSETS)
 
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
 
 class Feature(SearchableResource):
     feature_group = Text(required=True,
@@ -336,6 +340,8 @@ class Feature(SearchableResource):
                   analyzer=Analyzer.general_analyzer,
                   term_vector=POSITIONS_OFFSETS)
     availability = Keyword()
+
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
 
 
 class User(SearchableResource):
@@ -356,6 +362,8 @@ class User(SearchableResource):
                      },
                      analyzer=Analyzer.stemming_analyzer,
                      term_vector=POSITIONS_OFFSETS)
+
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
 
 class DataProvider(SearchableResource):
     # name = Text(required=True,
@@ -427,6 +435,8 @@ class DataProvider(SearchableResource):
                    term_vector=POSITIONS_OFFSETS,
                    analyzer=Analyzer.stemming_analyzer)
 
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
+
 class File(SearchableResource):
     name = Text(required=True,
                 fields={
@@ -488,6 +498,8 @@ class File(SearchableResource):
                    },
                    term_vector=POSITIONS_OFFSETS,
                    analyzer=Analyzer.stemming_analyzer)
+
+    embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
 
 
 RESOURCE_TO_MAPPING: Dict[str, Document] = {

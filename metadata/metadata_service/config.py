@@ -85,17 +85,9 @@ class Config:
     INIT_CUSTOM_EXT_AND_ROUTES = None  # type: Callable[[Flask], None]
 
     # API Config
-    METADATA_API_ENABLE_AUTH = bool(distutils.util.strtobool(os.getenv("METADATA_API_ENABLE_AUTH", "True")))
-    LOGGER.warning(f"METADATA_API_ENABLE_AUTH={METADATA_API_ENABLE_AUTH}")
     FLASK_OIDC_CLIENT_ID = os.environ['FLASK_OIDC_CLIENT_ID']
     FLASK_OIDC_CLIENT_SECRET = os.environ['FLASK_OIDC_CLIENT_SECRET']
     METADATA_API_URL_PREFIX = os.getenv('METADATA_API_URL_PREFIX', '/metadata-api')
-    METADATA_API_AUTH0_DOMAIN = os.environ['METADATA_API_AUTH0_DOMAIN']
-    METADATA_API_AUTH0_API_AUDIENCE = os.environ['METADATA_API_AUTH0_API_AUDIENCE']
-    METADATA_API_AUTH0_ISSUER = f'https://{METADATA_API_AUTH0_DOMAIN}/'
-    METADATA_API_AUTH0_ALGORITHMS = os.environ['METADATA_API_AUTH0_ALGORITHMS']
-    if METADATA_API_AUTH0_ALGORITHMS:
-        METADATA_API_AUTH0_ALGORITHMS = ast.literal_eval(METADATA_API_AUTH0_ALGORITHMS)
 
     # Allows /user and /user/ to be the same
     # STRICT_SLASHES = False
@@ -108,7 +100,6 @@ class Config:
         'title': 'CMD+RVL Metadata API',
         'uiversion': 3,
         'favicon': os.path.join(METADATA_API_URL_PREFIX, 'static', 'img', 'favicon.ico'),
-        # 'static_url_path': os.path.join('api', 'swagger_doc', 'templates'),
         'url_prefix': METADATA_API_URL_PREFIX,
         "specs": [
             {
@@ -118,9 +109,6 @@ class Config:
                 "model_filter": lambda tag: True,
             }
         ],
-        # "static_url_path": os.path.join(METADATA_API_URL_PREFIX, 'static'),
-        # "swagger_ui": SWAGGER_ENABLED,
-        # "specs_route": os.path.join(METADATA_API_URL_PREFIX, 'apidocs')
     }
 
     SWAGGER_VALIDATION = os.getenv("SWAGGER_VALIDATION", "true").lower() in ("true", "1", "yes")

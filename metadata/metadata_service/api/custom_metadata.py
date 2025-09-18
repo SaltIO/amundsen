@@ -11,7 +11,7 @@ from flasgger import swag_from
 from flask import request, current_app
 from flask_restful import Resource
 
-from metadata_service.auth import requires_auth, WRITE_PERMISSION
+from ddp_auth.flask import require_auth
 
 from amundsen_common.models.custom import (
     CustomMetadata, CustomMetadataSchema, CustomMetadataNode, CustomMetadataNodeSchema
@@ -33,7 +33,7 @@ class CustomMetadataAPI(Resource):
         self.client = get_proxy_client()
         super(CustomMetadataAPI, self).__init__()
 
-    @requires_auth()
+    @require_auth()
     # @swag_from('swagger_doc/custom_metadata/custom_metadata_get.yml')
     def get(self, label: str, custom_metadata_uri: Optional[str] = None) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
@@ -52,7 +52,7 @@ class CustomMetadataAPI(Resource):
             LOGGER.exception("Fail:")
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     # @swag_from('swagger_doc/reveal/chat_post.yml')
     def put(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:

@@ -50,7 +50,7 @@ class ElasticsearchBaseExtractor(Extractor):
         result = dict()
 
         try:
-            _indexes = self.es.indices.get('*')
+            _indexes = self.es.indices.get(index='*')
 
             for k, v in _indexes.items():
                 if not k.startswith('.'):

@@ -24,7 +24,7 @@ from metadata_service.entity.description import DescriptionSchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
-from metadata_service.auth import requires_auth, WRITE_PERMISSION
+from ddp_auth.flask import require_auth
 
 
 LOGGER = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class DashboardDetailAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DashboardDetailSchema, 'dashboard', self.client)
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/dashboard/detail_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         try:
@@ -55,7 +55,7 @@ class DashboardPutAPI(BaseAPI):
         self.client = get_proxy_client()
         super(DashboardPutAPI, self).__init__()
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/dashboard/detail_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         data = None
@@ -97,7 +97,7 @@ class DashboardDescriptionAPI(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DescriptionSchema, 'dashboard_description', self.client)
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/dashboard/description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -112,7 +112,7 @@ class DashboardDescriptionAPI(BaseAPI):
         except Exception:
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/dashboard/description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -149,7 +149,7 @@ class DashboardBadgeAPI(Resource):
 
         self._badge_common = BadgeCommon(client=self.client)
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/dashboard/badge_put.yml')
     def put(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -166,7 +166,7 @@ class DashboardBadgeAPI(Resource):
             published_tag=published_tag
         )
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/dashboard/badge_delete.yml')
     def delete(self, id: str, badge: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
@@ -192,7 +192,7 @@ class DashboardTagAPI(Resource):
 
         self._tag_common = TagCommon(client=self.client)
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/dashboard/tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
@@ -216,7 +216,7 @@ class DashboardTagAPI(Resource):
             published_tag=published_tag
         )
 
-    @requires_auth(required_permission=WRITE_PERMISSION)
+    @require_auth('write:metadata')
     @swag_from('swagger_doc/dashboard/tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """

@@ -27,7 +27,7 @@ def current_user() -> Response:
         else:
             raise Exception('AUTH_USER_METHOD is not configured')
 
-        url = '{0}{1}/{2}'.format(app.config['METADATASERVICE_BASE'], USER_ENDPOINT, user.user_id)
+        url = '{0}/{1}'.format(USER_ENDPOINT, user.user_id)
 
         response = request_metadata(url=url)
         status_code = response.status_code

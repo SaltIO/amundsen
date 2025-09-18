@@ -15,7 +15,7 @@ from amundsen_common.models.database import DatabaseSchema
 
 from metadata_service.api import BaseAPI
 from metadata_service.proxy import get_proxy_client
-from metadata_service.auth import requires_auth
+from ddp_auth.flask import require_auth
 
 
 class DatabaseIdGET(BaseAPI):
@@ -30,7 +30,7 @@ class DatabaseIdGET(BaseAPI):
             id_qstring_key='id'
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/database/database_id_get.yml')
     def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
         return super().get(**kwargs)
@@ -46,7 +46,7 @@ class DatabaseGET(BaseAPI):
             get_proxy_client()
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/database/database_get.yml')
     def get(self, *, database: str) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database)
@@ -59,7 +59,7 @@ class DatabasesGET(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(DatabaseSchema, 'databases', self.client)
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/database/databases_get.yml')
     def get(self) -> Iterable[Union[Mapping, int, None]]:
         return super().get()

@@ -10,7 +10,7 @@ from amundsen_common.models.cluster import ClusterSchema
 from metadata_service.api import BaseAPI
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
-from metadata_service.auth import requires_auth
+from ddp_auth.flask import require_auth
 
 
 class ClusterIdGET(BaseAPI):
@@ -25,7 +25,7 @@ class ClusterIdGET(BaseAPI):
             id_qstring_key='id'
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/cluster/cluster_id_get.yml')
     def get(self, **kwargs: Optional[Any]) -> Iterable[Union[Mapping, int, None]]:
         return super().get(**kwargs)
@@ -41,7 +41,7 @@ class ClusterGET(BaseAPI):
             get_proxy_client()
         )
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/cluster/cluster_get.yml')
     def get(self, *, database: str, cluster: str) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database, cluster=cluster)
@@ -54,7 +54,7 @@ class ClustersGET(BaseAPI):
         self.client = get_proxy_client()
         super().__init__(ClusterSchema, 'clusters', self.client)
 
-    @requires_auth()
+    @require_auth()
     @swag_from('swagger_doc/cluster/clusters_get.yml')
     def get(self, *, database: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         return super().get(database=database)
