@@ -45,43 +45,22 @@ FILE_ENDPOINT = '/data_source/file'
 
 
 def _get_table_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + TABLE_ENDPOINT
-
+    return TABLE_ENDPOINT
 
 def _get_type_metadata_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + TYPE_METADATA_ENDPOINT
-
+    return TYPE_METADATA_ENDPOINT
 
 def _get_feature_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + FEATURE_ENDPOINT
-
+    return FEATURE_ENDPOINT
 
 def _get_dashboard_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + DASHBOARD_ENDPOINT
+    return DASHBOARD_ENDPOINT
 
 def _get_data_provider_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + DATA_PROVIDER_ENDPOINT
+    return DATA_PROVIDER_ENDPOINT
 
 def _get_file_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + FILE_ENDPOINT
+    return FILE_ENDPOINT
 
 
 @metadata_blueprint.route('/popular_resources', methods=['GET'])
@@ -102,9 +81,8 @@ def popular_resources() -> Response:
 
         resource_types = get_query_param(request.args, 'types')
 
-        service_base = app.config['METADATASERVICE_BASE']
         count = app.config['POPULAR_RESOURCES_COUNT']
-        url = f'{service_base}{POPULAR_RESOURCES_ENDPOINT}/{user_id}?limit={count}&types={resource_types}'
+        url = f'{POPULAR_RESOURCES_ENDPOINT}/{user_id}?limit={count}&types={resource_types}'
 
         response = request_metadata(url=url)
         status_code = response.status_code
@@ -279,7 +257,7 @@ def get_last_indexed() -> Response:
     Schema Defined Here: https://github.com/lyft/amundsenmetadatalibrary/blob/master/metadata_service/api/system.py
     """
     try:
-        url = app.config['METADATASERVICE_BASE'] + LAST_INDEXED_ENDPOINT
+        url = LAST_INDEXED_ENDPOINT
 
         response = request_metadata(url=url)
         status_code = response.status_code
@@ -575,7 +553,7 @@ def get_tags() -> Response:
     :return: a json output containing the list of all tags, as 'tags'
     """
     try:
-        url = app.config['METADATASERVICE_BASE'] + TAGS_ENDPOINT
+        url = TAGS_ENDPOINT
         response = request_metadata(url=url)
         status_code = response.status_code
 
@@ -603,7 +581,7 @@ def get_badges() -> Response:
     :return: a json output containing the list of all badges, as 'badges'
     """
     try:
-        url = app.config['METADATASERVICE_BASE'] + BADGES_ENDPOINT
+        url = BADGES_ENDPOINT
         response = request_metadata(url=url)
         status_code = response.status_code
 
@@ -765,7 +743,7 @@ def get_user() -> Response:
         index = request.args.get('index', None)
         source = request.args.get('source', None)
 
-        url = '{0}{1}/{2}'.format(app.config['METADATASERVICE_BASE'], USER_ENDPOINT, user_id)
+        url = '{0}/{1}'.format(USER_ENDPOINT, user_id)
         _log_get_user(user_id=user_id, index=index, source=source)
 
         response = request_metadata(url=url)
@@ -805,7 +783,7 @@ def get_bookmark() -> Response:
             else:
                 raise Exception('AUTH_USER_METHOD is not configured')
 
-        url = '{0}{1}/{2}/follow/'.format(app.config['METADATASERVICE_BASE'], USER_ENDPOINT, user_id)
+        url = '{0}/{1}/follow/'.format(USER_ENDPOINT, user_id)
 
         response = request_metadata(url=url, method=request.method)
         status_code = response.status_code
@@ -857,11 +835,12 @@ def update_bookmark() -> Response:
         resource_type = get_query_param(args, 'type')
         resource_key = get_query_param(args, 'key')
 
-        url = '{0}{1}/{2}/follow/{3}/{4}'.format(app.config['METADATASERVICE_BASE'],
-                                                 USER_ENDPOINT,
-                                                 user.user_id,
-                                                 resource_type,
-                                                 resource_key)
+        url = '{0}/{1}/follow/{2}/{3}'.format(
+            USER_ENDPOINT,
+            user.user_id,
+            resource_type,
+            resource_key
+        )
 
         _log_update_bookmark(resource_key=resource_key, resource_type=resource_type, method=request.method)
 
@@ -884,9 +863,10 @@ def get_user_read() -> Response:
     try:
         user_id = get_query_param(request.args, 'user_id')
 
-        url = '{0}{1}/{2}/read/'.format(app.config['METADATASERVICE_BASE'],
-                                        USER_ENDPOINT,
-                                        user_id)
+        url = '{0}/{1}/read/'.format(
+            USER_ENDPOINT,
+            user_id
+        )
         response = request_metadata(url=url, method=request.method)
         status_code = response.status_code
         read_tables_raw = response.json().get('table')
@@ -908,9 +888,10 @@ def get_user_own() -> Response:
     try:
         user_id = get_query_param(request.args, 'user_id')
 
-        url = '{0}{1}/{2}/own/'.format(app.config['METADATASERVICE_BASE'],
-                                       USER_ENDPOINT,
-                                       user_id)
+        url = '{0}/{1}/own/'.format(
+            USER_ENDPOINT,
+            user_id
+        )
         response = request_metadata(url=url, method=request.method)
         status_code = response.status_code
         owned_tables_raw = response.json().get('table')
@@ -944,7 +925,7 @@ def get_dashboard_metadata() -> Response:
         source = request.args.get('source', None)
         _get_dashboard_metadata(uri=uri, index=index, source=source)
 
-        url = f'{app.config["METADATASERVICE_BASE"]}{DASHBOARD_ENDPOINT}/{uri}'
+        url = f'{DASHBOARD_ENDPOINT}/{uri}'
 
         response = request_metadata(url=url, method=request.method)
         dashboard = marshall_dashboard_full(response.json())
@@ -963,7 +944,7 @@ def get_related_dashboard_metadata(table_key: str) -> Response:
     :return:
     """
     try:
-        url = f'{app.config["METADATASERVICE_BASE"]}{TABLE_ENDPOINT}/{table_key}/dashboard/'
+        url = f'{TABLE_ENDPOINT}/{table_key}/dashboard/'
         results_dict = _get_related_dashboards_metadata(url=url)
         return make_response(jsonify(results_dict), results_dict.get('status_code', HTTPStatus.INTERNAL_SERVER_ERROR))
     except Exception as e:

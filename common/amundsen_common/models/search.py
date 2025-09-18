@@ -100,6 +100,51 @@ class KnnSearchResponseSchema(AttrsSchema):
 
 
 @attr.s(auto_attribs=True, kw_only=True)
+class HybridSearchRequest:
+    # Text search parameters
+    text_queries: List[str]  # List of text strings to search for
+    resource_types: List[str] = []  # Empty list means search all resource types
+    page_index: Optional[int] = 0
+    results_per_page: Optional[int] = 10
+    filters: List[Filter] = []
+    highlight_options: Optional[Dict[str, HighlightOptions]] = {}
+
+
+class HybridSearchRequestSchema(AttrsSchema):
+    class Meta:
+        target = HybridSearchRequest
+        register_as_scheme = True
+
+
+@attr.s(auto_attribs=True, kw_only=True)
+class HybridSearchHit:
+    score: float
+    result: Dict[str, Any]
+    search_type: str  # "text" or "knn" to indicate which search found this result
+
+
+class HybridSearchHitSchema(AttrsSchema):
+    class Meta:
+        target = HybridSearchHit
+        register_as_scheme = True
+
+
+@attr.s(auto_attribs=True, kw_only=True)
+class HybridSearchResponse:
+    msg: str
+    results: Optional[List[HybridSearchHit]] = None
+    page_index: int
+    results_per_page: int
+    status_code: int
+
+
+class HybridSearchResponseSchema(AttrsSchema):
+    class Meta:
+        target = HybridSearchResponse
+        register_as_scheme = True
+
+
+@attr.s(auto_attribs=True, kw_only=True)
 class UpdateDocumentRequest:
     resource_key: str
     resource_type: str

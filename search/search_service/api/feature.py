@@ -10,6 +10,7 @@ from flask_restful import Resource, reqparse
 from search_service.api.base import BaseFilterAPI
 from search_service.models.feature import SearchFeatureResultSchema
 from search_service.proxy import get_proxy_client
+from ddp_auth.flask import require_auth
 
 FEATURE_INDEX = 'feature_search_index'
 
@@ -30,6 +31,7 @@ class SearchFeatureAPI(Resource):
 
         super(SearchFeatureAPI, self).__init__()
 
+    @require_auth()
     @swag_from('swagger_doc/feature/search_feature.yml')
     def get(self) -> Iterable[Any]:
         """
@@ -61,6 +63,7 @@ class SearchFeatureFilterAPI(BaseFilterAPI):
         super().__init__(schema=SearchFeatureResultSchema,
                          index=FEATURE_INDEX)
 
+    @require_auth()
     @swag_from('swagger_doc/feature/search_feature_filter.yml')
     def post(self) -> Iterable[Any]:
         try:

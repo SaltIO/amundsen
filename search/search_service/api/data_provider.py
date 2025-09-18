@@ -10,6 +10,7 @@ from flask_restful import Resource, reqparse
 from search_service.api.base import BaseFilterAPI
 from search_service.models.data_provider import SearchDataProviderResultSchema
 from search_service.proxy import get_proxy_client
+from ddp_auth.flask import require_auth
 
 DATA_PROVIDER_INDEX = 'data_provider_search_index'
 
@@ -30,6 +31,7 @@ class SearchDataProviderAPI(Resource):
         super(SearchDataProviderAPI, self).__init__()
 
     # @swag_from('swagger_doc/provider/search_data_provider.yml')
+    @require_auth()
     def get(self) -> Iterable[Any]:
         """
         Fetch search results based on query_term.
@@ -65,6 +67,7 @@ class SearchDataProviderFilterAPI(BaseFilterAPI):
                          index=DATA_PROVIDER_INDEX)
 
     # @swag_from('swagger_doc/table/search_provider_filter.yml')
+    @require_auth()
     def post(self) -> Iterable[Any]:
         try:
             return super().post()

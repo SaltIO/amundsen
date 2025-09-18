@@ -7,7 +7,9 @@ from flask_restful import Resource, fields, marshal
 
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
-from metadata_service.auth import requires_auth
+
+from ddp_auth.flask import require_auth
+
 
 
 LOGGER = logging.getLogger(__name__)
@@ -38,7 +40,7 @@ class SnowflakeTableShareAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
 
-    @requires_auth()
+    @require_auth()
     @swag_from('../swagger_doc/snowflake/snowflake_table_share_get.yml')
     def get(self, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:

@@ -16,7 +16,7 @@ from metadata_service.ai.ai_embedding_client import AIEmbeddingClient
 from metadata_service.ai.openai_client import OpenAIChatClient
 from metadata_service.ai.st_embedding_client import STEmbeddingClient
 from metadata_service.api.utils.request_utils import request_search
-from metadata_service.auth import auth
+from ddp_auth.flask import require_auth
 
 from amundsen_common.models.search import KnnSearchResponseSchema, KnnSearchResponse
 from amundsen_common.models.ai import (
@@ -36,7 +36,7 @@ class RevealChatAPI(Resource):
     def __init__(self) -> None:
         self.ai_chat_client: AIChatClient = OpenAIChatClient()
 
-    @auth.requires_auth()
+    @require_auth()
     # @swag_from('swagger_doc/reveal/chat_post.yml')
     def post(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
@@ -72,9 +72,8 @@ class RevealSearchAPI(Resource):
     def __init__(self) -> None:
         self.ai_chat_client: AIChatClient = OpenAIChatClient()
         self.ai_embedding_client: AIEmbeddingClient = STEmbeddingClient()
-        self.search_service_base = current_app.config['SEARCHSERVICE_BASE']
 
-    @auth.requires_auth()
+    @require_auth()
     # @swag_from('swagger_doc/reveal/chat_post.yml')
     def post(self, resource:str) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
@@ -113,7 +112,7 @@ class RevealSearchAPI(Resource):
                     }
 
                     search_response = request_search(
-                        url=f"{self.search_service_base}/v2/knn_search",
+                        url="/v2/knn_search",
                         method="POST",
                         json=search_payload
                     )

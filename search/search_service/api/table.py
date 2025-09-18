@@ -10,6 +10,7 @@ from flask_restful import Resource, reqparse
 from search_service.api.base import BaseFilterAPI
 from search_service.models.table import SearchTableResultSchema
 from search_service.proxy import get_proxy_client
+from ddp_auth.flask import require_auth
 
 TABLE_INDEX = 'table_search_index'
 
@@ -30,6 +31,7 @@ class SearchTableAPI(Resource):
 
         super(SearchTableAPI, self).__init__()
 
+    @require_auth()
     @swag_from('swagger_doc/table/search_table.yml')
     def get(self) -> Iterable[Any]:
         """
@@ -65,6 +67,7 @@ class SearchTableFilterAPI(BaseFilterAPI):
         super().__init__(schema=SearchTableResultSchema,
                          index=TABLE_INDEX)
 
+    @require_auth()
     @swag_from('swagger_doc/table/search_table_filter.yml')
     def post(self) -> Iterable[Any]:
         try:

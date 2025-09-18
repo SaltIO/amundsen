@@ -35,11 +35,8 @@ SNOWFLAKE_TABLE_ENDPOINT = '/snowflake/table'
 
 
 def _get_snowflake_table_endpoint() -> str:
-    metadata_service_base = app.config['METADATASERVICE_BASE']
-    if metadata_service_base is None:
-        raise Exception('METADATASERVICE_BASE must be configured')
-    return metadata_service_base + SNOWFLAKE_TABLE_ENDPOINT
-    
+    return SNOWFLAKE_TABLE_ENDPOINT
+
 @snowflake_blueprint.route('/get_snowflake_table_shares', methods=['GET'])
 def get_snowflake_table_shares() -> Response:
     try:

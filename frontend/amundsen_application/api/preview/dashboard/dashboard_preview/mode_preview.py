@@ -108,7 +108,7 @@ class ModePreview(BasePreview):
         :raise: PermissionError when user is not allowed to access the dashboard
         """
 
-        metadata_svc_url = '{0}{1}/{2}'.format(app.config['METADATASERVICE_BASE'], USER_ENDPOINT, user_id)
+        metadata_svc_url = '{0}/{1}'.format(USER_ENDPOINT, user_id)
         response = request_metadata(url=metadata_svc_url)
         response.raise_for_status()
 
