@@ -141,7 +141,7 @@ class TableLineageAPI(Resource):
     @swag_from('swagger_doc/table/lineage_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
 
             lineage = data.get('lineage')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
@@ -174,7 +174,7 @@ class TableOwnerAPI(Resource):
     @swag_from('swagger_doc/table/owner_put.yml')
     def put(self, table_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
             self.client.add_owner(table_uri=table_uri, owner=owner, published_tag=published_tag)
@@ -234,7 +234,7 @@ class TableDescriptionAPI(Resource):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -263,7 +263,7 @@ class TableUpdateFrequencyAPI(Resource):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             frequency = data.get('frequency')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -316,7 +316,7 @@ class TableTagAPI(Resource):
         # use tag_type to distinguish between tag and badge
         tag_type = args.get('tag_type', 'default')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._tag_common.put(
@@ -361,7 +361,7 @@ class TableBadgeAPI(Resource):
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._badge_common.put(

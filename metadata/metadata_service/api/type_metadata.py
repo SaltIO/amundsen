@@ -38,7 +38,7 @@ class TypeMetadataDescriptionAPI(Resource):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -91,7 +91,7 @@ class TypeMetadataBadgeAPI(Resource):
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._badge_common.put(

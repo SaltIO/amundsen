@@ -80,7 +80,7 @@ class DataProviderDescriptionAPI(BaseAPI):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -181,7 +181,7 @@ class FileTagAPI(Resource):
         args = self.parser.parse_args()
         tag_type = args.get('tag_type', 'default')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._tag_common.put(
@@ -243,7 +243,7 @@ class FileDescriptionAPI(BaseAPI):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -270,7 +270,7 @@ class FileOwnerAPI(Resource):
     # @swag_from('swagger_doc/file/owner_put.yml')
     def put(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
             self.client.add_resource_owner(

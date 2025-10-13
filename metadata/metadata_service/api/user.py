@@ -32,23 +32,6 @@ class UserDetailAPI(BaseAPI):
     User detail API for people resources
     """
 
-    # def __init__(self) -> None:
-    #     self.client = get_proxy_client()
-    #     super().__init__(UserSchema, 'user', self.client)
-
-    # @requires_auth()
-    # @swag_from('swagger_doc/user/detail_get.yml')
-    # def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
-    #     if app.config['USER_DETAIL_METHOD']:
-    #         try:
-    #             user_data = app.config['USER_DETAIL_METHOD'](id)
-    #             return UserSchema().dump(user_data), HTTPStatus.OK
-    #         except Exception:
-    #             LOGGER.exception('UserDetailAPI GET Failed - Using "USER_DETAIL_METHOD" config variable')
-    #             return {'message': 'user_id {} fetch failed'.format(id)}, HTTPStatus.NOT_FOUND
-    #     else:
-    #         return super().get(id=id)
-
     def __init__(self) -> None:
         super().__init__(
             schema=UserSchema,
@@ -83,7 +66,7 @@ class UserPutAPI(Resource):
             return {'message': 'No user information provided in the request.'}, HTTPStatus.BAD_REQUEST
 
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             schema = UserSchema()
             user = schema.load(data)
 
@@ -180,7 +163,7 @@ class UserFollowAPI(Resource):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
             self.client.add_resource_relation_by_user(
@@ -197,7 +180,7 @@ class UserFollowAPI(Resource):
                                                               resource_type)}, HTTPStatus.OK
         except Exception as e:
             LOGGER.exception('UserFollowAPI PUT Failed')
-            return {'message': 'The user {} for id {} resource type {}'
+            return {'message': 'The user {} for id {} resource type {} '
                                'is not added successfully'.format(user_id,
                                                                   resource_id,
                                                                   resource_type)}, HTTPStatus.INTERNAL_SERVER_ERROR
@@ -297,7 +280,7 @@ class UserOwnAPI(Resource):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
             self.client.add_owner(

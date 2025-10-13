@@ -121,7 +121,7 @@ class DashboardDescriptionAPI(BaseAPI):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -155,7 +155,7 @@ class DashboardBadgeAPI(Resource):
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._badge_common.put(
@@ -205,7 +205,7 @@ class DashboardTagAPI(Resource):
         args = self.parser.parse_args()
         tag_type = args.get('tag_type', 'default')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._tag_common.put(

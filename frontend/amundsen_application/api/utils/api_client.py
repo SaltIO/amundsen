@@ -86,6 +86,8 @@ class APIClient:
             if not self.token:
                 self.token = self._get_auth_token()
             headers["Authorization"] = f"Bearer {self.token}"
+        if "Content-Type" not in headers:
+            headers["Content-Type"] = "application/json"
         return headers
 
     def _do_request(self, method: str, url: str, headers: dict, **kwargs) -> requests.Response:

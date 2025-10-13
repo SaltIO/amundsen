@@ -132,7 +132,7 @@ class FeatureOwnerAPI(Resource):
     @swag_from('swagger_doc/feature/owner_put.yml')
     def put(self, feature_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
             self.client.add_resource_owner(
@@ -193,7 +193,7 @@ class FeatureDescriptionAPI(Resource):
         Updates feature description (passed as a request body)
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -234,7 +234,7 @@ class FeatureTagAPI(Resource):
         # use tag_type to distinguish between tag and badge
         tag_type = args.get('tag_type', 'default')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         if tag_type == 'owner':
@@ -287,7 +287,7 @@ class FeatureBadgeAPI(Resource):
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._badge_common.put(

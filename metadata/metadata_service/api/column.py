@@ -57,7 +57,7 @@ class ColumnLineageAPI(Resource):
     @swag_from('swagger_doc/column/lineage_put.yml')
     def put(self, table_uri: str, column_name: str) -> Iterable[Union[Mapping, int, None]]:
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
 
             lineage = data.get('lineage')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
@@ -100,7 +100,7 @@ class ColumnDescriptionAPI(Resource):
         :return:
         """
         try:
-            data = json.loads(request.data)
+            data = request.get_json(force=True, silent=True) or {}
             description = data.get('description')
             published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
@@ -152,7 +152,7 @@ class ColumnBadgeAPI(Resource):
         args = self.parser.parse_args()
         category = args.get('category', '')
 
-        data = json.loads(request.data)
+        data = request.get_json(force=True, silent=True) or {}
         published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
 
         return self._badge_common.put(
