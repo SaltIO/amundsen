@@ -17,6 +17,7 @@ from databuilder.models.atlas_serializable import AtlasSerializable
 from databuilder.models.graph_node import GraphNode
 from databuilder.models.graph_relationship import GraphRelationship
 from databuilder.models.graph_serializable import GraphSerializable
+from databuilder.models.table_lineage import BaseLineage
 from databuilder.models.table_metadata import TableMetadata
 from databuilder.models.table_serializable import TableSerializable
 from databuilder.serializers.atlas_serializer import get_entity_attrs
@@ -41,21 +42,23 @@ class GenericApplication(GraphSerializable, TableSerializable, AtlasSerializable
     CONSUMES_REL_TYPE = 'CONSUMES'
     CONSUMED_BY_REL_TYPE = 'CONSUMED_BY'
 
-    LABELS_PERMITTED_TO_HAVE_USAGE = ['Table']
+    # LABELS_PERMITTED_TO_HAVE_USAGE = ['Table']
 
-    def __init__(self,
-                 start_label: str,
-                 start_key: str,
-                 application_type: str,
-                 application_id: str,
-                 application_url: str,
-                 application_description: Optional[str] = None,
-                 app_key_override: Optional[str] = None,  # for bw-compatibility only
-                 generates_resource: bool = True,
-                 ) -> None:
+    def __init__(
+        self,
+        start_label: str,
+        start_key: str,
+        application_type: str,
+        application_id: str,
+        application_url: str,
+        application_description: Optional[str] = None,
+        app_key_override: Optional[str] = None,  # for bw-compatibility only
+        generates_resource: bool = True,
+        generates_lineage: bool = False,
+    ) -> None:
 
-        if start_label and start_label not in GenericApplication.LABELS_PERMITTED_TO_HAVE_USAGE:
-            raise Exception(f'applications associated with {start_label} are not supported')
+        # if start_label and start_label not in GenericApplication.LABELS_PERMITTED_TO_HAVE_USAGE:
+        #     raise Exception(f'applications associated with {start_label} are not supported')
 
         self.start_label = start_label
         self.start_key = start_key
@@ -68,9 +71,10 @@ class GenericApplication(GraphSerializable, TableSerializable, AtlasSerializable
             application_id=self.application_id,
         )
         self.generates_resource = generates_resource
+        self.generates_lineage = generates_lineage
 
         self._node_iter = self._create_node_iterator()
-        self._relation_iter = self._create_relation_iterator() if self.start_label and self.start_key else None
+        self._relation_iter = None
         self._record_iter = self._create_record_iterator()
         self._atlas_entity_iterator = self._create_next_atlas_entity()
         self._atlas_relation_iterator = self._create_atlas_relation_iterator()
@@ -84,8 +88,11 @@ class GenericApplication(GraphSerializable, TableSerializable, AtlasSerializable
 
     def create_next_relation(self) -> Union[GraphRelationship, None]:
         try:
+            if not self._relation_iter:
+                self._relation_iter = self._create_relation_iterator()
             return next(self._relation_iter)
         except StopIteration:
+            self._relation_iter = None
             return None
 
     def create_next_record(self) -> Union[RDSModel, None]:
@@ -118,18 +125,34 @@ class GenericApplication(GraphSerializable, TableSerializable, AtlasSerializable
         Create relations between application and table nodes
         :return:
         """
-        graph_relationship = GraphRelationship(
-            start_key=self.start_key,
-            start_label=self.start_label,
-            end_key=self.application_key,
-            end_label=GenericApplication.LABEL,
-            type=(GenericApplication.DERIVED_FROM_REL_TYPE if self.generates_resource
-                  else GenericApplication.CONSUMED_BY_REL_TYPE),
-            reverse_type=(GenericApplication.GENERATES_REL_TYPE if self.generates_resource
-                          else GenericApplication.CONSUMES_REL_TYPE),
-            attributes={}
-        )
-        yield graph_relationship
+        if self.start_label and self.start_key:
+            graph_relationship = GraphRelationship(
+                start_key=self.start_key,
+                start_label=self.start_label,
+                end_key=self.application_key,
+                end_label=GenericApplication.LABEL,
+                type=(GenericApplication.DERIVED_FROM_REL_TYPE if self.generates_resource
+                    else GenericApplication.CONSUMED_BY_REL_TYPE),
+                reverse_type=(GenericApplication.GENERATES_REL_TYPE if self.generates_resource
+                            else GenericApplication.CONSUMES_REL_TYPE),
+                attributes={}
+            )
+            yield graph_relationship
+
+            # Generate lineage
+            if self.generates_lineage:
+                graph_relationship = GraphRelationship(
+                    start_key=self.start_key,
+                    start_label=self.start_label,
+                    end_key=self.application_key,
+                    end_label=GenericApplication.LABEL,
+                    type=BaseLineage.DEPENDENCY_ORIGIN_RELATION_TYPE if self.generates_resource else BaseLineage.ORIGIN_DEPENDENCY_RELATION_TYPE,
+                    reverse_type=BaseLineage.ORIGIN_DEPENDENCY_RELATION_TYPE if self.generates_resource else BaseLineage.DEPENDENCY_ORIGIN_RELATION_TYPE,
+                    attributes={}
+                )
+                yield graph_relationship
+        else:
+            yield None
 
     # TODO: support consuming/producing relationships and multiple apps per resource
     def _create_record_iterator(self) -> Iterator[RDSModel]:

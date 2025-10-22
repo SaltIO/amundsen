@@ -66,6 +66,7 @@ class GraphSerializable(object, metaclass=abc.ABCMeta):
             raise e
 
     def next_relation(self) -> Union[GraphRelationship, None]:
+        relation_dict = None
         try:
             relation_dict = self.create_next_relation()
             if not relation_dict:
@@ -100,5 +101,6 @@ class GraphSerializable(object, metaclass=abc.ABCMeta):
             raise RuntimeError(f'TYPE needs to be upper case: {value}')
 
     def _validate_label_value(self, value: str) -> None:
-        if not value.istitle():
-            raise RuntimeError(f'LABEL should only have upper case character on its first one: {value}')
+        # Allow camelCase labels (first character uppercase, rest can be mixed case)
+        if not value[0].isupper():
+            raise RuntimeError(f'LABEL should start with an uppercase character: {value}')
