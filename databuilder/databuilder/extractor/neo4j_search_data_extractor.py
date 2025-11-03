@@ -46,9 +46,16 @@ class Neo4jSearchDataExtractor(Extractor):
         programmatic_descriptions,
         COLLECT(col.name) AS column_names, COLLECT(col_description.description) AS column_descriptions
         OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(time_stamp:Timestamp)
-        RETURN db.name as database, cluster.name AS cluster, schema.name AS schema,
+        RETURN
+        db.key as database_key,
+        db.name as database,
+        cluster.key as cluster_key,
+        cluster.name AS cluster,
+        schema.key as schema_key,
+        schema.name AS schema,
         schema_description.description AS schema_description,
-        table.name AS name, table.key AS key, table_description.description AS description,
+        table.name AS name, table.key AS key,
+        table_description.description AS description,
         time_stamp.last_updated_timestamp AS last_updated_timestamp,
         column_names,
         column_descriptions,
@@ -63,18 +70,18 @@ class Neo4jSearchDataExtractor(Extractor):
 
     DEFAULT_NEO4J_COLUMN_CYPHER_QUERY = textwrap.dedent(
         """
-        MATCH (table:Table)<-[:COLUMN_OF]-(column:Column)
+        MATCH (db:Database)<-[:CLUSTER_OF]-(cluster:Cluster)<-[:SCHEMA_OF]-(schema:Schema)<-[:TABLE_OF]-(table:Table)<-[:COLUMN_OF]-(column:Column)
         {publish_tag_filter}
         OPTIONAL MATCH (column)-[:DESCRIPTION]->(column_description:Description)
         OPTIONAL MATCH (column)-[:TAGGED_BY]->(column_tags:Tag) WHERE column_tags.tag_type='default'
-        WITH column, column_description, table, COLLECT(DISTINCT toLower(column_tags.key)) as column_tags
+        WITH db, cluster, schema, column, column_description, table, COLLECT(DISTINCT toLower(column_tags.key)) as column_tags
         OPTIONAL MATCH (column)-[:HAS_BADGE]->(column_badges:Badge)
-        WITH column, column_description, column_tags, table, COLLECT(DISTINCT toLower(column_badges.key)) as column_badges
+        WITH db, cluster, schema, column, column_description, column_tags, table, COLLECT(DISTINCT toLower(column_badges.key)) as column_badges
         OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
         OPTIONAL MATCH (table)-[:TAGGED_BY]->(table_tags:Tag) WHERE table_tags.tag_type='default'
-        WITH column, column_description, column_tags, column_badges, table, table_description, COLLECT(DISTINCT toLower(table_tags.key)) as table_tags
+        WITH db, cluster, schema, column, column_description, column_tags, column_badges, table, table_description, COLLECT(DISTINCT toLower(table_tags.key)) as table_tags
         OPTIONAL MATCH (table)-[:HAS_BADGE]->(table_badges:Badge)
-        WITH column, column_description, column_tags, column_badges, table, table_description, table_tags, COLLECT(DISTINCT toLower(table_badges.key)) as table_badges
+        WITH db, cluster, schema, column, column_description, column_tags, column_badges, table, table_description, table_tags, COLLECT(DISTINCT toLower(table_badges.key)) as table_badges
         RETURN
             column.key AS key,
             column.name AS name,
@@ -86,7 +93,13 @@ class Neo4jSearchDataExtractor(Extractor):
             table.key AS table_key,
             table_description.description AS table_description,
             table_badges,
-            table_tags
+            table_tags,
+            db.key as database_key,
+            db.name as database,
+            cluster.key as cluster_key,
+            cluster.name AS cluster,
+            schema.key as schema_key,
+            schema.name AS schema
         ORDER BY
             table.name,
             column.name;
@@ -258,7 +271,8 @@ class Neo4jSearchDataExtractor(Extractor):
         Use close() method specified by neo4j_extractor
         to close connection to neo4j cluster
         """
-        self.neo4j_extractor.close()
+        if hasattr(self, 'neo4j_extractor'):
+            self.neo4j_extractor.close()
 
     def extract(self) -> Any:
         """

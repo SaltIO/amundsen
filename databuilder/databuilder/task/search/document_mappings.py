@@ -182,18 +182,30 @@ class Table(SearchableResource):
                         fields={"keyword": Subfield.keyword},
                         analyzer=Analyzer.general_analyzer,
                         term_vector=POSITIONS_OFFSETS)
+    database_key = Text(required=True,
+               fields={"keyword": Subfield.keyword},
+               analyzer=Analyzer.general_analyzer,
+               term_vector=POSITIONS_OFFSETS)
     database = Text(required=True,
                     fields={
                         "keyword": Subfield.keyword
                     },
                     analyzer=Analyzer.general_analyzer,
                     term_vector=POSITIONS_OFFSETS)
+    cluster_key = Text(required=True,
+               fields={"keyword": Subfield.keyword},
+               analyzer=Analyzer.general_analyzer,
+               term_vector=POSITIONS_OFFSETS)
     cluster = Text(required=True,
                    fields={
                        "keyword": Subfield.keyword
                    },
                    analyzer=Analyzer.general_analyzer,
                    term_vector=POSITIONS_OFFSETS)
+    schema_key = Text(required=True,
+               fields={"keyword": Subfield.keyword},
+               analyzer=Analyzer.general_analyzer,
+               term_vector=POSITIONS_OFFSETS)
     schema = Text(required=True,
                   fields={
                       "keyword": Subfield.keyword,
@@ -279,6 +291,38 @@ class Column(SearchableResource):
         analyzer=Analyzer.general_analyzer,
         term_vector=POSITIONS_OFFSETS
     )
+
+    database_key = Text(required=True,
+               fields={"keyword": Subfield.keyword},
+               analyzer=Analyzer.general_analyzer,
+               term_vector=POSITIONS_OFFSETS)
+    database = Text(required=True,
+                    fields={
+                        "keyword": Subfield.keyword
+                    },
+                    analyzer=Analyzer.general_analyzer,
+                    term_vector=POSITIONS_OFFSETS)
+    cluster_key = Text(required=True,
+               fields={"keyword": Subfield.keyword},
+               analyzer=Analyzer.general_analyzer,
+               term_vector=POSITIONS_OFFSETS)
+    cluster = Text(required=True,
+                   fields={
+                       "keyword": Subfield.keyword
+                   },
+                   analyzer=Analyzer.general_analyzer,
+                   term_vector=POSITIONS_OFFSETS)
+    schema_key = Text(required=True,
+               fields={"keyword": Subfield.keyword},
+               analyzer=Analyzer.general_analyzer,
+               term_vector=POSITIONS_OFFSETS)
+    schema = Text(required=True,
+                  fields={
+                      "keyword": Subfield.keyword,
+                      "general": Subfield.general
+                  },
+                  analyzer=Analyzer.stemming_analyzer,
+                  term_vector=POSITIONS_OFFSETS)
 
     embedding_vector = DenseVector(dims=384, index=True, similarity="cosine")
 
