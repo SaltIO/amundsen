@@ -423,6 +423,18 @@ class DataProvider(SearchableResource):
     #             analyzer=Analyzer.stemming_analyzer,
     #             term_vector=POSITIONS_OFFSETS)
 
+    data_channel_keys = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_channel_keys",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
     data_channel_names = Text(multi=True,
                    fields={
                        "keyword": Subfield.keyword,
@@ -454,6 +466,18 @@ class DataProvider(SearchableResource):
                                },
                                analyzer=Analyzer.english_analyzer,
                                term_vector=POSITIONS_OFFSETS)
+
+    data_location_keys = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_location_keys",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
 
     data_location_names = Text(multi=True,
                    fields={
@@ -537,6 +561,78 @@ class File(SearchableResource):
                        "general": Subfield.general_multi,
                        "ngram": Subfield.get_ngram_subfield(
                            field_name="data_location_name",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
+    data_location_key = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_location_key",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
+    data_channel_type = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_channel_type",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
+    data_channel_name = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_channel_name",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
+    data_channel_key = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_channel_key",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
+    data_provider_name = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_provider_name",
+                           multi=True,
+                           token_separator="_")
+                   },
+                   term_vector=POSITIONS_OFFSETS,
+                   analyzer=Analyzer.stemming_analyzer)
+
+    data_provider_key = Text(multi=True,
+                   fields={
+                       "keyword": Subfield.keyword,
+                       "general": Subfield.general_multi,
+                       "ngram": Subfield.get_ngram_subfield(
+                           field_name="data_provider_key",
                            multi=True,
                            token_separator="_")
                    },

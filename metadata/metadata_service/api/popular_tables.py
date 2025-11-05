@@ -11,7 +11,7 @@ from flask import request
 from flask_restful import Resource
 
 from metadata_service.proxy import get_proxy_client
-from ddp_auth.flask import require_auth
+from ddp_auth.flask_integration import require_auth
 
 
 class PopularTablesAPI(Resource):

@@ -60,7 +60,8 @@ class CloudJiraClient(BaseIssueTrackerClient):
         """
         return JIRA(
             server=self.jira_url,
-            basic_auth=(self.jira_user, self.jira_password)
+            basic_auth=(self.jira_user, self.jira_password),
+            options={"rest_api_version": "3"}
         )
 
     def get_issues(self, issue_type: IssueType, resource_uri: str) -> IssueResults:
