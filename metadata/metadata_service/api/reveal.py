@@ -16,7 +16,7 @@ from metadata_service.ai.ai_embedding_client import AIEmbeddingClient
 from metadata_service.ai.openai_client import OpenAIChatClient
 from metadata_service.ai.st_embedding_client import STEmbeddingClient
 from metadata_service.api.utils.request_utils import request_search
-from ddp_auth.flask import require_auth
+from ddp_auth.flask_integration import require_auth
 
 from amundsen_common.models.search import KnnSearchResponseSchema, KnnSearchResponse
 from amundsen_common.models.ai import (

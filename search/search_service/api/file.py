@@ -10,7 +10,7 @@ from flask_restful import Resource, reqparse
 from search_service.api.base import BaseFilterAPI
 from search_service.models.file import SearchFileResultSchema
 from search_service.proxy import get_proxy_client
-from ddp_auth.flask import require_auth
+from ddp_auth.flask_integration import require_auth
 
 FILE_INDEX = 'file_search_index'
 
