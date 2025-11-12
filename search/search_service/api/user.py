@@ -9,7 +9,7 @@ from flask_restful import Resource, reqparse
 
 from search_service.models.user import SearchUserResultSchema
 from search_service.proxy import get_proxy_client
-from ddp_auth.flask import require_auth
+from ddp_auth.flask_integration import require_auth
 
 USER_INDEX = 'user_search_index'
 

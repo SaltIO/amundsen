@@ -6,7 +6,7 @@ from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union
 
 from flask_restful import Resource, reqparse
 
-from ddp_auth.flask import require_auth
+from ddp_auth.flask_integration import require_auth
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import BaseProxy
 

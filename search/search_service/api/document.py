@@ -18,7 +18,7 @@ from search_service.models.table import TableSchema
 from search_service.models.user import UserSchema
 from search_service.proxy import get_proxy_client
 from search_service.proxy.base import BaseProxy
-from ddp_auth.flask import require_auth
+from ddp_auth.flask_integration import require_auth
 
 LOGGER = logging.getLogger(__name__)
 

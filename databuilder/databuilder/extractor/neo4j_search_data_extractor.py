@@ -46,35 +46,42 @@ class Neo4jSearchDataExtractor(Extractor):
         programmatic_descriptions,
         COLLECT(col.name) AS column_names, COLLECT(col_description.description) AS column_descriptions
         OPTIONAL MATCH (table)-[:LAST_UPDATED_AT]->(time_stamp:Timestamp)
-        RETURN db.name as database, cluster.name AS cluster, schema.name AS schema,
-        schema_description.description AS schema_description,
-        table.name AS name, table.key AS key, table_description.description AS description,
-        time_stamp.last_updated_timestamp AS last_updated_timestamp,
-        column_names,
-        column_descriptions,
-        total_usage,
-        unique_usage,
-        tags,
-        badges,
-        programmatic_descriptions
+        RETURN
+            db.key as database_key,
+            db.name as database,
+            cluster.key as cluster_key,
+            cluster.name AS cluster,
+            schema.key as schema_key,
+            schema.name AS schema,
+            schema_description.description AS schema_description,
+            table.name AS name, table.key AS key,
+            table_description.description AS description,
+            time_stamp.last_updated_timestamp AS last_updated_timestamp,
+            column_names,
+            column_descriptions,
+            total_usage,
+            unique_usage,
+            tags,
+            badges,
+            programmatic_descriptions
         ORDER BY table.name;
         """
     )
 
     DEFAULT_NEO4J_COLUMN_CYPHER_QUERY = textwrap.dedent(
         """
-        MATCH (table:Table)<-[:COLUMN_OF]-(column:Column)
+        MATCH (db:Database)<-[:CLUSTER_OF]-(cluster:Cluster)<-[:SCHEMA_OF]-(schema:Schema)<-[:TABLE_OF]-(table:Table)<-[:COLUMN_OF]-(column:Column)
         {publish_tag_filter}
         OPTIONAL MATCH (column)-[:DESCRIPTION]->(column_description:Description)
         OPTIONAL MATCH (column)-[:TAGGED_BY]->(column_tags:Tag) WHERE column_tags.tag_type='default'
-        WITH column, column_description, table, COLLECT(DISTINCT toLower(column_tags.key)) as column_tags
+        WITH db, cluster, schema, column, column_description, table, COLLECT(DISTINCT toLower(column_tags.key)) as column_tags
         OPTIONAL MATCH (column)-[:HAS_BADGE]->(column_badges:Badge)
-        WITH column, column_description, column_tags, table, COLLECT(DISTINCT toLower(column_badges.key)) as column_badges
+        WITH db, cluster, schema, column, column_description, column_tags, table, COLLECT(DISTINCT toLower(column_badges.key)) as column_badges
         OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
         OPTIONAL MATCH (table)-[:TAGGED_BY]->(table_tags:Tag) WHERE table_tags.tag_type='default'
-        WITH column, column_description, column_tags, column_badges, table, table_description, COLLECT(DISTINCT toLower(table_tags.key)) as table_tags
+        WITH db, cluster, schema, column, column_description, column_tags, column_badges, table, table_description, COLLECT(DISTINCT toLower(table_tags.key)) as table_tags
         OPTIONAL MATCH (table)-[:HAS_BADGE]->(table_badges:Badge)
-        WITH column, column_description, column_tags, column_badges, table, table_description, table_tags, COLLECT(DISTINCT toLower(table_badges.key)) as table_badges
+        WITH db, cluster, schema, column, column_description, column_tags, column_badges, table, table_description, table_tags, COLLECT(DISTINCT toLower(table_badges.key)) as table_badges
         RETURN
             column.key AS key,
             column.name AS name,
@@ -86,7 +93,13 @@ class Neo4jSearchDataExtractor(Extractor):
             table.key AS table_key,
             table_description.description AS table_description,
             table_badges,
-            table_tags
+            table_tags,
+            db.key as database_key,
+            db.name as database,
+            cluster.key as cluster_key,
+            cluster.name AS cluster,
+            schema.key as schema_key,
+            schema.name AS schema
         ORDER BY
             table.name,
             column.name;
@@ -103,13 +116,23 @@ class Neo4jSearchDataExtractor(Extractor):
         {publish_tag_filter}
         with user, a, b, c, read, own, follow, manager
         where user.full_name is not null
-        return user.email as key, user.email as email, user.first_name as first_name, user.last_name as last_name,
-        user.full_name as full_name, user.github_username as github_username, user.team_name as team_name,
-        user.employee_type as employee_type, manager.email as manager_email,
-        user.slack_id as slack_id, user.is_active as is_active, user.role_name as role_name,
-        REDUCE(sum_r = 0, r in COLLECT(DISTINCT read)| sum_r + r.read_count) AS total_read,
-        count(distinct b) as total_own,
-        count(distinct c) AS total_follow
+        RETURN
+            user.email as key,
+            user.email as email,
+            user.first_name as first_name,
+            user.last_name as last_name,
+            user.full_name as full_name,
+            user.github_username as github_username,
+            user.team_name as team_name,
+            user.employee_type as employee_type,
+            manager.email as manager_email,
+            user.slack_id as slack_id,
+            user.is_active as is_active,
+            user.role_name as role_name,
+            REDUCE(sum_r = 0,
+            r in COLLECT(DISTINCT read)| sum_r + r.read_count) AS total_read,
+            count(distinct b) as total_own,
+            count(distinct c) AS total_follow
         order by user.email
         """
     )
@@ -136,12 +159,22 @@ class Neo4jSearchDataExtractor(Extractor):
          OPTIONAL MATCH (dashboard)-[:HAS_BADGE]->(badges:Badge)
          WITH  dashboard, dbg, db_descr, dbg_descr, cluster, last_exec, query_names, chart_names, total_usage, tags,
          COLLECT(DISTINCT badges.key) as badges
-         RETURN dbg.name as group_name, dashboard.name as name, cluster.name as cluster,
-         coalesce(db_descr.description, '') as description,
-         coalesce(dbg.description, '') as group_description, dbg.dashboard_group_url as group_url,
-         dashboard.dashboard_url as url, dashboard.key as uri,
-         split(dashboard.key, '_')[0] as product, toInteger(last_exec.timestamp) as last_successful_run_timestamp,
-         query_names, chart_names, total_usage, tags, badges
+         RETURN
+            dashboard.dashboard_url as url,
+            dashboard.key as key,
+            split(dashboard.key, '_')[0] as product,
+            dbg.name as group_name,
+            dashboard.name as name,
+            cluster.name as cluster,
+            coalesce(db_descr.description, '') as description,
+            coalesce(dbg.description, '') as group_description,
+            dbg.dashboard_group_url as group_url,
+            toInteger(last_exec.timestamp) as last_successful_run_timestamp,
+            query_names,
+            chart_names,
+            total_usage,
+            tags,
+            badges
          order by dbg.name
         """
     )
@@ -157,18 +190,18 @@ class Neo4jSearchDataExtractor(Extractor):
          OPTIONAL MATCH (feature)-[:HAS_BADGE]->(badge:Badge)
          OPTIONAL MATCH (feature)-[read:READ_BY]->(user:User)
          RETURN
-         fg.name as feature_group,
-         feature.name as feature_name,
-         feature.version as version,
-         feature.key as key,
-         SUM(read.read_count) AS total_usage,
-         feature.status as status,
-         feature.entity as entity,
-         desc.description as description,
-         db.name as availability,
-         COLLECT(DISTINCT badge.key) as badges,
-         COLLECT(DISTINCT tag.key) as tags,
-         toInteger(feature.last_updated_timestamp) as last_updated_timestamp
+            fg.name as feature_group,
+            feature.name as feature_name,
+            feature.version as version,
+            feature.key as key,
+            SUM(read.read_count) AS total_usage,
+            feature.status as status,
+            feature.entity as entity,
+            desc.description as description,
+            db.name as availability,
+            COLLECT(DISTINCT badge.key) as badges,
+            COLLECT(DISTINCT tag.key) as tags,
+            toInteger(feature.last_updated_timestamp) as last_updated_timestamp
          order by fg.name, feature.name, feature.version
         """
     )
@@ -176,22 +209,25 @@ class Neo4jSearchDataExtractor(Extractor):
     DEFAULT_NEO4J_DATA_PROVIDER_CYPHER_QUERY = textwrap.dedent(
         """
         MATCH (dp:Data_Provider)
-        //OPTIONAL MATCH (dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp)
-        //OPTIONAL MATCH (dl:Data_Location)-[:DATA_LOCATION_OF]->(dc)
+        OPTIONAL MATCH (dc:Data_Channel)-[:DATA_CHANNEL_OF]->(dp)
+        OPTIONAL MATCH (dl:Data_Location)-[:DATA_LOCATION_OF]->(dc)
         OPTIONAL MATCH (dp)-[:DESCRIPTION]->(data_provider_desc:Description)
         OPTIONAL MATCH (dp)-[:TAGGED_BY]->(tags:Tag)
         {publish_tag_filter}
-        WITH dp, data_provider_desc, COLLECT(DISTINCT tags.key) as tags //, dc, dl
+        WITH dp, data_provider_desc, COLLECT(DISTINCT tags.key) as tags, dc, dl
         RETURN
-        dp.name as name,
-        dp.key as key,
-        data_provider_desc.description as description,
-        //collect(distinct dc.name) as data_channel_names,
-        //collect(distinct dc.type) as data_channel_types,
-        //collect(distinct dc.desc) as data_channel_descriptions,
-        //collect(distinct dl.name) as data_location_names,
-        //collect(distinct dl.type) as data_location_types
-        tags
+            dp.name as name,
+            dp.key as key,
+            data_provider_desc.description as description,
+            collect(distinct dc.name) as data_channel_names,
+            collect(distinct dc.key) as data_channel_keys,
+            collect(distinct dc.type) as data_channel_types,
+            collect(distinct dc.desc) as data_channel_descriptions,
+            collect(distinct dl.name) as data_location_names,
+            collect(distinct dl.key) as data_location_keys,
+            collect(distinct dl.type) as data_location_types,
+            collect(distinct dl.desc) as data_location_descriptions,
+            tags
         """
     )
 
@@ -205,20 +241,23 @@ class Neo4jSearchDataExtractor(Extractor):
         {publish_tag_filter}
         WITH f, file_desc, COLLECT(DISTINCT tags.key) as tags, dl, dc, dp
         RETURN
-        f.name as name,
-        f.key as key,
-        file_desc.description as description,
-        f.type as type,
-        f.category as category,
-        f.path as path,
-        f.is_directory as is_directory,
-        dl.name as data_location_name,
-        dl.type as data_location_type,
-        dc.name as data_channel_name,
-        dc.type as data_channel_type,
-        dc.license as data_channel_license,
-        dp.name as data_provider_name,
-        tags
+            f.name as name,
+            f.key as key,
+            file_desc.description as description,
+            f.type as type,
+            f.category as category,
+            f.path as path,
+            f.is_directory as is_directory,
+            dl.key as data_location_key,
+            dl.name as data_location_name,
+            dl.type as data_location_type,
+            dc.key as data_channel_key,
+            dc.name as data_channel_name,
+            dc.type as data_channel_type,
+            dc.license as data_channel_license,
+            dp.key as data_provider_key,
+            dp.name as data_provider_name,
+            tags
         """
     )
 
@@ -242,7 +281,7 @@ class Neo4jSearchDataExtractor(Extractor):
         if Neo4jSearchDataExtractor.CYPHER_QUERY_CONFIG_KEY in conf:
             self.cypher_query = conf.get_string(Neo4jSearchDataExtractor.CYPHER_QUERY_CONFIG_KEY)
         else:
-            default_query = Neo4jSearchDataExtractor.DEFAULT_QUERY_BY_ENTITY[self.entity]
+            default_query = self.get_default_query(self.entity)
             self.cypher_query = self._add_publish_tag_filter(conf.get_string(JOB_PUBLISH_TAG, ''),
                                                              cypher_query=default_query)
 
@@ -253,12 +292,16 @@ class Neo4jSearchDataExtractor(Extractor):
         # initialize neo4j_extractor from configs
         self.neo4j_extractor.init(Scoped.get_scoped_conf(self.conf, self.neo4j_extractor.get_scope()))
 
+    def get_default_query(self, entity: str) -> str:
+        return Neo4jSearchDataExtractor.DEFAULT_QUERY_BY_ENTITY[entity]
+
     def close(self) -> None:
         """
         Use close() method specified by neo4j_extractor
         to close connection to neo4j cluster
         """
-        self.neo4j_extractor.close()
+        if hasattr(self, 'neo4j_extractor'):
+            self.neo4j_extractor.close()
 
     def extract(self) -> Any:
         """
