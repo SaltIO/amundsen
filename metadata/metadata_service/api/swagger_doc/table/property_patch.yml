@@ -1,0 +1,33 @@
+Updates specific table properties (e.g., is_view). Properties like 'name' and 'key' cannot be edited.
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'table'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
+requestBody:
+  $ref: '#/components/requestBodies/PropertyPatchRequest'
+responses:
+  400:
+    description: 'Bad request - invalid properties or no properties provided'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    $ref: '#/components/responses/ResourceNotFoundResponse'
+  500:
+    description: 'Internal server error'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

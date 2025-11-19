@@ -10,7 +10,7 @@ from flask_restful import Resource, reqparse
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 from search_service.proxy import get_proxy_client
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 
 class BaseFilterAPI(Resource):

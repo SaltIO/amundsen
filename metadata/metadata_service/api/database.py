@@ -15,7 +15,7 @@ from amundsen_common.models.database import DatabaseSchema
 
 from metadata_service.api import BaseAPI
 from metadata_service.proxy import get_proxy_client
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 
 class DatabaseIdGET(BaseAPI):

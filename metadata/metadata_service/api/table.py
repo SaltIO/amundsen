@@ -23,7 +23,7 @@ from metadata_service.api.tag import TagCommon
 from metadata_service.entity.dashboard_summary import DashboardSummarySchema
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client, BaseProxy
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 
 LOGGER = logging.getLogger(__name__)
@@ -244,6 +244,58 @@ class TableDescriptionAPI(Resource):
 
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+
+class TablePropertyPatchAPI(Resource):
+    """
+    TablePropertyPatchAPI supports PATCH operation to update specific table properties.
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(TablePropertyPatchAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    @swag_from('swagger_doc/table/property_patch.yml')
+    def patch(self, table_uri: str) -> Iterable[Any]:
+        """
+        Updates specific table properties (passed as a request body).
+        Properties like 'name' and 'key' cannot be edited.
+        :param table_uri: Table URI (key in Neo4j)
+        :return:
+        """
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            if not data:
+                return {'message': 'No properties provided in request body'}, HTTPStatus.BAD_REQUEST
+
+            # Properties that cannot be edited
+            non_editable_properties = {'name', 'key'}
+            provided_properties = set(data.keys())
+            invalid_properties = provided_properties & non_editable_properties
+
+            if invalid_properties:
+                return {
+                    'message': f'Properties {list(invalid_properties)} cannot be edited',
+                    'invalid_properties': list(invalid_properties)
+                }, HTTPStatus.BAD_REQUEST
+
+            # Call proxy method to patch properties
+            # Property validation is done in create_edit_plan tool, proxy will handle any errors
+            self.client.patch_table_properties(
+                table_uri=table_uri,
+                properties=data,
+                published_tag=published_tag
+            )
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': 'table_uri {} does not exist'.format(table_uri)}, HTTPStatus.NOT_FOUND
+        except Exception as e:
+            LOGGER.error(f'Failed to patch table properties: {str(e)}', exc_info=True)
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
 class TableUpdateFrequencyAPI(Resource):
     """

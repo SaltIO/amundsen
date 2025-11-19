@@ -128,6 +128,20 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def patch_table_properties(self, *,
+                              table_uri: str,
+                              properties: Dict[str, Any],
+                              published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Update specific table properties in Neo4j.
+        
+        :param table_uri: Table URI (key in Neo4j)
+        :param properties: Dictionary of property names to values to update
+        :param published_tag: Published tag for audit trail
+        """
+        pass
+
+    @abstractmethod
     def put_table_update_frequency(self, *,
                               table_uri: str,
                               frequency: str,

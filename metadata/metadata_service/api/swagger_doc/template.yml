@@ -136,6 +136,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/UpdateFrequencyPut'
+    PropertyPatchRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PropertyPatch'
     UserDetailPutRequest:
       required: true
       content:
@@ -692,6 +698,21 @@ components:
       type: object
       allOf:
         - $ref: '#/components/schemas/UpdateFrequency'
+        - $ref: '#/components/schemas/Publisher'
+    PropertyPatch:
+      type: object
+      description: 'Properties to update on the table. Properties like "name" and "key" cannot be edited.'
+      additionalProperties: true
+      properties:
+        is_view:
+          type: boolean
+          description: 'Whether the table is a view'
+          example: true
+        published_tag:
+          type: string
+          description: 'A meaningful tag to describe the publishing mechanism.'
+          example: 'edited'
+      allOf:
         - $ref: '#/components/schemas/Publisher'
     Publisher:
       type: object

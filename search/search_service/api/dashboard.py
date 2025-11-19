@@ -12,7 +12,7 @@ from search_service.api.base import BaseFilterAPI
 from search_service.exception import NotFoundException
 from search_service.models.dashboard import SearchDashboardResultSchema
 from search_service.proxy import get_proxy_client
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 DASHBOARD_INDEX = 'dashboard_search_index'
 

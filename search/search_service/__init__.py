@@ -26,6 +26,10 @@ from search_service.api.table import SearchTableAPI, SearchTableFilterAPI
 from search_service.api.user import SearchUserAPI
 from search_service.api.data_provider import SearchDataProviderAPI, SearchDataProviderFilterAPI
 from search_service.api.auth import AuthTokenAPI
+from search_service.api.api_key import (
+    APIKeyCreateAPI, APIKeyListAPI, APIKeyGetAPI,
+    APIKeyRevokeAPI, APIKeyDeleteAPI, APIKeyBulkDeleteAPI
+)
 
 # For customized flask use below arguments to override.
 FLASK_APP_MODULE_NAME = os.getenv('FLASK_APP_MODULE_NAME')
@@ -143,6 +147,20 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(DocumentFeatureAPI, '/document_feature/<document_id>')
 
     api.add_resource(AuthTokenAPI, '/auth/token/')
+
+    # API key management endpoints
+    api.add_resource(APIKeyCreateAPI,
+                     '/auth/api-key')
+    api.add_resource(APIKeyListAPI,
+                     '/auth/api-key')
+    api.add_resource(APIKeyGetAPI,
+                     '/auth/api-key/<int:key_id>')
+    api.add_resource(APIKeyRevokeAPI,
+                     '/auth/api-key/<int:key_id>')
+    api.add_resource(APIKeyDeleteAPI,
+                     '/auth/api-key/<int:key_id>/permanent')
+    api.add_resource(APIKeyBulkDeleteAPI,
+                     '/auth/api-key/bulk')
 
     app.register_blueprint(api_bp)
 

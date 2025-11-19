@@ -11,7 +11,7 @@ from flasgger import swag_from
 from flask import request, current_app
 from flask_restful import Resource
 
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 from amundsen_common.models.custom import (
     CustomMetadata, CustomMetadataSchema, CustomMetadataNode, CustomMetadataNodeSchema

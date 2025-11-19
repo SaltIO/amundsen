@@ -1,0 +1,60 @@
+Get API Key
+Get a specific API key by ID for the configured service
+---
+tags:
+  - 'api-key'
+security:
+  - Bearer: []
+parameters:
+  - name: key_id
+    in: path
+    required: true
+    schema:
+      type: integer
+    description: The ID of the API key to retrieve
+responses:
+  200:
+    description: API key details
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            description:
+              type: string
+            service:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            last_used_at:
+              type: string
+              format: date-time
+            expires_at:
+              type: string
+              format: date-time
+            created_by:
+              type: string
+  404:
+    description: API key not found
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+  500:
+    description: Internal server error
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+

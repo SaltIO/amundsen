@@ -1,0 +1,36 @@
+Revoke API Key
+Revoke (deactivate) an API key for the configured service
+---
+tags:
+  - 'api-key'
+security:
+  - Bearer: []
+parameters:
+  - name: key_id
+    in: path
+    required: true
+    schema:
+      type: integer
+    description: The ID of the API key to revoke
+responses:
+  204:
+    description: API key revoked successfully
+  404:
+    description: API key not found
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+  500:
+    description: Internal server error
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+

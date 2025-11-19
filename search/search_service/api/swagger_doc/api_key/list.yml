@@ -1,0 +1,46 @@
+List API Keys
+List all API keys for the configured service
+---
+tags:
+  - 'api-key'
+security:
+  - Bearer: []
+responses:
+  200:
+    description: List of API keys
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              description:
+                type: string
+              service:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              last_used_at:
+                type: string
+                format: date-time
+              expires_at:
+                type: string
+                format: date-time
+              created_by:
+                type: string
+  500:
+    description: Internal server error
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+

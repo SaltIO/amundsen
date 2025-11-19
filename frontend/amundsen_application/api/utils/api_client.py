@@ -5,6 +5,7 @@ from flask import current_app
 from http import HTTPStatus
 import time
 import threading
+import os
 
 LOGGER = logging.getLogger(__name__)
 
@@ -83,12 +84,26 @@ class APIClient:
     def _build_headers(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         headers = headers.copy() if headers else {}
         if self.auth:
-            if not self.token:
-                self.token = self._get_auth_token()
-            headers["Authorization"] = f"Bearer {self.token}"
+            # Check for API key first (if configured, use it instead of Bearer token)
+            api_key = self._get_api_key()
+            if api_key:
+                headers["X-API-Key"] = api_key
+            else:
+                # Fall back to Bearer token if no API key
+                if not self.token:
+                    self.token = self._get_auth_token()
+                headers["Authorization"] = f"Bearer {self.token}"
         if "Content-Type" not in headers:
             headers["Content-Type"] = "application/json"
         return headers
+
+    def _get_api_key(self) -> Optional[str]:
+        """Get API key from Flask config if available."""
+        if self.api_name == 'metadata':
+            return current_app.config.get('METADATA_API_AUTH_API_KEY')
+        elif self.api_name == 'search':
+            return current_app.config.get('SEARCH_API_AUTH_API_KEY')
+        return None
 
     def _do_request(self, method: str, url: str, headers: dict, **kwargs) -> requests.Response:
         try:
@@ -111,8 +126,16 @@ class APIClient:
         headers = self._build_headers(kwargs.pop("headers", None))
         response = self._do_request(method, url, headers, **kwargs)
 
-        # If 401 and we have auth enabled, refresh token and try once more
+        # If 401 and we have auth enabled
         if response.status_code == HTTPStatus.UNAUTHORIZED and self.auth:
+            # Check if we're using an API key - if so, fail immediately (no fallback)
+            api_key = self._get_api_key()
+            if api_key:
+                error_msg = response.text[:200] if response.text else "Authentication failed"
+                LOGGER.error(f"401 Unauthorized with API key for {self.api_name} API: {error_msg}")
+                raise Exception(f"API key authentication failed for {self.api_name} API: {error_msg}")
+
+            # If using Bearer token, refresh token and try once more
             LOGGER.warning("401 Unauthorized. Refreshing token and retrying...")
             cache_key = f"{self.api_name}_token"
             _token_cache.pop(cache_key, None)

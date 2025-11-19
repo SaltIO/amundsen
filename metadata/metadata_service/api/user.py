@@ -18,7 +18,7 @@ from flask_restful import Resource
 from marshmallow.exceptions import ValidationError as SchemaValidationError
 
 from metadata_service.api import BaseAPI
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy

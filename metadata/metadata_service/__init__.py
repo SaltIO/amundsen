@@ -17,6 +17,10 @@ from metadata_service.api.reveal import RevealChatAPI, RevealSearchAPI #, Reveal
 from werkzeug.utils import import_string
 
 from metadata_service.api.auth import AuthAPI
+from metadata_service.api.api_key import (
+    APIKeyCreateAPI, APIKeyListAPI, APIKeyGetAPI,
+    APIKeyRevokeAPI, APIKeyDeleteAPI, APIKeyBulkDeleteAPI
+)
 from metadata_service.api.badge import BadgeAPI
 from metadata_service.api.column import (ColumnBadgeAPI, ColumnDescriptionAPI,
                                          ColumnLineageAPI, ColumnStatsAPI)
@@ -39,6 +43,7 @@ from metadata_service.api.system import Neo4jDetailAPI, StatisticsMetricsAPI
 from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
                                         TableDescriptionAPI, TableGET, TablesGET, TableIdGET,
                                         TableLineageAPI, TableOwnerAPI,
+                                        TablePropertyPatchAPI,
                                         TableTagAPI, TableUpdateFrequencyAPI,
                                         TablePutAPI, TableStatsAPI)
 from metadata_service.api.tag import TagAPI, TagPATCH
@@ -143,6 +148,20 @@ def create_app(*, config_module_class: str) -> Flask:
     api.add_resource(AuthAPI,
                      '/auth/token/')
 
+    # API key management endpoints
+    api.add_resource(APIKeyCreateAPI,
+                     '/auth/api-key')
+    api.add_resource(APIKeyListAPI,
+                     '/auth/api-key')
+    api.add_resource(APIKeyGetAPI,
+                     '/auth/api-key/<int:key_id>')
+    api.add_resource(APIKeyRevokeAPI,
+                     '/auth/api-key/<int:key_id>')
+    api.add_resource(APIKeyDeleteAPI,
+                     '/auth/api-key/<int:key_id>/permanent')
+    api.add_resource(APIKeyBulkDeleteAPI,
+                     '/auth/api-key/bulk')
+
     # `PopularTablesAPI` is deprecated, and will be removed in version 4.
     api.add_resource(PopularTablesAPI,
                      '/popular_tables/',
@@ -163,6 +182,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/table/')
     api.add_resource(TableDescriptionAPI,
                      '/table/<path:id>/description')
+    api.add_resource(TablePropertyPatchAPI,
+                     '/table/<path:table_uri>/property')
     api.add_resource(TableTagAPI,
                      '/table/<path:id>/tag/<tag>')
     api.add_resource(TableBadgeAPI,

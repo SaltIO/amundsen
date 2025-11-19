@@ -424,6 +424,13 @@ class Neo4jFabricProxy(Neo4jProxy):
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_column_description() is not supported')
 
     @timer_with_counter
+    def patch_table_properties(self, *,
+                               table_uri: str,
+                               properties: Dict[str, Any],
+                               published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  patch_table_properties() is not supported')
+
+    @timer_with_counter
     def put_table_update_frequency(self, *,
                                    table_uri: str,
                                    frequency: str) -> None:

@@ -1808,6 +1808,81 @@ class Neo4jProxy(BaseProxy):
                                       published_tag=published_tag)
 
     @timer_with_counter
+    def patch_table_properties(
+        self, *,
+        table_uri: str,
+        properties: Dict[str, Any],
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG
+    ) -> None:
+        """
+        Update specific table properties in Neo4j.
+
+        :param table_uri: Table URI (key in Neo4j)
+        :param properties: Dictionary of property names to values to update
+        :param published_tag: Published tag for audit trail
+        """
+        if not properties:
+            raise ValueError("No properties provided to update")
+
+        # Properties that cannot be edited
+        non_editable_properties = {'name', 'key'}
+        provided_properties = set(properties.keys())
+        invalid_properties = provided_properties & non_editable_properties
+
+        if invalid_properties:
+            raise ValueError(f"Properties {list(invalid_properties)} cannot be edited")
+
+        current_time_milliseconds = int(time.time() * 1000)
+
+        # Build SET clause for properties
+        set_clauses = []
+        params = {
+            'table_key': table_uri,
+            'publisher_last_updated_epoch_ms': current_time_milliseconds,
+            'published_tag': published_tag
+        }
+
+        for prop_name, prop_value in properties.items():
+            set_clauses.append(f"t.{prop_name} = ${prop_name}")
+            params[prop_name] = prop_value
+
+        set_clause = ", ".join(set_clauses)
+        set_clause += ", t.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms"
+        set_clause += ", t.published_tag = $published_tag"
+
+        update_table_properties_query = textwrap.dedent(f"""
+        MATCH (t:Table {{key: $table_key}})
+        SET {set_clause}
+        RETURN t.key
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(update_table_properties_query, params)
+
+            if not result.single():
+                raise NotFoundException(f'Table with key {table_uri} does not exist')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to patch table properties')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Patch table properties process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
     def put_table_update_frequency(
         self, *,
         table_uri: str,

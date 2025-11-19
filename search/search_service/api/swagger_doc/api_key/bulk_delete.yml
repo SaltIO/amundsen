@@ -1,0 +1,51 @@
+Bulk Delete API Keys
+Bulk delete API keys for the configured service
+---
+tags:
+  - 'api-key'
+security:
+  - Bearer: []
+requestBody:
+  required: false
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          key_ids:
+            type: array
+            items:
+              type: integer
+            description: List of API key IDs to delete (if not provided, all keys for the service are deleted)
+          permanent:
+            type: boolean
+            default: false
+            description: Whether to permanently delete (vs soft delete/revoke)
+responses:
+  200:
+    description: Bulk delete completed
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            deleted_count:
+              type: integer
+            requested_count:
+              type: integer
+            permanent:
+              type: boolean
+            service:
+              type: string
+  500:
+    description: Internal server error
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+

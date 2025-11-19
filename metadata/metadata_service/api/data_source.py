@@ -22,7 +22,7 @@ from metadata_service.api.tag import TagCommon
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
 from metadata_service.proxy.base_proxy import BaseProxy
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 
 LOGGER = logging.getLogger(__name__)

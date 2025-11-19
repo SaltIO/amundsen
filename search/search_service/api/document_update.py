@@ -11,7 +11,7 @@ from flask_restful import Resource, request
 
 from search_service.proxy import get_proxy_client
 from search_service.proxy.es_proxy_utils import RESOURCE_STR_MAPPING
-from ddp_auth.flask_integration import require_auth
+from ddp_auth.flask_api_keys import require_auth
 
 
 class DocumentAPI(Resource):
