@@ -1,0 +1,29 @@
+Delete stats of a table
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'table'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/TableUriParameter'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    description: 'Table not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    description: 'Internal server error'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

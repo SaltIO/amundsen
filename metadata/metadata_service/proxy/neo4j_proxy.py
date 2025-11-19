@@ -1792,6 +1792,88 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    def delete_resource_description(
+        self, *,
+        resource_type: ResourceType,
+        uri: str,
+        published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete description for a resource by removing the relationships between the resource and description node.
+        The description node itself is only deleted if it has no other relationships (orphan cleanup).
+
+        :param resource_type: Type of resource (Table, Dashboard, Feature, etc.)
+        :param uri: Resource URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        desc_key = uri + '/_description'
+
+        delete_desc_relation_query = textwrap.dedent("""
+        MATCH (n2:{node_label} {{key: $key}})
+        OPTIONAL MATCH (n2)-[r1:DESCRIPTION]->(n1:Description {{key: $desc_key}})
+        OPTIONAL MATCH (n1)-[r2:DESCRIPTION_OF]->(n2)
+        WITH n1, n2, r1, r2
+        DELETE r1, r2
+        WITH n1
+        WHERE n1 IS NOT NULL
+        // Delete description node if it has no other relationships (orphan cleanup)
+        OPTIONAL MATCH (n1)-[r3]-()
+        WITH n1, count(r3) as rel_count
+        WHERE rel_count = 0
+        DELETE n1
+        RETURN count(n1) as deleted_count
+        """.format(node_label=resource_type.name))
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_desc_relation_query, {
+                'desc_key': desc_key,
+                'key': uri
+            })
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                # Check if resource exists
+                check_resource_query = textwrap.dedent("""
+                MATCH (n:{node_label} {{key: $key}})
+                RETURN n.key
+                """.format(node_label=resource_type.name))
+                check_result = tx.run(check_resource_query, {'key': uri})
+                if not check_result.single():
+                    raise NotFoundException(f'Resource {uri} does not exist')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to delete description')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Delete description process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def delete_table_description(self, *,
+                                 table_uri: str,
+                                 published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete table description
+        :param table_uri: Table uri (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        self.delete_resource_description(resource_type=ResourceType.Table,
+                                         uri=table_uri,
+                                         published_tag=published_tag)
+
+    @timer_with_counter
     def put_table_description(self, *,
                               table_uri: str,
                               description: str,
@@ -3028,6 +3110,67 @@ class Neo4jProxy(BaseProxy):
             if not tx.closed():
                 tx.rollback()
             raise e
+
+    @timer_with_counter
+    def delete_table_stats(self, *,
+                           table_uri: str,
+                           published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete all table stats by removing relationships and stat nodes.
+        Stat nodes are only deleted if they have no other relationships (orphan cleanup).
+
+        :param table_uri: Table URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        delete_stats_query = textwrap.dedent("""
+        MATCH (t:Table {{key: $table_key}})
+        OPTIONAL MATCH (t)-[r1:STAT]->(s:Stat)
+        OPTIONAL MATCH (s)-[r2:STAT_OF]->(t)
+        WITH s, r1, r2
+        DELETE r1, r2
+        WITH s
+        WHERE s IS NOT NULL
+        // Delete stat node if it has no other relationships (orphan cleanup)
+        OPTIONAL MATCH (s)-[r3]-()
+        WITH s, count(r3) as rel_count
+        WHERE rel_count = 0
+        DELETE s
+        RETURN count(s) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_stats_query, {'table_key': table_uri})
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                # Check if table exists
+                check_table_query = textwrap.dedent("""
+                MATCH (t:Table {key: $table_key})
+                RETURN t.key
+                """)
+                check_result = tx.run(check_table_query, {'table_key': table_uri})
+                if not check_result.single():
+                    raise NotFoundException(f'Table {table_uri} does not exist')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to delete table stats')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Delete table stats process elapsed for {} seconds'.format(time.time() - start))
 
     def _get_global_popular_resources_uris_query_statement(self, resource_type: ResourceType = ResourceType.Table) -> str:
         # query = textwrap.dedent("""

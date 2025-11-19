@@ -400,6 +400,19 @@ class Neo4jFabricProxy(Neo4jProxy):
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_resource_description() is not supported')
 
     @timer_with_counter
+    def delete_resource_description(self, *,
+                                    resource_type: ResourceType,
+                                    uri: str,
+                                    published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_resource_description() is not supported')
+
+    @timer_with_counter
+    def delete_table_description(self, *,
+                                 table_uri: str,
+                                 published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_table_description() is not supported')
+
+    @timer_with_counter
     def put_column_lineage(
             self, *,
             table_uri: str,
@@ -546,6 +559,12 @@ class Neo4jFabricProxy(Neo4jProxy):
             stats: List[Stat],
             published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_table_stats() is not supported')
+
+    @timer_with_counter
+    def delete_table_stats(self, *,
+                           table_uri: str,
+                           published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_table_stats() is not supported')
 
     def create_update_dashboard(
             self,

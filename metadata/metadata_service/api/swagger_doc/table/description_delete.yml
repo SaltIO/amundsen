@@ -1,0 +1,25 @@
+Delete description of a table
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'table'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - $ref: '#/components/parameters/ResourceIdParameter'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    $ref: '#/components/responses/ResourceNotFoundResponse'
+  500:
+    description: 'Internal server error'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+

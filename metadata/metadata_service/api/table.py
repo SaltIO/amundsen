@@ -245,6 +245,28 @@ class TableDescriptionAPI(Resource):
         except NotFoundException:
             return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
+    @require_auth('write:metadata')
+    @swag_from('swagger_doc/table/description_delete.yml')
+    def delete(self, id: str) -> Iterable[Any]:
+        """
+        Deletes table description
+        :param id: Table URI (key in Neo4j)
+        :return:
+        """
+        try:
+            published_tag = request.get_json(force=True, silent=True) or {}
+            published_tag = published_tag.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.delete_table_description(table_uri=id, published_tag=published_tag)
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': 'table_uri {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
+        except Exception as e:
+            LOGGER.exception(f'Failed to delete table description: {e}')
+            return {'message': f'Internal server error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
 class TablePropertyPatchAPI(Resource):
     """
     TablePropertyPatchAPI supports PATCH operation to update specific table properties.
@@ -518,3 +540,29 @@ class TableStatsAPI(Resource):
         except NotFoundException:
             msg = 'table_uri {} does not exist'.format(table_uri)
             return {'message': msg}, HTTPStatus.NOT_FOUND
+
+    @require_auth('write:metadata')
+    @swag_from('swagger_doc/table/stats_delete.yml')
+    def delete(self, table_uri: str) -> Iterable[Union[dict, tuple, int, None]]:
+        """
+        Deletes all table stats
+        :param table_uri: Table URI (key in Neo4j)
+        :return:
+        """
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.delete_table_stats(
+                table_uri=table_uri,
+                published_tag=published_tag
+            )
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException:
+            msg = 'table_uri {} does not exist'.format(table_uri)
+            return {'message': msg}, HTTPStatus.NOT_FOUND
+        except Exception as e:
+            LOGGER.exception(f'Failed to delete table stats: {e}')
+            return {'message': f'Internal server error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR

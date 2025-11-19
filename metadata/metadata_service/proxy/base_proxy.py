@@ -128,13 +128,26 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def delete_table_description(self, *,
+                                 table_uri: str,
+                                 published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def delete_resource_description(self, *,
+                                    resource_type: ResourceType,
+                                    uri: str,
+                                    published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
     def patch_table_properties(self, *,
                               table_uri: str,
                               properties: Dict[str, Any],
                               published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         """
         Update specific table properties in Neo4j.
-        
+
         :param table_uri: Table URI (key in Neo4j)
         :param properties: Dictionary of property names to values to update
         :param published_tag: Published tag for audit trail
@@ -285,6 +298,12 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
             table_uri: str,
             stats: List[Stat],
             published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        pass
+
+    @abstractmethod
+    def delete_table_stats(self, *,
+                           table_uri: str,
+                           published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
         pass
 
     @abstractmethod
