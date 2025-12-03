@@ -1433,11 +1433,15 @@ def _get_data_provider_metadata(*, data_provider_key: str, index: int, source: s
 
     try:
         provider_data_raw: dict = response.json()
+        logging.info(f"_get_data_provider_metadata: raw response from metadata service={provider_data_raw}")
+        logging.info(f"_get_data_provider_metadata: tags in raw response={provider_data_raw.get('tags', 'NOT_FOUND')}")
 
         # Ideally the response should include 'key' to begin with
         provider_data_raw['key'] = data_provider_key
 
         results_dict['providerData'] = marshall_data_provider_full(provider_data_raw)
+        logging.info(f"_get_data_provider_metadata: after marshall, providerData={results_dict['providerData']}")
+        logging.info(f"_get_data_provider_metadata: tags in providerData={results_dict['providerData'].get('tags', 'NOT_FOUND')}")
         results_dict['msg'] = 'Success'
         return results_dict
     except Exception as e:

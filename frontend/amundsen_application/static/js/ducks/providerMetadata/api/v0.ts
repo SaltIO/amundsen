@@ -38,11 +38,17 @@ export function getProviderData(key: string, index?: string, source?: string) {
   const providerURL = `${API_PATH}/provider?${providerQueryParams}`;
   const providerRequest = axios.get<ProviderDataAPI>(providerURL);
 
-  return providerRequest.then((providerResponse: AxiosResponse<ProviderDataAPI>) => ({
-    data: getProviderDataFromResponseData(providerResponse.data),
-    tags: providerResponse.data.providerData.tags,
-    statusCode: providerResponse.status,
-  }));
+  return providerRequest.then((providerResponse: AxiosResponse<ProviderDataAPI>) => {
+    const tags = providerResponse.data.providerData.tags || [];
+    console.log('getProviderData API: raw tags from response=', tags);
+    console.log('getProviderData API: tags type=', typeof tags);
+    console.log('getProviderData API: tags is array?', Array.isArray(tags));
+    return {
+      data: getProviderDataFromResponseData(providerResponse.data),
+      tags: tags,
+      statusCode: providerResponse.status,
+    };
+  });
 }
 
 export function getProviderDescription(providerData: ProviderMetadata) {

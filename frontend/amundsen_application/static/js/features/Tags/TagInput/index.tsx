@@ -386,11 +386,16 @@ export class TagInput extends React.Component<TagInputProps, TagInputState> {
   }
 }
 
-export const mapStateToProps = (state: GlobalState) => ({
-  allTags: state.tags.allTags.tags,
-  isLoading: state.tags.allTags.isLoading || state.tags.resourceTags.isLoading,
-  tags: state.tags.resourceTags.tags,
-});
+export const mapStateToProps = (state: GlobalState) => {
+  const tags = state.tags.resourceTags.tags;
+  console.log('TagInput mapStateToProps: resourceTags=', state.tags.resourceTags);
+  console.log('TagInput mapStateToProps: tags=', tags);
+  return {
+    allTags: state.tags.allTags.tags,
+    isLoading: state.tags.allTags.isLoading || state.tags.resourceTags.isLoading,
+    tags: tags,
+  };
+};
 
 export const mapDispatchToProps = (dispatch: any, ownProps: OwnProps) =>
   bindActionCreators(

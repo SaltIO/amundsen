@@ -4,6 +4,7 @@ import { GetDashboard, GetDashboardResponse } from 'ducks/dashboard/types';
 import { GetFeature, GetFeatureResponse } from 'ducks/feature/types';
 import { GetTableData, GetTableDataResponse } from 'ducks/tableMetadata/types';
 import { GetFileData, GetFileDataResponse } from 'ducks/fileMetadata/types';
+import { GetProviderData, GetProviderDataResponse } from 'ducks/providerMetadata/types';
 
 import {
   GetAllTags,
@@ -110,6 +111,7 @@ export default function reducer(
     case GetFileData.REQUEST:
     case GetDashboard.REQUEST:
     case GetFeature.REQUEST:
+    case GetProviderData.REQUEST:
       return {
         ...state,
         resourceTags: {
@@ -154,10 +156,22 @@ export default function reducer(
           tags: (<GetFeatureResponse>action).payload.feature?.tags || [],
         },
       };
+    case GetProviderData.SUCCESS:
+      const providerTags = (<GetProviderDataResponse>action).payload.tags || [];
+      console.log('Tags reducer: GetProviderData.SUCCESS, tags=', providerTags);
+      return {
+        ...state,
+        resourceTags: {
+          ...state.resourceTags,
+          isLoading: false,
+          tags: providerTags,
+        },
+      };
     case GetTableData.FAILURE:
     case GetFileData.FAILURE:
     case GetDashboard.FAILURE:
     case GetFeature.FAILURE:
+    case GetProviderData.FAILURE:
       return {
         ...state,
         resourceTags: {

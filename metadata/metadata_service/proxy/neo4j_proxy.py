@@ -4920,16 +4920,17 @@ class Neo4jProxy(BaseProxy):
             MATCH (data_provider:Data_Provider {key: $data_provider_key})
             OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
             OPTIONAL MATCH (data_provider)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
-            WITH data_provider, data_provider_desc, collect(DISTINCT tag) AS tags
+            WITH data_provider, data_provider_desc, collect(DISTINCT tag) AS provider_tags
             OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider)
             OPTIONAL MATCH (file:File)-[:FILE_OF]->(data_channel)
             OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
-            WITH data_provider, data_provider_desc, tags, data_channel, collect(DISTINCT data_location) AS data_locations
-            WITH data_provider, data_provider_desc, tags, data_channel, data_locations,
+            WITH data_provider, data_provider_desc, provider_tags, data_channel,
+                collect(DISTINCT data_location) AS data_locations
+            WITH data_provider, data_provider_desc, provider_tags, data_channel, data_locations,
                 {data_channel: data_channel, data_locations: data_locations} AS channel_data
-            WITH data_provider, data_provider_desc, tags,
+            WITH data_provider, data_provider_desc, provider_tags,
                 collect(channel_data) AS data_channels
-            RETURN data_provider, data_provider_desc, data_channels, tags;
+            RETURN data_provider, data_provider_desc, data_channels, provider_tags AS tags;
         """)
         return data_provider_query
 
@@ -4961,13 +4962,18 @@ class Neo4jProxy(BaseProxy):
                                              param_dict={'data_provider_key': data_provider_uri})
 
         if records is None:
+            LOGGER.info("get_data_provider: records is None")
             return None
 
-        LOGGER.info(f"records={records}")
+        LOGGER.info(f"get_data_provider: records={records}")
 
         record = get_single_record(records)
 
-        LOGGER.info(f"record={record}")
+        LOGGER.info(f"get_data_provider: record={record}")
+        LOGGER.info(f"get_data_provider: record keys={record.keys() if record else 'None'}")
+        if record:
+            LOGGER.info(f"get_data_provider: tags in record={record.get('tags', 'NOT_FOUND')}")
+            LOGGER.info(f"get_data_provider: type of tags in record={type(record.get('tags', None))}")
 
         if record is None:
             return None
@@ -4997,13 +5003,21 @@ class Neo4jProxy(BaseProxy):
 
         tags = []
         tag_records = record.get('tags', [])
+        LOGGER.info(f"get_data_provider: tag_records from query={tag_records}")
+        LOGGER.info(f"get_data_provider: type of tag_records={type(tag_records)}")
         if tag_records:
+            LOGGER.info(f"get_data_provider: processing {len(tag_records)} tag records")
             for tag_record in tag_records:
                 if tag_record:  # Check if tag_record is not None
+                    LOGGER.info(f"get_data_provider: processing tag_record={tag_record}")
                     tag = Tag(tag_name=tag_record['key'],
                               tag_type=tag_record.get('tag_type', 'default'))
                     tags.append(tag)
+                    LOGGER.info(f"get_data_provider: created tag={tag}")
+        else:
+            LOGGER.info(f"get_data_provider: no tag_records found or empty list")
 
+        LOGGER.info(f"get_data_provider: final tags list={tags}, count={len(tags)}")
         data_provider_rec = record["data_provider"]
         data_provider = DataProvider(name=data_provider_rec["name"],
                                      key=data_provider_rec["key"],
@@ -5011,6 +5025,7 @@ class Neo4jProxy(BaseProxy):
                                      website=data_provider_rec.get("website", None),
                                      data_channels=data_channels,
                                      tags=tags if tags else None)
+        LOGGER.info(f"get_data_provider: created DataProvider with tags={data_provider.tags}")
 
         return data_provider
 

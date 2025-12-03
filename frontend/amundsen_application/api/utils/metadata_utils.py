@@ -390,9 +390,18 @@ def marshall_data_provider_full(data_provider_dict: Dict) -> Dict:
     """
     """
 
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"marshall_data_provider_full: input data_provider_dict={data_provider_dict}")
+    logger.info(f"marshall_data_provider_full: tags in input={data_provider_dict.get('tags', 'NOT_FOUND')}")
+
     schema = DataProviderSchema()
     data_provider: DataProvider = schema.load(data_provider_dict)
+    logger.info(f"marshall_data_provider_full: loaded DataProvider object, tags={data_provider.tags}")
+
     results: Dict[str, Any] = schema.dump(data_provider)
+    logger.info(f"marshall_data_provider_full: dumped results, tags in results={results.get('tags', 'NOT_FOUND')}")
 
     # is_editable = is_table_editable(results['schema'], results['name'])
     is_editable = True
@@ -401,6 +410,7 @@ def marshall_data_provider_full(data_provider_dict: Dict) -> Dict:
     # data_provider_name_key = re.sub(r'\W+', '_', data_provider.name).lower()
     # results['key'] = f"data_provider://{data_provider_name_key}"
 
+    logger.info(f"marshall_data_provider_full: final results with tags={results.get('tags', 'NOT_FOUND')}")
     return results
 
 def marshall_file_full(file_dict: Dict) -> Dict:

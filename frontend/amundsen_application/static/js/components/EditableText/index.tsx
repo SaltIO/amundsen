@@ -214,10 +214,17 @@ class EditableText extends React.Component<
     }
   };
 
-  isJsonString = (str: string) => {
+  isJsonString = (str: string | null | undefined) => {
     let isJson = false;
+    if (!str || str === null || str === undefined || typeof str !== 'string') {
+      return false;
+    }
     try {
-      const parsed = JSON.parse(he.decode(str));
+      const decoded = he.decode(str);
+      if (!decoded) {
+        return false;
+      }
+      const parsed = JSON.parse(decoded);
       isJson = typeof parsed === 'object' && parsed !== null;
     } catch (e) {
       console.log(e)
@@ -239,13 +246,14 @@ class EditableText extends React.Component<
     }
 
     if (!isEditing) {
-      const sanitizedContent = allowDangerousHtml ? DOMPurify.sanitize(value) : value;
-      const isJson = this.isJsonString(sanitizedContent)
+      const safeValue = value || '';
+      const sanitizedContent = allowDangerousHtml ? (DOMPurify.sanitize(safeValue) || '') : safeValue;
+      const isJson = sanitizedContent ? this.isJsonString(sanitizedContent) : false;
 
       return (
         <div className="editable-text">
             <div className="markdown-wrapper">
-              {isJson ?
+              {isJson && sanitizedContent ?
                 (
                   <div style={{ width: '400px', height: '500px', overflow: 'auto', border: '1px solid #ddd' }}>
                     <SyntaxHighlighter language="json" style={dark}>

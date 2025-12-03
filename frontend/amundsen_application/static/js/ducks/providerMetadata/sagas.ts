@@ -23,14 +23,20 @@ export function* getProviderDataWorker(action: GetProviderDataRequest): SagaIter
   const { key, searchIndex, source } = action.payload;
 
   try {
-    const { data, statusCode, tags } = yield call(
+    const response = yield call(
       API.getProviderData,
       key,
       searchIndex,
       source
     );
 
-    yield put(getProviderDataSuccess(data, statusCode, tags));
+    console.log('Provider saga: full response=', response);
+    const { data, statusCode, tags } = response;
+    console.log('Provider saga: extracted tags=', tags);
+    console.log('Provider saga: tags type=', typeof tags);
+    console.log('Provider saga: tags is array?', Array.isArray(tags));
+
+    yield put(getProviderDataSuccess(data, statusCode, tags || []));
   } catch (e) {
     yield put(getProviderDataFailure());
   }

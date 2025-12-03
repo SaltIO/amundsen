@@ -6,6 +6,7 @@ import { User } from './User';
 import { Badge } from './Badges';
 import { ProgrammaticDescription } from './TableMetadata'
 import { DataChannel } from './DataChannel'
+import { Tag } from './Tags';
 
 export interface ProviderMetadata {
   key: string;
@@ -13,6 +14,7 @@ export interface ProviderMetadata {
   description: string;
   is_editable: boolean;
   dataChannels?: DataChannel[];
+  tags?: Tag[];
 }
 
 export interface ProviderProgrammaticDescriptions {
