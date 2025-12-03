@@ -198,7 +198,7 @@ class Table:
     badges: Optional[List[Badge]] = []
     table_readers: Optional[List[Reader]] = []
     description: Optional[str] = None
-    columns: List[Column]
+    columns: Optional[List[Column]] = []
     owners: Optional[List[User]] = []
     watermarks: Optional[List[Watermark]] = []
     table_writer: Optional[Application] = None

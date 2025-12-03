@@ -414,6 +414,281 @@ class Neo4jProxy(BaseProxy):
             raise e
 
     @timer_with_counter
+    def delete_table(
+            self,
+            *,
+            table_uri: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a table and all its child resources (columns, descriptions, stats, etc.).
+
+        This method performs cascading deletion:
+        - Deletes all columns and their relationships (descriptions, stats, badges, type_metadata)
+        - Deletes table-level resources (descriptions, stats, tags, badges, owners, watermarks, update_frequency, sources, programmatic_descriptions)
+        - Deletes the table node itself
+        - Performs orphan cleanup for description and stat nodes
+
+        :param table_uri: Table URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        delete_table_query = textwrap.dedent("""
+        MATCH (t:Table {key: $table_key})
+
+        // Delete column-level resources first
+        OPTIONAL MATCH (t)-[:COLUMN]->(col:Column)
+        OPTIONAL MATCH (col)-[col_desc_rel:DESCRIPTION]->(col_desc:Description)
+        OPTIONAL MATCH (col_desc)-[col_desc_of_rel:DESCRIPTION_OF]->(col)
+        OPTIONAL MATCH (col)-[col_stat_rel:STAT]->(col_stat:Stat)
+        OPTIONAL MATCH (col_stat)-[col_stat_of_rel:STAT_OF]->(col)
+        OPTIONAL MATCH (col)-[col_badge_rel:HAS_BADGE]->(col_badge:Badge)
+        OPTIONAL MATCH (col_badge)-[col_badge_for_rel:BADGE_FOR]->(col)
+        OPTIONAL MATCH (col)-[col_prog_desc_rel:DESCRIPTION]->(col_prog_desc:Programmatic_Description)
+        OPTIONAL MATCH (col)-[col_tm_rel:TYPE_METADATA]->(col_tm:Type_Metadata)
+        OPTIONAL MATCH (col_tm)-[col_tm_subtype_rel:SUBTYPE*0..]->(col_tm_child:Type_Metadata)
+        OPTIONAL MATCH (col_tm_child)-[col_tm_desc_rel:DESCRIPTION]->(col_tm_desc:Description)
+        OPTIONAL MATCH (col_tm_child)-[col_tm_badge_rel:HAS_BADGE]->(col_tm_badge:Badge)
+
+        // Delete column relationships
+        WITH t, col, col_desc, col_stat, col_badge, col_prog_desc, col_tm, col_tm_child, col_tm_desc, col_tm_badge,
+            col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel,
+            col_badge_rel, col_badge_for_rel, col_prog_desc_rel,
+            col_tm_rel, col_tm_subtype_rel, col_tm_desc_rel, col_tm_badge_rel
+        DELETE col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel,
+            col_badge_rel, col_badge_for_rel, col_prog_desc_rel,
+            col_tm_rel, col_tm_subtype_rel, col_tm_desc_rel, col_tm_badge_rel
+
+        // Delete column type metadata nodes (orphan cleanup)
+        WITH t, col, col_desc, col_stat, col_badge, col_prog_desc, col_tm, col_tm_child, col_tm_desc, col_tm_badge
+        WHERE col_tm_child IS NOT NULL
+        OPTIONAL MATCH (col_tm_child)-[r3]-()
+        WITH col_tm_child, count(r3) as rel_count
+        WHERE rel_count = 0
+        DELETE col_tm_child
+
+        // Delete column type metadata root (orphan cleanup)
+        WITH t, col, col_desc, col_stat, col_badge, col_prog_desc, col_tm
+        WHERE col_tm IS NOT NULL
+        OPTIONAL MATCH (col_tm)-[r4]-()
+        WITH col_tm, count(r4) as rel_count
+        WHERE rel_count = 0
+        DELETE col_tm
+
+        // Delete column description nodes (orphan cleanup)
+        WITH t, col, col_desc, col_stat, col_badge, col_prog_desc
+        WHERE col_desc IS NOT NULL
+        OPTIONAL MATCH (col_desc)-[r5]-()
+        WITH col_desc, count(r5) as rel_count
+        WHERE rel_count = 0
+        DELETE col_desc
+
+        // Delete column stat nodes (orphan cleanup)
+        WITH t, col, col_stat, col_badge, col_prog_desc
+        WHERE col_stat IS NOT NULL
+        OPTIONAL MATCH (col_stat)-[r6]-()
+        WITH col_stat, count(r6) as rel_count
+        WHERE rel_count = 0
+        DELETE col_stat
+
+        // Delete column programmatic description nodes (orphan cleanup)
+        WITH t, col, col_badge, col_prog_desc
+        WHERE col_prog_desc IS NOT NULL
+        OPTIONAL MATCH (col_prog_desc)-[r7]-()
+        WITH col_prog_desc, count(r7) as rel_count
+        WHERE rel_count = 0
+        DELETE col_prog_desc
+
+        // Delete columns themselves
+        WITH t, col
+        DELETE col
+
+        // Delete table-level resources
+        WITH t
+        OPTIONAL MATCH (t)-[tbl_desc_rel:DESCRIPTION]->(tbl_desc:Description)
+        OPTIONAL MATCH (tbl_desc)-[tbl_desc_of_rel:DESCRIPTION_OF]->(t)
+        OPTIONAL MATCH (t)-[tbl_stat_rel:STAT]->(tbl_stat:Stat)
+        OPTIONAL MATCH (tbl_stat)-[tbl_stat_of_rel:STAT_OF]->(t)
+        OPTIONAL MATCH (t)-[tbl_tag_rel:TAGGED_BY]->(tbl_tag:Tag)
+        OPTIONAL MATCH (tbl_tag)-[tbl_tag_tag_rel:TAG]->(t)
+        OPTIONAL MATCH (t)-[tbl_badge_rel:HAS_BADGE]->(tbl_badge:Badge)
+        OPTIONAL MATCH (tbl_badge)-[tbl_badge_for_rel:BADGE_FOR]->(t)
+        OPTIONAL MATCH (t)-[tbl_owner_rel:OWNER]->(tbl_owner:User)
+        OPTIONAL MATCH (tbl_owner)-[tbl_owner_of_rel:OWNER_OF]->(t)
+        OPTIONAL MATCH (tbl_wmk:Watermark)-[tbl_wmk_rel:BELONG_TO_TABLE]->(t)
+        OPTIONAL MATCH (t)-[tbl_uf_rel:UPDATE_FREQUENCY]->(tbl_uf:Update_Frequency)
+        OPTIONAL MATCH (tbl_uf)-[tbl_uf_of_rel:UPDATE_FREQUENCY_OF]->(t)
+        OPTIONAL MATCH (t)-[tbl_src_rel:SOURCE]->(tbl_src:Source)
+        OPTIONAL MATCH (t)-[tbl_prog_desc_rel:DESCRIPTION]->(tbl_prog_desc:Programmatic_Description)
+        OPTIONAL MATCH (t)-[tbl_last_updated_rel:LAST_UPDATED_AT]->(tbl_timestamp:Timestamp)
+        OPTIONAL MATCH (t)-[tbl_report_rel:HAS_REPORT]->(tbl_report:Report)
+
+        // Delete table relationships
+        WITH t, tbl_desc, tbl_stat, tbl_tag, tbl_badge, tbl_owner, tbl_wmk, tbl_uf, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report,
+            tbl_desc_rel, tbl_desc_of_rel, tbl_stat_rel, tbl_stat_of_rel,
+            tbl_tag_rel, tbl_tag_tag_rel, tbl_badge_rel, tbl_badge_for_rel,
+            tbl_owner_rel, tbl_owner_of_rel, tbl_wmk_rel,
+            tbl_uf_rel, tbl_uf_of_rel, tbl_src_rel, tbl_prog_desc_rel,
+            tbl_last_updated_rel, tbl_report_rel
+        DELETE tbl_desc_rel, tbl_desc_of_rel, tbl_stat_rel, tbl_stat_of_rel,
+            tbl_tag_rel, tbl_tag_tag_rel, tbl_badge_rel, tbl_badge_for_rel,
+            tbl_owner_rel, tbl_owner_of_rel, tbl_wmk_rel,
+            tbl_uf_rel, tbl_uf_of_rel, tbl_src_rel, tbl_prog_desc_rel,
+            tbl_last_updated_rel, tbl_report_rel
+
+        // Delete table description node (orphan cleanup)
+        WITH t, tbl_desc, tbl_stat, tbl_tag, tbl_badge, tbl_owner, tbl_wmk, tbl_uf, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report
+        WHERE tbl_desc IS NOT NULL
+        OPTIONAL MATCH (tbl_desc)-[r8]-()
+        WITH tbl_desc, count(r8) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_desc
+
+        // Delete table stat nodes (orphan cleanup)
+        WITH t, tbl_stat, tbl_tag, tbl_badge, tbl_owner, tbl_wmk, tbl_uf, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report
+        WHERE tbl_stat IS NOT NULL
+        OPTIONAL MATCH (tbl_stat)-[r9]-()
+        WITH tbl_stat, count(r9) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_stat
+
+        // Delete update frequency node (orphan cleanup)
+        WITH t, tbl_tag, tbl_badge, tbl_owner, tbl_wmk, tbl_uf, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report
+        WHERE tbl_uf IS NOT NULL
+        OPTIONAL MATCH (tbl_uf)-[r10]-()
+        WITH tbl_uf, count(r10) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_uf
+
+        // Delete watermark nodes (orphan cleanup)
+        WITH t, tbl_tag, tbl_badge, tbl_owner, tbl_wmk, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report
+        WHERE tbl_wmk IS NOT NULL
+        OPTIONAL MATCH (tbl_wmk)-[r11]-()
+        WITH tbl_wmk, count(r11) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_wmk
+
+        // Delete source nodes (orphan cleanup)
+        WITH t, tbl_tag, tbl_badge, tbl_owner, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report
+        WHERE tbl_src IS NOT NULL
+        OPTIONAL MATCH (tbl_src)-[r12]-()
+        WITH tbl_src, count(r12) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_src
+
+        // Delete programmatic description nodes (orphan cleanup)
+        WITH t, tbl_tag, tbl_badge, tbl_owner, tbl_prog_desc, tbl_timestamp, tbl_report
+        WHERE tbl_prog_desc IS NOT NULL
+        OPTIONAL MATCH (tbl_prog_desc)-[r13]-()
+        WITH tbl_prog_desc, count(r13) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_prog_desc
+
+        // Delete timestamp node (orphan cleanup)
+        WITH t, tbl_tag, tbl_badge, tbl_owner, tbl_timestamp, tbl_report
+        WHERE tbl_timestamp IS NOT NULL
+        OPTIONAL MATCH (tbl_timestamp)-[r14]-()
+        WITH tbl_timestamp, count(r14) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_timestamp
+
+        // Delete report nodes (orphan cleanup)
+        WITH t, tbl_tag, tbl_badge, tbl_owner, tbl_report
+        WHERE tbl_report IS NOT NULL
+        OPTIONAL MATCH (tbl_report)-[r15]-()
+        WITH tbl_report, count(r15) as rel_count
+        WHERE rel_count = 0
+        DELETE tbl_report
+
+        // Delete lineage relationships (upstream/downstream)
+        WITH t
+        OPTIONAL MATCH (t)-[lineage_up:HAS_UPSTREAM]->(upstream)
+        OPTIONAL MATCH (upstream)-[lineage_up_rev:HAS_DOWNSTREAM]->(t)
+        OPTIONAL MATCH (t)-[lineage_down:HAS_DOWNSTREAM]->(downstream)
+        OPTIONAL MATCH (downstream)-[lineage_down_rev:HAS_UPSTREAM]->(t)
+        DELETE lineage_up, lineage_up_rev, lineage_down, lineage_down_rev
+
+        // Delete read relationships
+        WITH t
+        OPTIONAL MATCH (t)-[read_rel:READ_BY]->(reader:User)
+        OPTIONAL MATCH (reader)-[read_rev:READ]->(t)
+        DELETE read_rel, read_rev
+
+        // Delete follow relationships
+        WITH t
+        OPTIONAL MATCH (t)-[follow_rel:FOLLOWED_BY]->(follower:User)
+        OPTIONAL MATCH (follower)-[follow_rev:FOLLOW]->(t)
+        DELETE follow_rel, follow_rev
+
+        // Delete application relationships
+        WITH t
+        OPTIONAL MATCH (app:Application)-[gen_rel:GENERATES]->(t)
+        OPTIONAL MATCH (app:Application)-[cons_rel:CONSUMES]->(t)
+        DELETE gen_rel, cons_rel
+
+        // Delete dashboard relationships
+        WITH t
+        OPTIONAL MATCH (dashboard:Dashboard)-[dash_rel:DASHBOARD_WITH_TABLE]->(t)
+        DELETE dash_rel
+
+        // Delete join relationships
+        WITH t
+        OPTIONAL MATCH (t)-[:COLUMN]->(col:Column)-[join_rel:COLUMN_JOINS_WITH]->(join:Join)
+        OPTIONAL MATCH (join)-[join_of_col_rel:JOIN_OF_COLUMN]->(col)
+        OPTIONAL MATCH (join)-[join_of_query_rel:JOIN_OF_QUERY]->(query:Query)
+        DELETE join_rel, join_of_col_rel, join_of_query_rel
+
+        // Delete where clause relationships
+        WITH t
+        OPTIONAL MATCH (t)-[:COLUMN]->(col:Column)-[where_rel:USES_WHERE_CLAUSE]->(where:Where)
+        OPTIONAL MATCH (where)-[where_of_rel:WHERE_CLAUSE_OF]->(query:Query)
+        DELETE where_rel, where_of_rel
+
+        // Delete schema relationship
+        WITH t
+        OPTIONAL MATCH (schema:Schema)-[schema_rel:TABLE]->(t)
+        DELETE schema_rel
+
+        // Finally, delete the table node itself
+        WITH t
+        DELETE t
+
+        RETURN count(t) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_table_query, {'table_key': table_uri})
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                # Check if table exists
+                check_table_query = textwrap.dedent("""
+                MATCH (t:Table {key: $table_key})
+                RETURN t.key
+                """)
+                check_result = tx.run(check_table_query, {'table_key': table_uri})
+                if not check_result.single():
+                    raise NotFoundException(f'Table {table_uri} does not exist')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to delete table')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Delete table process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
     def create_update_dashboard(
             self,
             *,
@@ -549,25 +824,25 @@ class Neo4jProxy(BaseProxy):
 
         LOGGER.info(f'file={file}')
 
-        data_provider_metadata = None
+        data_channel_metadata = None
         if file.dataProvider:
+
             data_provider_metadata = DataProviderDataBuilder(
                 name=file.dataProvider.name,
                 website=file.dataProvider.website,
                 desc=file.dataProvider.description
             )
 
-        data_channel_metadata = None
-        if file.dataProvider.data_channels and len(file.dataProvider.data_channels) == 1:
-            channel = file.dataProvider.data_channels[0]
-            data_channel_metadata = DataChannelDataBuilder(
-                name=channel.name,
-                type=DataChannelDataBuilder.DataChannelType(channel.type),
-                url=channel.url,
-                desc=channel.description,
-                license=channel.license,
-                data_provider=data_provider_metadata
-            )
+            if file.dataProvider.data_channels and len(file.dataProvider.data_channels) == 1:
+                channel = file.dataProvider.data_channels[0]
+                data_channel_metadata = DataChannelDataBuilder(
+                    name=channel.name,
+                    type=DataChannelDataBuilder.DataChannelType(channel.type),
+                    url=channel.url,
+                    desc=channel.description,
+                    license=channel.license,
+                    data_provider=data_provider_metadata
+                )
 
         data_location_metadata = None
         if file.dataLocation:
@@ -4644,14 +4919,17 @@ class Neo4jProxy(BaseProxy):
         data_provider_query = textwrap.dedent("""
             MATCH (data_provider:Data_Provider {key: $data_provider_key})
             OPTIONAL MATCH (data_provider)-[:DESCRIPTION]->(data_provider_desc:Description)
+            OPTIONAL MATCH (data_provider)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
+            WITH data_provider, data_provider_desc, collect(DISTINCT tag) AS tags
             OPTIONAL MATCH (data_channel:Data_Channel)-[:DATA_CHANNEL_OF]->(data_provider)
-            OPTIONAL MATCH (data_location:Data_Location)-[:DATA_LOCATION_OF]->(data_channel)
-            WITH data_provider, data_provider_desc, data_channel, collect(data_location) AS data_locations
-            WITH data_provider, data_provider_desc,
-                CASE WHEN data_channel IS NULL THEN NULL
-                    ELSE collect({data_channel: data_channel, data_locations: data_locations})
-                END AS data_channels
-            RETURN data_provider, data_provider_desc, data_channels;
+            OPTIONAL MATCH (file:File)-[:FILE_OF]->(data_channel)
+            OPTIONAL MATCH (data_location:Data_Location)-[:FILE]->(file)
+            WITH data_provider, data_provider_desc, tags, data_channel, collect(DISTINCT data_location) AS data_locations
+            WITH data_provider, data_provider_desc, tags, data_channel, data_locations,
+                {data_channel: data_channel, data_locations: data_locations} AS channel_data
+            WITH data_provider, data_provider_desc, tags,
+                collect(channel_data) AS data_channels
+            RETURN data_provider, data_provider_desc, data_channels, tags;
         """)
         return data_provider_query
 
@@ -4698,10 +4976,12 @@ class Neo4jProxy(BaseProxy):
         if "data_channels" in record and record.get("data_channels"):
             for rec in record.get("data_channels"):
                 LOGGER.info(f"rec={rec}")
+                if rec is None or rec.get("data_channel") is None:
+                    continue
                 data_channel_rec = rec["data_channel"]
                 LOGGER.info(f"data_channel_rec={data_channel_rec}")
                 data_locations = []
-                if "data_locations" in record and record.get("data_locations"):
+                if "data_locations" in rec and rec.get("data_locations"):
                     for data_location_rec in rec.get("data_locations"):
                         LOGGER.info(f"data_location_rec={data_location_rec}")
                         data_locations.append(self._get_data_location(data_location_rec))
@@ -4715,12 +4995,22 @@ class Neo4jProxy(BaseProxy):
                                             data_locations=data_locations)
                 data_channels.append(data_channel)
 
+        tags = []
+        tag_records = record.get('tags', [])
+        if tag_records:
+            for tag_record in tag_records:
+                if tag_record:  # Check if tag_record is not None
+                    tag = Tag(tag_name=tag_record['key'],
+                              tag_type=tag_record.get('tag_type', 'default'))
+                    tags.append(tag)
+
         data_provider_rec = record["data_provider"]
         data_provider = DataProvider(name=data_provider_rec["name"],
                                      key=data_provider_rec["key"],
                                      description=self._safe_get(record, "data_provider_desc", "description"),
                                      website=data_provider_rec.get("website", None),
-                                     data_channels=data_channels)
+                                     data_channels=data_channels,
+                                     tags=tags if tags else None)
 
         return data_provider
 

@@ -91,6 +91,20 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def delete_table(
+            self,
+            *,
+            table_uri: str,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a table and all its child resources (columns, descriptions, stats, etc.).
+
+        :param table_uri: Table URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        pass
+
+    @abstractmethod
     def create_update_dashboard(
             self,
             *,

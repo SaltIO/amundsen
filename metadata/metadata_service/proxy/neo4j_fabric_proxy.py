@@ -543,6 +543,14 @@ class Neo4jFabricProxy(Neo4jProxy):
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_table() is not supported')
 
     @timer_with_counter
+    def delete_table(
+            self,
+            *,
+            table_uri: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_table() is not supported')
+
+    @timer_with_counter
     def create_update_column_stats(
             self,
             *,

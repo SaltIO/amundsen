@@ -40,7 +40,7 @@ from metadata_service.api.healthcheck import HealthcheckAPI
 from metadata_service.api.popular_resources import PopularResourcesAPI
 from metadata_service.api.popular_tables import PopularTablesAPI
 from metadata_service.api.system import Neo4jDetailAPI, StatisticsMetricsAPI
-from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI,
+from metadata_service.api.table import (TableBadgeAPI, TableDashboardAPI, TableDeleteAPI,
                                         TableDescriptionAPI, TableGET, TablesGET, TableIdGET,
                                         TableLineageAPI, TableOwnerAPI,
                                         TablePropertyPatchAPI,
@@ -55,6 +55,7 @@ from metadata_service.api.user import (UserDetailAPI, UserFollowAPI,
 from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
 from metadata_service.api.data_source import (DataProviderDetailAPI,
                                               DataProviderDescriptionAPI,
+                                              DataProviderTagAPI,
                                               FileDetailAPI,
                                               FilePutAPI,
                                               FileTagAPI,
@@ -180,6 +181,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/tables/<path:database>/<path:cluster>/<path:schema>')
     api.add_resource(TablePutAPI,
                      '/table/')
+    api.add_resource(TableDeleteAPI,
+                     '/table/<path:table_uri>')
     api.add_resource(TableDescriptionAPI,
                      '/table/<path:id>/description')
     api.add_resource(TablePropertyPatchAPI,
@@ -269,6 +272,8 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/data_source/data_provider/<path:data_provider_uri>')
     api.add_resource(DataProviderDescriptionAPI,
                      '/data_source/data_provider/<path:id>/description')
+    api.add_resource(DataProviderTagAPI,
+                     '/data_source/data_provider/<path:id>/tag/<tag>')
     api.add_resource(FileDetailAPI,
                      '/data_source/file/<path:file_uri>')
     api.add_resource(FilePutAPI,

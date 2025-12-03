@@ -95,6 +95,62 @@ class DataProviderDescriptionAPI(BaseAPI):
         except NotFoundException:
             return {'message': 'id {} does not exist'.format(id)}, HTTPStatus.NOT_FOUND
 
+class DataProviderTagAPI(Resource):
+    """
+    DataProviderTagAPI that supports PUT and DELETE operation to add or delete tag
+    on Data Provider
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        self.parser = reqparse.RequestParser()
+        self.parser.add_argument('tag_type', type=str, location="args", required=False, default='default')
+        super(DataProviderTagAPI, self).__init__()
+
+        self._tag_common = TagCommon(client=self.client)
+
+    @require_auth('write:metadata')
+    # @swag_from('swagger_doc/data_source/data_provider_tag_put.yml')
+    def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
+        """
+        API to add a tag to existing Data Provider.
+
+        :param data_provider_uri:
+        :param tag:
+        :return:
+        """
+        args = self.parser.parse_args()
+        tag_type = args.get('tag_type', 'default')
+
+        data = request.get_json(force=True, silent=True) or {}
+        published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+        return self._tag_common.put(
+            id=id,
+            resource_type=ResourceType.Data_Provider,
+            tag=tag,
+            tag_type=tag_type,
+            published_tag=published_tag
+        )
+
+    @require_auth()
+    # @swag_from('swagger_doc/data_source/data_provider_tag_delete.yml')
+    def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
+        """
+        API to remove a association between a given tag and a Data Provider.
+
+        :param data_provider_uri:
+        :param tag:
+        :return:
+        """
+        args = self.parser.parse_args()
+        tag_type = args.get('tag_type', 'default')
+
+        return self._tag_common.delete(id=id,
+                                       resource_type=ResourceType.Data_Provider,
+                                       tag=tag,
+                                       tag_type=tag_type)
+
 class FileDetailAPI(Resource):
     """
     FileDetailAPI API

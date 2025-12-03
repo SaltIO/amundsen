@@ -42,7 +42,6 @@ class DataLocation:
     key: Optional[str] = None
     name: str
     type: str = None
-    key: Optional[str] = None
 
 class DataLocationSchema(AttrsSchema):
     class Meta:
@@ -84,7 +83,6 @@ class AwsS3DataLocationSchema(AttrsSchema):
 class DataChannel:
     key: Optional[str] = None
     name: str
-    key: Optional[str] = None
     description: Optional[str] = None
     license: Optional[DataLicenseType] = None
     type: Optional[str] = None
@@ -124,11 +122,10 @@ class DataChannelSchema(AttrsSchema):
 class DataProvider:
     key: Optional[str] = None
     name: str
-    key: Optional[str] = None
     description: Optional[str] = None
     website: Optional[str] = None
     data_channels: Optional[List[DataChannel]] = None
-    # tags: List[Tag] = []
+    tags: Optional[List[Tag]] = None
     # badges: List[Badge] = []
 
 class DataProviderSchema(AttrsSchema):
@@ -156,7 +153,7 @@ class File:
     category: Optional[str] = None
     path: str
     is_directory: bool = None
-    dataLocation: Optional[Union[FilesystemDataLocation, AwsS3DataLocation, DataLocation]] = None
+    dataLocation: Union[FilesystemDataLocation, AwsS3DataLocation, DataLocation]
     dataProvider: Optional[DataProvider] = None
     fileTables: Optional[List[FileTable]] = None
     tags: Optional[List[Tag]] = None
@@ -170,7 +167,7 @@ class FileSchema(AttrsSchema):
     # Define methods to handle serialization and deserialization for dataLocation
     def get_data_location(self, obj):
         if obj.dataLocation is None:
-            return None
+            raise ValueError("Data Location is required")
         elif isinstance(obj.dataLocation, FilesystemDataLocation):
             return FilesystemDataLocationSchema().dump(obj.dataLocation)
         elif isinstance(obj.dataLocation, AwsS3DataLocation):
@@ -182,7 +179,7 @@ class FileSchema(AttrsSchema):
 
     def set_data_location(self, value):
         # Implement deserialization logic for dataLocation
-        if isinstance(value, dict):
+        if value and isinstance(value, dict):
             if 'filesystem' == value['type']:
                 return FilesystemDataLocationSchema().load(value)
             if 'aws_s3' == value['type']:

@@ -311,7 +311,7 @@ export function* searchAllWorker(action: SearchAllRequest): SagaIterator {
       dashboards: response.dashboard || initialState.dashboards,
       features: response.feature || initialState.features,
       files: response.file || initialState.files,
-      data_providers: response.provider || initialState.providers,
+      data_providers: response.data_provider || initialState.providers,
       isLoading: false,
     };
 
@@ -354,7 +354,7 @@ export function* inlineSearchWorker(action: InlineSearchRequest): SagaIterator {
       tables: response.table || initialInlineResultsState.tables,
       users: response.user || initialInlineResultsState.users,
       files: response.file || initialInlineResultsState.files,
-      data_providers: response.provider || initialInlineResultsState.providers,
+      data_providers: response.data_provider || initialInlineResultsState.providers,
     };
 
     yield put(getInlineResultsSuccess(inlineSearchResponse));

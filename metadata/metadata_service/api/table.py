@@ -113,6 +113,45 @@ class TablePutAPI(Resource):
             return {'message': f'Failed to update/create table: {data}'}, HTTPStatus.NOT_FOUND
 
 
+class TableDeleteAPI(Resource):
+    """
+    TableDelete API - Delete a table and all its child resources.
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+
+    @require_auth('write:metadata')
+    @swag_from('swagger_doc/table/detail_delete.yml')
+    def delete(self, table_uri: str) -> Iterable[Union[Mapping, int, None]]:
+        """
+        Delete a table and all its child resources (columns, descriptions, stats, etc.).
+
+        :param table_uri: Table URI (key in Neo4j)
+        :return: Empty response with 200 OK on success
+        """
+        try:
+            # Handle optional JSON body - check if there's content first
+            data = {}
+            if request.data and len(request.data) > 0:
+                try:
+                    data = request.get_json(force=True, silent=True) or {}
+                except Exception:
+                    # If JSON parsing fails, use empty dict
+                    data = {}
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            self.client.delete_table(table_uri=table_uri, published_tag=published_tag)
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': f'Table {table_uri} does not exist'}, HTTPStatus.NOT_FOUND
+
+        except Exception as e:
+            LOGGER.exception('Failed to delete table')
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
 class TableLineageAPI(Resource):
     def __init__(self) -> None:
         self.client = get_proxy_client()
@@ -304,7 +343,7 @@ class TablePropertyPatchAPI(Resource):
                 }, HTTPStatus.BAD_REQUEST
 
             # Call proxy method to patch properties
-            # Property validation is done in create_edit_plan tool, proxy will handle any errors
+            # Property validation is done in build_table_edit_plan tool, proxy will handle any errors
             self.client.patch_table_properties(
                 table_uri=table_uri,
                 properties=data,
