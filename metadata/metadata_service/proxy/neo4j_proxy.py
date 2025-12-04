@@ -2603,6 +2603,243 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Update process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    def delete_column(
+            self,
+            *,
+            column_uri: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a column and all its directly connected orphaned nodes.
+
+        This method performs cascading deletion:
+        - Deletes column description relationships and orphaned description nodes
+        - Deletes column stat relationships and orphaned stat nodes
+        - Deletes column programmatic description relationships and orphaned nodes
+        - Deletes the column node itself
+        - Does NOT delete nodes that may have other relationships (badges, type_metadata, lineage, etc.)
+
+        :param column_uri: Column URI (key in Neo4j, format: table_uri/column_name)
+        :param published_tag: Published tag for audit trail
+        """
+        # Extract table_uri from column_uri (format: table_uri/column_name)
+        parts = column_uri.rsplit('/', 1)
+        if len(parts) != 2:
+            raise ValueError(f'Invalid column_uri format: {column_uri}. Expected format: table_uri/column_name')
+        table_key = parts[0]
+        column_key = column_uri
+
+        delete_column_query = textwrap.dedent("""
+        MATCH (t:Table {key: $table_key})-[:COLUMN]->(col:Column {key: $column_key})
+
+        // Delete column description relationships
+        OPTIONAL MATCH (col)-[col_desc_rel:DESCRIPTION]->(col_desc:Description)
+        OPTIONAL MATCH (col_desc)-[col_desc_of_rel:DESCRIPTION_OF]->(col)
+
+        // Delete column stat relationships
+        OPTIONAL MATCH (col)-[col_stat_rel:STAT]->(col_stat:Stat)
+        OPTIONAL MATCH (col_stat)-[col_stat_of_rel:STAT_OF]->(col)
+
+        // Delete column programmatic description relationships
+        OPTIONAL MATCH (col)-[col_prog_desc_rel:DESCRIPTION]->(col_prog_desc:Programmatic_Description)
+
+        // Delete column relationships
+        WITH t, col, col_desc, col_stat, col_prog_desc,
+            col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel, col_prog_desc_rel
+        DELETE col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel, col_prog_desc_rel
+
+        // Delete column description nodes (orphan cleanup)
+        WITH t, col, col_desc, col_stat, col_prog_desc
+        WHERE col_desc IS NOT NULL
+        OPTIONAL MATCH (col_desc)-[r1]-()
+        WITH col_desc, count(r1) as rel_count
+        WHERE rel_count = 0
+        DELETE col_desc
+
+        // Delete column stat nodes (orphan cleanup)
+        WITH t, col, col_stat, col_prog_desc
+        WHERE col_stat IS NOT NULL
+        OPTIONAL MATCH (col_stat)-[r2]-()
+        WITH col_stat, count(r2) as rel_count
+        WHERE rel_count = 0
+        DELETE col_stat
+
+        // Delete column programmatic description nodes (orphan cleanup)
+        WITH t, col, col_prog_desc
+        WHERE col_prog_desc IS NOT NULL
+        OPTIONAL MATCH (col_prog_desc)-[r3]-()
+        WITH col_prog_desc, count(r3) as rel_count
+        WHERE rel_count = 0
+        DELETE col_prog_desc
+
+        // Delete COLUMN relationship from table
+        WITH t, col
+        OPTIONAL MATCH (t)-[col_rel:COLUMN]->(col)
+        DELETE col_rel
+
+        // Finally, delete the column node itself
+        WITH col
+        DELETE col
+
+        RETURN count(col) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_column_query, {
+                'table_key': table_key,
+                'column_key': column_key
+            })
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                raise NotFoundException(f'Column {column_uri} not found')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to delete column')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Delete column process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def create_update_column(
+            self,
+            *,
+            column_uri: str,
+            column_name: Optional[str] = None,
+            col_type: Optional[str] = None,
+            sort_order: Optional[int] = None,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Create or update a column's properties (name, type, sort_order).
+
+        :param column_uri: Column URI (key in Neo4j, format: table_uri/column_name)
+        :param column_name: Column name (optional, only used for creation if column doesn't exist)
+        :param col_type: Column data type (optional, only updates if provided)
+        :param sort_order: Column sort order (optional, only updates if provided)
+        :param published_tag: Published tag for audit trail
+        """
+        # Extract table_uri from column_uri (format: table_uri/column_name)
+        parts = column_uri.rsplit('/', 1)
+        if len(parts) != 2:
+            raise ValueError(f'Invalid column_uri format: {column_uri}. Expected format: table_uri/column_name')
+        table_key = parts[0]
+        column_key = column_uri
+
+        # If column_name not provided, extract from column_uri
+        if column_name is None:
+            column_name = parts[1]
+
+        current_time_milliseconds = int(time.time() * 1000)
+
+        # Build update properties dynamically
+        update_props = []
+        params = {
+            'table_key': table_key,
+            'column_key': column_key,
+            'publisher_last_updated_epoch_ms': current_time_milliseconds,
+            'published_tag': published_tag
+        }
+
+        if col_type is not None:
+            update_props.append('col.col_type = $col_type')
+            params['col_type'] = col_type
+
+        if sort_order is not None:
+            update_props.append('col.sort_order = $sort_order')
+            params['sort_order'] = sort_order
+
+        # First, verify that the table exists
+        verify_table_query = textwrap.dedent("""
+        MATCH (t:Table {key: $table_key})
+        RETURN t.key as key
+        """)
+
+        # Use MERGE approach for simplicity
+        # Note: Even if no update_props, we still need to create/update the column
+        # (e.g., to update published_tag or create if it doesn't exist)
+        # Create bidirectional relationships: TABLE->COLUMN (COLUMN) and COLUMN->TABLE (COLUMN_OF)
+        create_update_column_query = textwrap.dedent("""
+        MATCH (t:Table {key: $table_key})
+
+        // Merge column with bidirectional relationships
+        // TABLE -> COLUMN: COLUMN relationship
+        // COLUMN -> TABLE: COLUMN_OF relationship
+        MERGE (t)-[r1:COLUMN]->(col:Column {key: $column_key})-[r2:COLUMN_OF]->(t)
+        ON CREATE SET col.name = $column_name,
+                      col.col_type = COALESCE($col_type, ''),
+                      col.sort_order = COALESCE($sort_order, 0),
+                      col.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+                      col.published_tag = $published_tag,
+                      r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+                      r1.published_tag = $published_tag,
+                      r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+                      r2.published_tag = $published_tag
+        ON MATCH SET col.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+                     col.published_tag = $published_tag,
+                     r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+                     r1.published_tag = $published_tag,
+                     r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+                     r2.published_tag = $published_tag
+        """)
+
+        # Add dynamic property updates
+        if update_props:
+            create_update_column_query += "\n        ON MATCH SET " + ", ".join(update_props)
+
+        create_update_column_query += "\n        RETURN col.key"
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            # First, verify that the table exists
+            verify_result = tx.run(verify_table_query, {'table_key': table_key})
+            if not verify_result.single():
+                raise NotFoundException(f'Table {table_key} not found. Cannot create column without a corresponding table.')
+
+            # Add column_name to params for creation case
+            params['column_name'] = column_name
+            if col_type is None:
+                params['col_type'] = ''
+            if sort_order is None:
+                params['sort_order'] = 0
+
+            result = tx.run(create_update_column_query, params)
+
+            if not result.single():
+                raise NotFoundException(f'Failed to create/update column {column_uri}')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to create/update column')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Create/update column process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
     def add_owner(self, *,
                   table_uri: str,
                   owner: str,

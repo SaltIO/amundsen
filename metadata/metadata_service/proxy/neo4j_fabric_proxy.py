@@ -4,7 +4,7 @@
 import re
 import logging
 import textwrap
-from typing import (Tuple, List, Union, Dict, Any)  # noqa: F401
+from typing import (Tuple, List, Union, Dict, Any, Optional)  # noqa: F401
 import os
 
 import neo4j
@@ -435,6 +435,21 @@ class Neo4jFabricProxy(Neo4jProxy):
                                column_name: str,
                                description: str) -> None:
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  put_column_description() is not supported')
+
+    @timer_with_counter
+    def delete_column(self, *,
+                      column_uri: str,
+                      published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_column() is not supported')
+
+    @timer_with_counter
+    def create_update_column(self, *,
+                             column_uri: str,
+                             column_name: Optional[str] = None,
+                             col_type: Optional[str] = None,
+                             sort_order: Optional[int] = None,
+                             published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_column() is not supported')
 
     @timer_with_counter
     def patch_table_properties(self, *,

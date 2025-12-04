@@ -301,6 +301,47 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def delete_column(
+            self,
+            *,
+            column_uri: str,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a column and all its directly connected orphaned nodes.
+
+        This method performs cascading deletion:
+        - Deletes column description relationships and orphaned description nodes
+        - Deletes column stat relationships and orphaned stat nodes
+        - Deletes column programmatic description relationships and orphaned nodes
+        - Deletes the column node itself
+        - Does NOT delete nodes that may have other relationships (badges, type_metadata, lineage, etc.)
+
+        :param column_uri: Column URI (key in Neo4j, format: table_uri/column_name)
+        :param published_tag: Published tag for audit trail
+        """
+        pass
+
+    @abstractmethod
+    def create_update_column(
+            self,
+            *,
+            column_uri: str,
+            column_name: Optional[str] = None,
+            col_type: Optional[str] = None,
+            sort_order: Optional[int] = None,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Create or update a column's properties (name, type, sort_order).
+
+        :param column_uri: Column URI (key in Neo4j, format: table_uri/column_name)
+        :param column_name: Column name (optional, only used for creation if column doesn't exist)
+        :param col_type: Column data type (optional, only updates if provided)
+        :param sort_order: Column sort order (optional, only updates if provided)
+        :param published_tag: Published tag for audit trail
+        """
+        pass
+
+    @abstractmethod
     def get_table_stats(self, *,
                         table_uri: str) -> List:
         pass

@@ -3,7 +3,7 @@
 import logging
 import json
 from http import HTTPStatus
-from typing import Iterable, Mapping, Union
+from typing import Iterable, Mapping, Optional, Union
 
 from amundsen_common.entity.resource_type import ResourceType
 from amundsen_common.models.lineage import LineageSchema, LineageBaseSchema
@@ -250,3 +250,206 @@ class ColumnStatsAPI(Resource):
     #                                      resource_type=ResourceType.Column,
     #                                      badge_name=badge,
     #                                      category=category)
+
+
+class ColumnDeleteAPI(Resource):
+    """
+    ColumnDelete API - Delete a column and all its directly connected orphaned nodes.
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+
+    def _resolve_column_uri(
+            self,
+            column_uri: Optional[str] = None,
+            table_name: Optional[str] = None,
+            column_name: Optional[str] = None,
+            database_name: Optional[str] = None,
+            cluster_name: Optional[str] = None,
+            schema_name: Optional[str] = None) -> str:
+        """
+        Resolve column URI from either:
+        1. Direct column_uri parameter
+        2. table_name + column_name + (database_name, cluster_name, schema_name) to lookup table
+
+        Returns:
+            Column URI (format: table_uri/column_name)
+
+        Raises:
+            NotFoundException: If table not found or multiple matches found
+            ValueError: If required parameters are missing
+        """
+        if column_uri:
+            return column_uri
+
+        if not table_name or not column_name:
+            raise ValueError('Either column_uri or (table_name and column_name) must be provided')
+
+        # Lookup table by name using client's get_table method
+        if database_name and cluster_name and schema_name:
+            try:
+                table = self.client.get_table(
+                    database=database_name,
+                    cluster=cluster_name,
+                    schema=schema_name,
+                    table=table_name
+                )
+                table_key = table.key
+            except NotFoundException:
+                raise NotFoundException(f'Table {table_name} not found in {database_name}://{cluster_name}.{schema_name}')
+        else:
+            # If not all table identifiers provided, try to find by name only
+            # This may return multiple results, so we need to handle that
+            raise ValueError('When using table_name, database_name, cluster_name, and schema_name are required to uniquely identify the table')
+
+        # Build column URI
+        return f"{table_key}/{column_name}"
+
+    @require_auth('write:metadata')
+    @swag_from('swagger_doc/column/detail_delete.yml')
+    def delete(self, column_uri: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
+        """
+        Delete a column and all its directly connected orphaned nodes.
+
+        Can be called with:
+        - column_uri: Direct column URI (format: table_uri/column_name)
+        - OR table_name + column_name + (database_name, cluster_name, schema_name) in request body
+
+        :param column_uri: Column URI (from path parameter)
+        :return: Empty response with 200 OK on success
+        """
+        try:
+            # Handle optional JSON body for table lookup
+            data = {}
+            if request.data and len(request.data) > 0:
+                try:
+                    data = request.get_json(force=True, silent=True) or {}
+                except Exception:
+                    data = {}
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            # Resolve column_uri
+            resolved_column_uri = self._resolve_column_uri(
+                column_uri=column_uri,
+                table_name=data.get('table_name'),
+                column_name=data.get('column_name'),
+                database_name=data.get('database_name'),
+                cluster_name=data.get('cluster_name'),
+                schema_name=data.get('schema_name')
+            )
+
+            self.client.delete_column(column_uri=resolved_column_uri, published_tag=published_tag)
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException as e:
+            return {'message': str(e)}, HTTPStatus.NOT_FOUND
+        except ValueError as e:
+            return {'message': str(e)}, HTTPStatus.BAD_REQUEST
+        except Exception as e:
+            LOGGER.exception('Failed to delete column')
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+class ColumnPutAPI(Resource):
+    """
+    ColumnPut API - Create or update a column's properties.
+    """
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+
+    def _resolve_column_uri(
+            self,
+            column_uri: Optional[str] = None,
+            table_name: Optional[str] = None,
+            column_name: Optional[str] = None,
+            database_name: Optional[str] = None,
+            cluster_name: Optional[str] = None,
+            schema_name: Optional[str] = None) -> str:
+        """
+        Resolve column URI from either:
+        1. Direct column_uri parameter
+        2. table_name + column_name + (database_name, cluster_name, schema_name) to lookup table
+
+        Returns:
+            Column URI (format: table_uri/column_name)
+
+        Raises:
+            NotFoundException: If table not found or multiple matches found
+            ValueError: If required parameters are missing
+        """
+        if column_uri:
+            return column_uri
+
+        if not table_name or not column_name:
+            raise ValueError('Either column_uri or (table_name and column_name) must be provided')
+
+        # Lookup table by name using client's get_table method
+        if database_name and cluster_name and schema_name:
+            try:
+                table = self.client.get_table(
+                    database=database_name,
+                    cluster=cluster_name,
+                    schema=schema_name,
+                    table=table_name
+                )
+                table_key = table.key
+            except NotFoundException:
+                raise NotFoundException(f'Table {table_name} not found in {database_name}://{cluster_name}.{schema_name}')
+        else:
+            # If not all table identifiers provided, try to find by name only
+            # This may return multiple results, so we need to handle that
+            raise ValueError('When using table_name, database_name, cluster_name, and schema_name are required to uniquely identify the table')
+
+        # Build column URI
+        return f"{table_key}/{column_name}"
+
+    @require_auth('write:metadata')
+    @swag_from('swagger_doc/column/detail_put.yml')
+    def put(self, column_uri: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
+        """
+        Create or update a column's properties (name, type, sort_order).
+
+        Can be called with:
+        - column_uri: Direct column URI (format: table_uri/column_name) in path
+        - OR table_name + column_name + (database_name, cluster_name, schema_name) in request body
+
+        :param column_uri: Column URI (from path parameter)
+        :return: Empty response with 200 OK on success
+        """
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            published_tag = data.get('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            # Resolve column_uri
+            resolved_column_uri = self._resolve_column_uri(
+                column_uri=column_uri,
+                table_name=data.get('table_name'),
+                column_name=data.get('column_name'),
+                database_name=data.get('database_name'),
+                cluster_name=data.get('cluster_name'),
+                schema_name=data.get('schema_name')
+            )
+
+            # Extract column properties from request body
+            col_type = data.get('col_type')
+            sort_order = data.get('sort_order')
+            column_name_for_create = data.get('column_name')  # For creation if column doesn't exist
+
+            self.client.create_update_column(
+                column_uri=resolved_column_uri,
+                column_name=column_name_for_create,
+                col_type=col_type,
+                sort_order=sort_order,
+                published_tag=published_tag
+            )
+
+            return {}, HTTPStatus.OK
+
+        except NotFoundException as e:
+            return {'message': str(e)}, HTTPStatus.NOT_FOUND
+        except ValueError as e:
+            return {'message': str(e)}, HTTPStatus.BAD_REQUEST
+        except Exception as e:
+            LOGGER.exception('Failed to create/update column')
+            return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR

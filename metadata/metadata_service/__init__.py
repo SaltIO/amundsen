@@ -22,8 +22,8 @@ from metadata_service.api.api_key import (
     APIKeyRevokeAPI, APIKeyDeleteAPI, APIKeyBulkDeleteAPI
 )
 from metadata_service.api.badge import BadgeAPI
-from metadata_service.api.column import (ColumnBadgeAPI, ColumnDescriptionAPI,
-                                         ColumnLineageAPI, ColumnStatsAPI)
+from metadata_service.api.column import (ColumnBadgeAPI, ColumnDeleteAPI, ColumnDescriptionAPI,
+                                         ColumnLineageAPI, ColumnPutAPI, ColumnStatsAPI)
 from metadata_service.api.dashboard import (DashboardBadgeAPI,
                                             DashboardDescriptionAPI,
                                             DashboardDetailAPI,
@@ -207,6 +207,10 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/table/<path:table_uri>/column/<column_name>/lineage')
     api.add_resource(ColumnStatsAPI,
                      '/table/<path:table_uri>/column/<column_name>/stats')
+    api.add_resource(ColumnDeleteAPI,
+                     '/column/<path:column_uri>')
+    api.add_resource(ColumnPutAPI,
+                     '/column/<path:column_uri>')
     api.add_resource(TableUpdateFrequencyAPI,
                      '/table/<path:table_uri>/update_frequency')
     api.add_resource(TypeMetadataDescriptionAPI,

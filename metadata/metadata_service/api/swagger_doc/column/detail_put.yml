@@ -1,0 +1,76 @@
+Create or update a column's properties
+Create or update a column's properties (name, type, sort_order). If column doesn't exist, it will be created. If it exists, only provided properties will be updated.
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'column'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: column_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'Column URI (format: table_uri/column_name)'
+    example: 'database://cluster.schema/table_name/column_name'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          published_tag:
+            type: string
+            description: Published tag for the update
+          table_name:
+            type: string
+            description: Table name (alternative to column_uri in path, requires database_name, cluster_name, schema_name)
+          column_name:
+            type: string
+            description: Column name (alternative to column_uri in path, required for creation if column doesn't exist)
+          database_name:
+            type: string
+            description: Database name (required if using table_name)
+          cluster_name:
+            type: string
+            description: Cluster name (required if using table_name)
+          schema_name:
+            type: string
+            description: Schema name (required if using table_name)
+          col_type:
+            type: string
+            description: Column data type (optional, only updates if provided)
+            example: 'string'
+          sort_order:
+            type: integer
+            description: Column sort order (optional, only updates if provided)
+            example: 0
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    description: 'Table not found (when using table_name lookup)'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  400:
+    description: 'Bad request (missing required parameters)'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    description: 'Internal server error'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+
