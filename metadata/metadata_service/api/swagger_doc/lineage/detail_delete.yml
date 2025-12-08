@@ -1,0 +1,65 @@
+Delete bidirectional lineage between two resources
+Delete bidirectional lineage relationships (HAS_UPSTREAM and HAS_DOWNSTREAM) between any two resources
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'lineage'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: upstream_resource_key
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'Key of the upstream resource (e.g., table_uri, column_uri, dashboard_uri)'
+    example: 'database://cluster.schema/table_name'
+  - name: downstream_resource_key
+    in: query
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'Key of the downstream resource (e.g., table_uri, column_uri, dashboard_uri)'
+    example: 'database://cluster.schema/other_table'
+requestBody:
+  required: false
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          published_tag:
+            type: string
+            description: Published tag for the lineage deletion
+            default: 'edited'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    description: 'One or both resources not found, or lineage relationship does not exist'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  400:
+    description: 'Bad request (invalid resource keys)'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    description: 'Internal server error'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+
+
+
+

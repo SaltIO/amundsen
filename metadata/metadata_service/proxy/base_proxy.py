@@ -342,6 +342,46 @@ class BaseProxy(SnowflakeBaseProxy, metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def create_lineage(
+            self,
+            *,
+            upstream_resource_key: str,
+            downstream_resource_key: str,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Create bidirectional lineage relationships between any two resources.
+
+        Creates:
+        - downstream -> HAS_UPSTREAM -> upstream
+        - upstream -> HAS_DOWNSTREAM -> downstream
+
+        :param upstream_resource_key: Key of the upstream resource (any resource type)
+        :param downstream_resource_key: Key of the downstream resource (any resource type)
+        :param published_tag: Published tag for audit trail
+        """
+        pass
+
+    @abstractmethod
+    def delete_lineage(
+            self,
+            *,
+            upstream_resource_key: str,
+            downstream_resource_key: str,
+            published_tag: str = DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete bidirectional lineage relationships between any two resources.
+
+        Deletes:
+        - downstream -> HAS_UPSTREAM -> upstream
+        - upstream -> HAS_DOWNSTREAM -> downstream
+
+        :param upstream_resource_key: Key of the upstream resource (any resource type)
+        :param downstream_resource_key: Key of the downstream resource (any resource type)
+        :param published_tag: Published tag for audit trail
+        """
+        pass
+
+    @abstractmethod
     def get_table_stats(self, *,
                         table_uri: str) -> List:
         pass

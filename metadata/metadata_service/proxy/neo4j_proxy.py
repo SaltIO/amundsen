@@ -2714,6 +2714,175 @@ class Neo4jProxy(BaseProxy):
                 LOGGER.debug('Delete column process elapsed for {} seconds'.format(time.time() - start))
 
     @timer_with_counter
+    def create_lineage(
+            self,
+            *,
+            upstream_resource_key: str,
+            downstream_resource_key: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Create bidirectional lineage relationships between any two resources.
+
+        Creates:
+        - downstream -> HAS_UPSTREAM -> upstream
+        - upstream -> HAS_DOWNSTREAM -> downstream
+
+        :param upstream_resource_key: Key of the upstream resource (any resource type)
+        :param downstream_resource_key: Key of the downstream resource (any resource type)
+        :param published_tag: Published tag for audit trail
+        """
+        current_time_milliseconds = int(time.time() * 1000)
+
+        # Generic query that works for any node type
+        # First verify both resources exist
+        verify_resources_query = textwrap.dedent("""
+        MATCH (upstream {key: $upstream_key})
+        MATCH (downstream {key: $downstream_key})
+        RETURN upstream.key as upstream_key, downstream.key as downstream_key
+        """)
+
+        # Create bidirectional lineage relationships
+        # Pattern: downstream -> HAS_UPSTREAM -> upstream
+        #          upstream -> HAS_DOWNSTREAM -> downstream
+        create_lineage_query = textwrap.dedent("""
+        MATCH (downstream {key: $downstream_key})
+        MATCH (upstream {key: $upstream_key})
+        WITH downstream, upstream
+        MERGE (downstream)-[r1:HAS_UPSTREAM]->(upstream)
+        SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+            r1.published_tag = $published_tag
+        MERGE (upstream)-[r2:HAS_DOWNSTREAM]->(downstream)
+        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms,
+            r2.published_tag = $published_tag
+        RETURN downstream.key, upstream.key
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            # First, verify that both resources exist
+            verify_result = tx.run(verify_resources_query, {
+                'upstream_key': upstream_resource_key,
+                'downstream_key': downstream_resource_key
+            })
+            result_record = verify_result.single()
+
+            if not result_record:
+                # Determine which resource(s) are missing
+                check_upstream = tx.run("MATCH (n {key: $key}) RETURN n.key LIMIT 1", {'key': upstream_resource_key})
+                check_downstream = tx.run("MATCH (n {key: $key}) RETURN n.key LIMIT 1", {'key': downstream_resource_key})
+
+                missing = []
+                if not check_upstream.single():
+                    missing.append(f"upstream resource '{upstream_resource_key}'")
+                if not check_downstream.single():
+                    missing.append(f"downstream resource '{downstream_resource_key}'")
+
+                raise NotFoundException(f"Resource(s) not found: {', '.join(missing)}")
+
+            # Create bidirectional lineage relationships
+            result = tx.run(create_lineage_query, {
+                'upstream_key': upstream_resource_key,
+                'downstream_key': downstream_resource_key,
+                'publisher_last_updated_epoch_ms': current_time_milliseconds,
+                'published_tag': published_tag
+            })
+
+            if not result.single():
+                raise NotFoundException(f'Failed to create lineage between {downstream_resource_key} and {upstream_resource_key}')
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to create lineage')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Create lineage process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
+    def delete_lineage(
+            self,
+            *,
+            upstream_resource_key: str,
+            downstream_resource_key: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete bidirectional lineage relationships between any two resources.
+
+        Deletes:
+        - downstream -> HAS_UPSTREAM -> upstream
+        - upstream -> HAS_DOWNSTREAM -> downstream
+
+        :param upstream_resource_key: Key of the upstream resource (any resource type)
+        :param downstream_resource_key: Key of the downstream resource (any resource type)
+        :param published_tag: Published tag for audit trail
+        """
+        # Delete bidirectional lineage relationships
+        delete_lineage_query = textwrap.dedent("""
+        MATCH (downstream {key: $downstream_key})-[r1:HAS_UPSTREAM]->(upstream {key: $upstream_key})
+        MATCH (upstream)-[r2:HAS_DOWNSTREAM]->(downstream)
+        DELETE r1, r2
+        RETURN downstream.key, upstream.key
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_lineage_query, {
+                'upstream_key': upstream_resource_key,
+                'downstream_key': downstream_resource_key
+            })
+
+            if not result.single():
+                # Check if relationships exist (might be in wrong direction or don't exist)
+                check_query = textwrap.dedent("""
+                OPTIONAL MATCH (downstream {key: $downstream_key})-[r1:HAS_UPSTREAM]->(upstream {key: $upstream_key})
+                OPTIONAL MATCH (upstream)-[r2:HAS_DOWNSTREAM]->(downstream)
+                RETURN count(r1) + count(r2) as relationship_count
+                """)
+                check_result = tx.run(check_query, {
+                    'upstream_key': upstream_resource_key,
+                    'downstream_key': downstream_resource_key
+                })
+                count_record = check_result.single()
+                if count_record and count_record.get('relationship_count', 0) == 0:
+                    raise NotFoundException(
+                        f'Lineage relationship not found between {downstream_resource_key} and {upstream_resource_key}'
+                    )
+                else:
+                    raise NotFoundException(
+                        f'Failed to delete lineage between {downstream_resource_key} and {upstream_resource_key}'
+                    )
+
+            tx.commit()
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception('Failed to delete lineage')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+        finally:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug('Delete lineage process elapsed for {} seconds'.format(time.time() - start))
+
+    @timer_with_counter
     def create_update_column(
             self,
             *,

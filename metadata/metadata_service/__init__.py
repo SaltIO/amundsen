@@ -24,6 +24,7 @@ from metadata_service.api.api_key import (
 from metadata_service.api.badge import BadgeAPI
 from metadata_service.api.column import (ColumnBadgeAPI, ColumnDeleteAPI, ColumnDescriptionAPI,
                                          ColumnLineageAPI, ColumnPutAPI, ColumnStatsAPI)
+from metadata_service.api.lineage import (LineagePutAPI, LineageDeleteAPI)
 from metadata_service.api.dashboard import (DashboardBadgeAPI,
                                             DashboardDescriptionAPI,
                                             DashboardDetailAPI,
@@ -211,6 +212,10 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/column/<path:column_uri>')
     api.add_resource(ColumnPutAPI,
                      '/column/<path:column_uri>')
+    api.add_resource(LineagePutAPI,
+                     '/lineage/<path:upstream_resource_key>')
+    api.add_resource(LineageDeleteAPI,
+                     '/lineage/<path:upstream_resource_key>')
     api.add_resource(TableUpdateFrequencyAPI,
                      '/table/<path:table_uri>/update_frequency')
     api.add_resource(TypeMetadataDescriptionAPI,

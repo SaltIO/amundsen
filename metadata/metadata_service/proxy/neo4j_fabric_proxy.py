@@ -452,6 +452,24 @@ class Neo4jFabricProxy(Neo4jProxy):
         LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_update_column() is not supported')
 
     @timer_with_counter
+    def create_lineage(
+            self,
+            *,
+            upstream_resource_key: str,
+            downstream_resource_key: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  create_lineage() is not supported')
+
+    @timer_with_counter
+    def delete_lineage(
+            self,
+            *,
+            upstream_resource_key: str,
+            downstream_resource_key: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        LOGGER.info('Neo4fFabricProxy is READ ONLY.  delete_lineage() is not supported')
+
+    @timer_with_counter
     def patch_table_properties(self, *,
                                table_uri: str,
                                properties: Dict[str, Any],
