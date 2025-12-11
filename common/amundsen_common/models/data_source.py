@@ -80,6 +80,20 @@ class AwsS3DataLocationSchema(AttrsSchema):
         register_as_scheme = True
 
 @attr.s(auto_attribs=True, kw_only=True)
+class SharePointDataLocation(DataLocation):
+    document_library: Optional[str] = None
+
+class SharePointDataLocationSchema(AttrsSchema):
+    type = fields.Function(
+        serialize=lambda obj: "sharepoint",
+        deserialize=lambda val: "sharepoint"
+    )
+
+    class Meta:
+        target = SharePointDataLocation
+        register_as_scheme = True
+
+@attr.s(auto_attribs=True, kw_only=True)
 class DataChannel:
     key: Optional[str] = None
     name: str
@@ -134,17 +148,6 @@ class DataProviderSchema(AttrsSchema):
         register_as_scheme = True
 
 @attr.s(auto_attribs=True, kw_only=True)
-class FileTable:
-    key: Optional[str] = None
-    name: str
-    content: str
-
-class FileTableSchema(AttrsSchema):
-    class Meta:
-        target = FileTable
-        register_as_scheme = True
-
-@attr.s(auto_attribs=True, kw_only=True)
 class File:
     name: str
     key: Optional[str] = None
@@ -153,9 +156,8 @@ class File:
     category: Optional[str] = None
     path: str
     is_directory: bool = None
-    dataLocation: Union[FilesystemDataLocation, AwsS3DataLocation, DataLocation]
+    dataLocation: Union[FilesystemDataLocation, AwsS3DataLocation, SharePointDataLocation, DataLocation]
     dataProvider: Optional[DataProvider] = None
-    fileTables: Optional[List[FileTable]] = None
     tags: Optional[List[Tag]] = None
     owners: Optional[List[User]] = None
     # badges: List[Badge] = []

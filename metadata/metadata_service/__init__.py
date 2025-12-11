@@ -57,8 +57,15 @@ from metadata_service.api.snowflake.snowflake import (SnowflakeTableShareAPI)
 from metadata_service.api.data_source import (DataProviderDetailAPI,
                                               DataProviderDescriptionAPI,
                                               DataProviderTagAPI,
+                                              DataProviderPutAPI,
+                                              DataProviderDeleteAPI,
+                                              DataLocationPutAPI,
+                                              DataLocationDeleteAPI,
+                                              DataChannelPutAPI,
+                                              DataChannelDeleteAPI,
                                               FileDetailAPI,
                                               FilePutAPI,
+                                              FileDeleteAPI,
                                               FileTagAPI,
                                               FileDescriptionAPI,
                                               FileOwnerAPI,
@@ -283,10 +290,24 @@ def create_app(*, config_module_class: str) -> Flask:
                      '/data_source/data_provider/<path:id>/description')
     api.add_resource(DataProviderTagAPI,
                      '/data_source/data_provider/<path:id>/tag/<tag>')
+    api.add_resource(DataProviderPutAPI,
+                     '/data_source/data_provider/')
+    api.add_resource(DataProviderDeleteAPI,
+                     '/data_source/data_provider/<path:data_provider_uri>')
+    api.add_resource(DataLocationPutAPI,
+                     '/data_source/data_location/')
+    api.add_resource(DataLocationDeleteAPI,
+                     '/data_source/data_location/<path:data_location_key>')
+    api.add_resource(DataChannelPutAPI,
+                     '/data_source/data_provider/<path:data_provider_uri>/channel/')
+    api.add_resource(DataChannelDeleteAPI,
+                     '/data_source/data_provider/<path:data_provider_uri>/channel/<path:data_channel_key>')
     api.add_resource(FileDetailAPI,
                      '/data_source/file/<path:file_uri>')
     api.add_resource(FilePutAPI,
                      '/data_source/file/')
+    api.add_resource(FileDeleteAPI,
+                     '/data_source/file/<path:file_uri>')
     api.add_resource(FileTagAPI,
                      '/data_source/file/<path:id>/tag/<tag>')
     api.add_resource(FileDescriptionAPI,

@@ -7,7 +7,7 @@ from typing import Any, Iterable, Mapping, Optional, Union
 import logging
 
 from amundsen_common.entity.resource_type import ResourceType
-from amundsen_common.models.data_source import DataProviderSchema, FileSchema
+from amundsen_common.models.data_source import DataProviderSchema, FileSchema, DataLocationSchema, DataChannelSchema
 from amundsen_common.models.lineage import LineageSchema
 from amundsen_common.models.key_status import KeyStatusSchema
 from flasgger import swag_from
@@ -380,4 +380,211 @@ class FileLineageAPI(Resource):
             return schema.dump(lineage), HTTPStatus.OK
         except Exception as e:
             return {'message': f'Exception raised when getting file lineage: {e}'}, HTTPStatus.NOT_FOUND
+
+
+class DataProviderPutAPI(Resource):
+    """
+    DataProviderPutAPI that supports PUT operation to create/update data provider
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DataProviderPutAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def put(self) -> Iterable[Union[Mapping, int, None]]:
+        data = None
+        try:
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            data_provider = DataProviderSchema().loads(json.dumps(data))
+
+            # TODO: Implement create_update_data_provider in proxy
+            provider_key, status = self.client.create_update_data_provider(
+                data_provider=data_provider,
+                published_tag=published_tag
+            )
+
+            result = KeyStatusSchema().dump({
+                'key': provider_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
+
+        except ValidationError as ve:
+            msg = 'Validation Error: {}'.format(ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
+
+        except NotFoundException:
+            return {'message': f'Failed to update/create data provider: {data}'}, HTTPStatus.NOT_FOUND
+
+
+class DataProviderDeleteAPI(Resource):
+    """
+    DataProviderDeleteAPI that supports DELETE operation to delete data provider
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DataProviderDeleteAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def delete(self, data_provider_uri: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            # TODO: Implement delete_data_provider in proxy (should cascade delete channels)
+            self.client.delete_data_provider(data_provider_uri=data_provider_uri)
+            return {'message': f'Data provider {data_provider_uri} deleted successfully'}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': f'Data provider {data_provider_uri} does not exist'}, HTTPStatus.NOT_FOUND
+
+
+class DataLocationPutAPI(Resource):
+    """
+    DataLocationPutAPI that supports PUT operation to create/update data location
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DataLocationPutAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def put(self) -> Iterable[Union[Mapping, int, None]]:
+        data = None
+        try:
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            data_location = DataLocationSchema().loads(json.dumps(data))
+
+            # TODO: Implement create_update_data_location in proxy
+            location_key, status = self.client.create_update_data_location(
+                data_location=data_location,
+                published_tag=published_tag
+            )
+
+            result = KeyStatusSchema().dump({
+                'key': location_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
+
+        except ValidationError as ve:
+            msg = 'Validation Error: {}'.format(ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
+
+        except NotFoundException:
+            return {'message': f'Failed to update/create data location: {data}'}, HTTPStatus.NOT_FOUND
+
+
+class DataLocationDeleteAPI(Resource):
+    """
+    DataLocationDeleteAPI that supports DELETE operation to delete data location
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DataLocationDeleteAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def delete(self, data_location_key: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            # TODO: Implement delete_data_location in proxy (should cascade delete files)
+            self.client.delete_data_location(data_location_key=data_location_key)
+            return {'message': f'Data location {data_location_key} deleted successfully'}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': f'Data location {data_location_key} does not exist'}, HTTPStatus.NOT_FOUND
+
+
+class DataChannelPutAPI(Resource):
+    """
+    DataChannelPutAPI that supports PUT operation to create/update data channel within a provider
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DataChannelPutAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def put(self, data_provider_uri: str) -> Iterable[Union[Mapping, int, None]]:
+        data = None
+        try:
+            data = request.get_json(force=True)
+            published_tag = data.pop('published_tag', BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG)
+
+            data_channel = DataChannelSchema().loads(json.dumps(data))
+
+            # TODO: Implement create_update_data_channel in proxy
+            channel_key, status = self.client.create_update_data_channel(
+                data_provider_uri=data_provider_uri,
+                data_channel=data_channel,
+                published_tag=published_tag
+            )
+
+            result = KeyStatusSchema().dump({
+                'key': channel_key,
+                'status': status
+            })
+
+            resp_code = HTTPStatus.CREATED if status == 'created' else HTTPStatus.OK
+
+            return result, resp_code
+
+        except ValidationError as ve:
+            msg = 'Validation Error: {}'.format(ve.normalized_messages())
+            return {'message': msg}, HTTPStatus.BAD_REQUEST
+
+        except NotFoundException:
+            return {'message': f'Failed to update/create data channel: {data}'}, HTTPStatus.NOT_FOUND
+
+
+class DataChannelDeleteAPI(Resource):
+    """
+    DataChannelDeleteAPI that supports DELETE operation to delete data channel from a provider
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(DataChannelDeleteAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def delete(self, data_provider_uri: str, data_channel_key: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            # TODO: Implement delete_data_channel in proxy
+            self.client.delete_data_channel(
+                data_provider_uri=data_provider_uri,
+                data_channel_key=data_channel_key
+            )
+            return {'message': f'Data channel {data_channel_key} deleted successfully from provider {data_provider_uri}'}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': f'Data channel {data_channel_key} does not exist in provider {data_provider_uri}'}, HTTPStatus.NOT_FOUND
+
+
+class FileDeleteAPI(Resource):
+    """
+    FileDeleteAPI that supports DELETE operation to delete file
+    """
+
+    def __init__(self) -> None:
+        self.client = get_proxy_client()
+        super(FileDeleteAPI, self).__init__()
+
+    @require_auth('write:metadata')
+    def delete(self, file_uri: str) -> Iterable[Union[Mapping, int, None]]:
+        try:
+            # TODO: Implement delete_file in proxy
+            self.client.delete_file(file_uri=file_uri)
+            return {'message': f'File {file_uri} deleted successfully'}, HTTPStatus.OK
+
+        except NotFoundException:
+            return {'message': f'File {file_uri} does not exist'}, HTTPStatus.NOT_FOUND
 

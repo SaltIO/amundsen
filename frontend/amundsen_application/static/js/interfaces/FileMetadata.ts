@@ -9,11 +9,6 @@ import { ProviderMetadata } from './ProviderMetadata';
 
 
 
-export interface FileTable {
-  name: string
-  content: string
-}
-
 export interface FileMetadata {
   badges: Badge[];
   key: string;
@@ -25,7 +20,6 @@ export interface FileMetadata {
   dataLocation?: FilesystemDataLocation | AwsS3DataLocation | DataLocation;
   dataProvider?: ProviderMetadata;
   tags?:  Tag[];
-  fileTables?: FileTable[]
   is_editable: boolean;
 }
 

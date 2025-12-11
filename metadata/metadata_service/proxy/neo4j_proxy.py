@@ -32,7 +32,7 @@ from amundsen_common.models.user import User as UserEntity
 from amundsen_common.models.user import UserSchema
 from amundsen_common.models.tag import Tag, TagSchema
 from amundsen_common.models.snowflake.snowflake import SnowflakeTableShare, SnowflakeListing
-from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File, FileTable)
+from amundsen_common.models.data_source import (DataProvider, DataChannel, DataLocation, AwsS3DataLocation, FilesystemDataLocation, File)
 from amundsen_common.models.database import Database, DatabaseSchema
 from amundsen_common.models.cluster import Cluster, ClusterSchema
 from amundsen_common.models.schema import Schema, SchemaSchema
@@ -866,7 +866,7 @@ class Neo4jProxy(BaseProxy):
             description=file.description,
             data_location=data_location_metadata,
             data_channel=data_channel_metadata,
-            tags=[tag.tag_name for tag in file.tags]
+            tags=[tag.tag_name for tag in (file.tags or [])]
         )
 
         file_key = file_metadata.get_key()
@@ -904,6 +904,399 @@ class Neo4jProxy(BaseProxy):
             return file_key, status
         except Exception as e:
             LOGGER.exception('Failed to create_update_file.')
+            raise e
+
+    def delete_file(
+            self,
+            *,
+            file_uri: str,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a file and all its relationships.
+
+        This method performs cascading deletion:
+        - Deletes file-level resources (descriptions, tags, owners)
+        - Deletes the file node itself
+        - Performs orphan cleanup for description nodes
+
+        :param file_uri: File URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        delete_file_query = textwrap.dedent("""
+        MATCH (f:File {key: $file_key})
+
+        // Delete the file node and all its relationships using DETACH DELETE
+        DETACH DELETE f
+        RETURN count(f) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_file_query, {'file_key': file_uri})
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                # Check if file exists
+                check_file_query = textwrap.dedent("""
+                MATCH (f:File {key: $file_key})
+                RETURN f.key
+                """)
+                check_result = tx.run(check_file_query, {'file_key': file_uri})
+                if not check_result.single():
+                    raise NotFoundException(f'File {file_uri} does not exist')
+
+            tx.commit()
+            LOGGER.info(f'Successfully deleted file {file_uri}')
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception(f'Failed to delete file {file_uri}.')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+
+    def delete_data_location(self, data_location_key: str, published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a DataLocation node and all associated files.
+
+        This method deletes the DataLocation node and all its relationships,
+        including associated File nodes (cascade delete).
+
+        :param data_location_key: DataLocation URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        delete_location_query = textwrap.dedent("""
+        MATCH (dl:Data_Location {key: $location_key})
+
+        // Delete the data location node and all its relationships using DETACH DELETE
+        DETACH DELETE dl
+        RETURN count(dl) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_location_query, {'location_key': data_location_key})
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                # Check if location exists
+                check_location_query = textwrap.dedent("""
+                MATCH (dl:Data_Location {key: $location_key})
+                RETURN dl.key
+                """)
+                check_result = tx.run(check_location_query, {'location_key': data_location_key})
+                if not check_result.single():
+                    raise NotFoundException(f'Data location {data_location_key} does not exist')
+
+            tx.commit()
+            LOGGER.info(f'Successfully deleted data location {data_location_key}')
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception(f'Failed to delete data location {data_location_key}.')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+
+    def delete_data_channel(self, data_provider_uri: str, data_channel_key: str, published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a DataChannel node from a DataProvider.
+
+        This method deletes the DataChannel node and all its relationships.
+
+        :param data_provider_uri: DataProvider URI (key in Neo4j)
+        :param data_channel_key: DataChannel URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        # First check if channel exists and is associated with the provider
+        check_channel_query = textwrap.dedent("""
+        MATCH (dp:Data_Provider {key: $provider_key})-[:DATA_CHANNEL]->(dc:Data_Channel {key: $channel_key})
+        RETURN dc.key
+        """)
+
+        delete_channel_query = textwrap.dedent("""
+        MATCH (dc:Data_Channel {key: $channel_key})
+
+        // Delete the data channel node and all its relationships using DETACH DELETE
+        DETACH DELETE dc
+        RETURN count(dc) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            # Check if channel exists and is associated with the provider
+            check_result = tx.run(check_channel_query, {
+                'provider_key': data_provider_uri,
+                'channel_key': data_channel_key
+            })
+            if not check_result.single():
+                raise NotFoundException(f'Data channel {data_channel_key} does not exist in provider {data_provider_uri}')
+
+            # Delete the channel
+            result = tx.run(delete_channel_query, {'channel_key': data_channel_key})
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                raise NotFoundException(f'Data channel {data_channel_key} does not exist')
+
+            tx.commit()
+            LOGGER.info(f'Successfully deleted data channel {data_channel_key} from provider {data_provider_uri}')
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception(f'Failed to delete data channel {data_channel_key} from provider {data_provider_uri}.')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+
+    def delete_data_provider(self, data_provider_uri: str, published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> None:
+        """
+        Delete a DataProvider node and all associated channels (cascade delete).
+
+        This method deletes the DataProvider node and all its relationships,
+        including associated DataChannel nodes (cascade delete).
+
+        :param data_provider_uri: DataProvider URI (key in Neo4j)
+        :param published_tag: Published tag for audit trail
+        """
+        delete_provider_query = textwrap.dedent("""
+        MATCH (dp:Data_Provider {key: $provider_key})
+
+        // Delete the data provider node and all its relationships using DETACH DELETE
+        DETACH DELETE dp
+        RETURN count(dp) as deleted_count
+        """)
+
+        start = time.time()
+        tx = None
+
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+
+            result = tx.run(delete_provider_query, {'provider_key': data_provider_uri})
+
+            record = result.single()
+            if not record or record['deleted_count'] == 0:
+                # Check if provider exists
+                check_provider_query = textwrap.dedent("""
+                MATCH (dp:Data_Provider {key: $provider_key})
+                RETURN dp.key
+                """)
+                check_result = tx.run(check_provider_query, {'provider_key': data_provider_uri})
+                if not check_result.single():
+                    raise NotFoundException(f'Data provider {data_provider_uri} does not exist')
+
+            tx.commit()
+            LOGGER.info(f'Successfully deleted data provider {data_provider_uri}')
+
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            LOGGER.exception(f'Failed to delete data provider {data_provider_uri}.')
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+
+    def create_update_data_provider(
+            self,
+            *,
+            data_provider: DataProvider,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, str]:
+        """
+        Create or update a DataProvider.
+
+        :param data_provider: DataProvider object
+        :param published_tag: Published tag for audit trail
+        :return: Tuple of (provider_key, status) where status is 'created' or 'updated'
+        """
+        LOGGER.info(f'data_provider={data_provider}')
+
+        data_provider_metadata = DataProviderDataBuilder(
+            name=data_provider.name,
+            website=data_provider.website,
+            desc=data_provider.description
+        )
+
+        provider_key = data_provider_metadata.get_key()
+
+        try:
+            status = self._execute_databuilder(
+                databuilder=data_provider_metadata,
+                status_label=data_provider_metadata.DATA_PROVIDER_NODE_LABEL,
+                published_tag=published_tag
+            )
+
+            return provider_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_data_provider.')
+            raise e
+
+    def create_update_data_location(
+            self,
+            *,
+            data_location: DataLocation,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, str]:
+        """
+        Create or update a DataLocation.
+
+        :param data_location: DataLocation object (can be FilesystemDataLocation, AwsS3DataLocation, or generic DataLocation)
+        :param published_tag: Published tag for audit trail
+        :return: Tuple of (location_key, status) where status is 'created' or 'updated'
+        """
+        LOGGER.info(f'data_location={data_location}')
+
+        data_location_metadata = None
+        if isinstance(data_location, AwsS3DataLocation):
+            data_location_metadata = AwsS3DataLocationDataBuilder(
+                name=data_location.name,
+                bucket=data_location.bucket
+            )
+        elif isinstance(data_location, FilesystemDataLocation):
+            data_location_metadata = FilesystemDataLocationDataBuilder(
+                name=data_location.name,
+                drive=data_location.drive
+            )
+        else:
+            # Generic DataLocation - need to pass type
+            location_type = data_location.type if data_location.type else 'filesystem'
+            data_location_metadata = DataLocationDataBuilder(
+                name=data_location.name,
+                type=location_type
+            )
+
+        location_key = data_location_metadata.get_key()
+
+        try:
+            status = self._execute_databuilder(
+                databuilder=data_location_metadata,
+                status_label=data_location_metadata.DATA_LOCATION_NODE_LABEL,
+                published_tag=published_tag
+            )
+
+            return location_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_data_location.')
+            raise e
+
+    def create_update_data_channel(
+            self,
+            *,
+            data_provider_uri: str,
+            data_channel: DataChannel,
+            published_tag: str = BaseProxy.DEFAULT_EDITED_PUBLISHED_TAG) -> Tuple[str, str]:
+        """
+        Create or update a DataChannel within a DataProvider.
+
+        :param data_provider_uri: DataProvider URI (key in Neo4j)
+        :param data_channel: DataChannel object
+        :param published_tag: Published tag for audit trail
+        :return: Tuple of (channel_key, status) where status is 'created' or 'updated'
+        """
+        LOGGER.info(f'data_channel={data_channel}, data_provider_uri={data_provider_uri}')
+
+        # First, get or create the provider
+        provider_lookup_query = textwrap.dedent("""
+        MATCH (dp:Data_Provider {key: $provider_key})
+        RETURN dp.key as key, dp.name as name
+        """)
+
+        tx = None
+        try:
+            tx = self._driver.session(database=self.get_database_name()).begin_transaction()
+            provider_result = tx.run(provider_lookup_query, {'provider_key': data_provider_uri})
+            provider_record = provider_result.single()
+
+            if not provider_record:
+                raise NotFoundException(f'Data provider {data_provider_uri} does not exist')
+
+            provider_name = provider_record.get('name', data_provider_uri.split('://')[-1] if '://' in data_provider_uri else data_provider_uri)
+
+            tx.commit()
+        except NotFoundException:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise
+        except Exception as e:
+            if tx and not tx.closed():
+                tx.rollback()
+            raise e
+
+        # Build the provider metadata for the channel
+        data_provider_metadata = DataProviderDataBuilder(
+            name=provider_name,
+            website=None,
+            desc=None
+        )
+
+        # Build channel metadata
+        # Type is required for data channels
+        if not data_channel.type:
+            raise ValueError("Data channel type is required. Must be one of: 'data_feed', 'data_share', 'api', 'sftp'")
+
+        try:
+            channel_type = DataChannelDataBuilder.DataChannelType(data_channel.type)
+        except (ValueError, AttributeError) as e:
+            raise ValueError(
+                f"Invalid data channel type '{data_channel.type}'. "
+                f"Must be one of: 'data_feed', 'data_share', 'api', 'sftp'"
+            ) from e
+
+        # Handle license - it can be DataLicenseType enum, string, or None
+        license_str = None
+        if data_channel.license:
+            if hasattr(data_channel.license, 'value') and hasattr(data_channel.license.value, 'name'):
+                # It's a DataLicenseType enum
+                license_str = data_channel.license.value.name
+            elif isinstance(data_channel.license, str):
+                license_str = data_channel.license
+            else:
+                # Try to get name attribute
+                license_str = getattr(data_channel.license, 'name', str(data_channel.license))
+
+        data_channel_metadata = DataChannelDataBuilder(
+            name=data_channel.name,
+            type=channel_type,
+            url=data_channel.url or '',
+            desc=data_channel.description or '',
+            license=license_str or '',
+            data_provider=data_provider_metadata
+        )
+
+        channel_key = data_channel_metadata.get_key()
+
+        try:
+            status = self._execute_databuilder(
+                databuilder=data_channel_metadata,
+                status_label=data_channel_metadata.DATA_CHANNEL_NODE_LABEL,
+                published_tag=published_tag
+            )
+
+            return channel_key, status
+        except Exception as e:
+            LOGGER.exception('Failed to create_update_data_channel.')
             raise e
 
     def _execute_databuilder(
@@ -995,7 +1388,7 @@ class Neo4jProxy(BaseProxy):
             raise e
 
 
-    CORE_NODE_LABELS = ['Application', 'Badge', 'Chart', 'Cluster', 'Column', 'Dashboard', 'Dashboardgroup', 'Database', 'Data_Channel', 'Data_Provider', 'Data_Location', 'Description', 'Execution', 'File', 'File_Table', 'Programmatic_Description', 'Query', 'Schema', 'Score', 'Snowflakelisting', 'Snowflakeshare', 'Source', 'Stat', 'Table', 'Tag', 'Timestamp', 'Update_Frequency', 'User', 'Watermark']
+    CORE_NODE_LABELS = ['Application', 'Badge', 'Chart', 'Cluster', 'Column', 'Dashboard', 'Dashboardgroup', 'Database', 'Data_Channel', 'Data_Provider', 'Data_Location', 'Description', 'Execution', 'File', 'Programmatic_Description', 'Query', 'Schema', 'Score', 'Snowflakelisting', 'Snowflakeshare', 'Source', 'Stat', 'Table', 'Tag', 'Timestamp', 'Update_Frequency', 'User', 'Watermark']
     CUSTOM_METADATA_NODE_KEY_FORMAT = "custom://{label}/{name}"
 
     def _convert_to_label(name: str) -> str:
@@ -5443,7 +5836,6 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (file)-[:DESCRIPTION]->(file_desc:Description)
             OPTIONAL MATCH (file)-[:TAGGED_BY]->(tag:Tag {tag_type: 'default'})
             OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
-            OPTIONAL MATCH (file)-[:FILE_TABLE]->(file_table:File_Table)
             WITH file, file_desc, data_provider, data_channel, data_location,
                 collect(distinct tag) as tags,
                 collect(distinct owner) as owners,
@@ -5497,15 +5889,6 @@ class Neo4jProxy(BaseProxy):
                           tag_type=tag_record['tag_type'])
                 tags.append(tag)
 
-        file_tables_rec = record.get("file_tables", None)
-        file_tables: List[FileTable] = None
-        if file_tables_rec and len(file_tables_rec) > 0:
-            file_tables: List[FileTable] = []
-            for file_table_rec in file_tables_rec:
-                file_table = FileTable(name=file_table_rec["name"],
-                                       content=file_table_rec["content"])
-                file_tables.append(file_table)
-
         owners = self._create_owners(record['owners'])
 
         file_rec = record["file"]
@@ -5520,8 +5903,7 @@ class Neo4jProxy(BaseProxy):
             dataLocation=data_location,
             dataProvider=data_provider,
             tags=tags,
-            owners=owners,
-            fileTables=file_tables
+            owners=owners
         )
 
         return file

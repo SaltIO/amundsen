@@ -13,7 +13,7 @@ parameters:
     schema:
       type: string
     required: true
-    description: 'Column URI (format: table_uri/column_name)'
+    description: 'Column URI (format table_uri/column_name)'
     example: 'database://cluster.schema/table_name/column_name'
 requestBody:
   required: false
