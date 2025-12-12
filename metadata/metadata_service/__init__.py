@@ -130,6 +130,10 @@ def create_app(*, config_module_class: str) -> Flask:
         os.getenv('METADATA_SVC_CONFIG_MODULE_CLASS') or config_module_class
     app.config.from_object(config_module_class)
 
+    # Allow routes to accept both with and without trailing slashes
+    if app.config.get('STRICT_SLASHES') is False:
+        app.url_map.strict_slashes = False
+
     if app.config.get('LOG_CONFIG_FILE'):
         logging.config.fileConfig(app.config.get('LOG_CONFIG_FILE'), disable_existing_loggers=False)
     else:

@@ -90,7 +90,7 @@ class Config:
     METADATA_API_URL_PREFIX = os.getenv('METADATA_API_URL_PREFIX', '/metadata-api')
 
     # Allows /user and /user/ to be the same
-    # STRICT_SLASHES = False
+    STRICT_SLASHES = False
 
     # Swagger
     SWAGGER_ENABLED = os.environ.get('SWAGGER_ENABLED', True)
