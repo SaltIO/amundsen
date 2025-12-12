@@ -215,24 +215,44 @@ class EditableText extends React.Component<
   };
 
   isJsonString = (str: string | null | undefined) => {
-    let isJson = false;
     if (!str || str === null || str === undefined || typeof str !== 'string') {
       return false;
     }
-    try {
-      const decoded = he.decode(str);
-      if (!decoded) {
-        return false;
-      }
-      const parsed = JSON.parse(decoded);
-      isJson = typeof parsed === 'object' && parsed !== null;
-    } catch (e) {
-      console.log(e)
-      isJson = false;
+
+    // Early return for empty strings
+    if (str.trim().length === 0) {
+      return false;
     }
 
-    console.log(`isJson=${isJson}`)
-    return isJson
+    try {
+      const decoded = he.decode(str);
+      if (!decoded || decoded.trim().length === 0) {
+        return false;
+      }
+
+      // Only attempt to parse if the string looks like JSON (starts with { or [)
+      const trimmed = decoded.trim();
+      const firstChar = trimmed.charAt(0);
+
+      // Must start with { or [ to be considered JSON
+      if (firstChar !== '{' && firstChar !== '[') {
+        return false;
+      }
+
+      // Must also end with } or ] to be valid JSON structure
+      const lastChar = trimmed.charAt(trimmed.length - 1);
+      if ((firstChar === '{' && lastChar !== '}') &&
+          (firstChar === '[' && lastChar !== ']')) {
+        return false;
+      }
+
+      // Only now attempt to parse
+      const parsed = JSON.parse(trimmed);
+      return typeof parsed === 'object' && parsed !== null;
+    } catch (e) {
+      // If parsing fails, it's not valid JSON
+      return false;
+    }
   };
 
   render() {
