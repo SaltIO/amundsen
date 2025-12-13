@@ -70,23 +70,29 @@ export class ColumnType extends React.Component<
   renderParsedChildren = (children: ParsedType[], level: number) => {
     const textIndent = level * TEXT_INDENT;
 
-    return children.map((item) => {
-      if (typeof item === 'string') {
-        return this.createLineItem(item, textIndent);
-      }
+    return children
+      .filter((item) => item !== null && item !== undefined)
+      .map((item) => {
+        if (typeof item === 'string') {
+          return this.createLineItem(item, textIndent);
+        }
 
-      return this.renderNestedType(item, level);
-    });
+        return this.renderNestedType(item, level);
+      });
   };
 
   renderNestedType = (nestedType: NestedType, level: number = 0) => {
+    if (!nestedType || nestedType === null) {
+      return null;
+    }
+
     const { head, tail, children } = nestedType;
     const textIndent = level * TEXT_INDENT;
 
     return (
       <div key={`nesteditem:${head}${tail}`}>
         {this.createLineItem(head, textIndent)}
-        {this.renderParsedChildren(children, level + 1)}
+        {this.renderParsedChildren(children || [], level + 1)}
         {this.createLineItem(tail, textIndent)}
       </div>
     );

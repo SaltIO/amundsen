@@ -92,13 +92,15 @@ const getSortingFunction = (
 };
 
 const hasTypeMetadataWithBadge = (typeMetadata: TypeMetadata[]) =>
-  typeMetadata.some((tm) => {
-    if (tm.badges?.length) {
-      return true;
-    }
+  typeMetadata
+    .filter((tm) => tm !== null && tm !== undefined)
+    .some((tm) => {
+      if (tm.badges?.length) {
+        return true;
+      }
 
-    return hasTypeMetadataWithBadge(tm.children || []);
-  });
+      return hasTypeMetadataWithBadge(tm.children || []);
+    });
 
 const hasColumnWithBadge = (columns: TableColumn[]) =>
   columns.some((col) => {
