@@ -135,11 +135,23 @@ const aggregateResourceNotices = (
     ResourceType.table,
     `${data.cluster}.${data.database}.${data.schema}.${data.name}`
   );
-  const dynamicNotices: NoticeType[] = notices.map((notice) => ({
-    severity: SEVERITY_TO_NOTICE_SEVERITY[notice.severity],
-    messageHtml: notice.message,
-    payload: notice.payload,
-  }));
+
+  if (!notices || !Array.isArray(notices)) {
+    return staticNotice ? [staticNotice] : [];
+  }
+
+  // Filter out invalid notices first, then map
+  const validNotices = notices.filter((notice) => {
+    return notice !== null && notice !== undefined;
+  });
+
+  const dynamicNotices: NoticeType[] = validNotices.map((notice) => {
+    return {
+      severity: SEVERITY_TO_NOTICE_SEVERITY[notice.severity],
+      messageHtml: notice.message,
+      payload: notice.payload,
+    };
+  });
 
   return staticNotice ? [...dynamicNotices, staticNotice] : dynamicNotices;
 };
@@ -355,16 +367,28 @@ export class TableDetail extends React.Component<
       return null;
     }
 
-    return descriptions.map((d) => (
-      <EditableSection key={`prog_desc:${d.source}`} title={d.source} readOnly>
-        <EditableText
-          maxLength={999999}
-          value={d.text}
-          editable={false}
-          allowDangerousHtml
-        />
-      </EditableSection>
-    ));
+    if (!Array.isArray(descriptions)) {
+      return null;
+    }
+
+    return descriptions
+      .map((d) => {
+        if (!d || d === null || d === undefined) {
+          return null;
+        }
+
+        return (
+          <EditableSection key={`prog_desc:${d.source}`} title={d.source} readOnly>
+            <EditableText
+              maxLength={999999}
+              value={d.text}
+              editable={false}
+              allowDangerousHtml
+            />
+          </EditableSection>
+        );
+      })
+      .filter((item) => item !== null && item !== undefined);
   };
 
   toggleExpandingColumns = () => {
@@ -445,9 +469,13 @@ export class TableDetail extends React.Component<
     }
 
     if (newColumnDetails && shouldPanelOpen) {
+      // Defensive check: ensure type exists and has type property
+      const typeValue = newColumnDetails && typeof newColumnDetails === 'object' && 'type' in newColumnDetails ? (newColumnDetails as any).type : null;
+      const typeTypeValue = typeValue && typeof typeValue === 'object' && typeValue !== null && 'type' in typeValue ? (typeValue as any).type : '';
+
       logAction({
         command: 'click',
-        label: `${newColumnDetails.key} ${newColumnDetails.type.type}`,
+        label: `${newColumnDetails.key} ${typeTypeValue}`,
         target_id: `column::${newColumnDetails.key}`,
         target_type: 'column stats',
       });
