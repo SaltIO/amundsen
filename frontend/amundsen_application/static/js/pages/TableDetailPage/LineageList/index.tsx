@@ -92,6 +92,10 @@ export const LineageList: React.FC<LineageListProps> = ({
     <>
       <div className="list-group">
         {items.map((item, index) => {
+          // Skip null/undefined items
+          if (!item || !item.type) {
+            return null;
+          }
 
           if (item.type == 'Table') {
             const logging = {
@@ -143,6 +147,29 @@ export const LineageList: React.FC<LineageListProps> = ({
                 fileHighlights={getHighlightedFileMetadata(fileResource)}
                 disabled={false}
               />
+            );
+          }
+          else {
+            // Handle generic/unknown types - display minimally
+            const genericDetail = item.lineage_item_detail as any || {};
+            const genericName = genericDetail?.name || item.key || 'Unknown';
+
+            return (
+              <div
+                key={`lineage-item::${index}`}
+                className="list-group-item"
+                style={{ padding: '10px', opacity: 0.7 }}
+              >
+                <div>
+                  <strong>{item.type || 'Unknown'}</strong>
+                  {genericName && <span style={{ marginLeft: '10px' }}>{genericName}</span>}
+                </div>
+                {item.key && (
+                  <div style={{ fontSize: '0.85em', color: '#666', marginTop: '5px' }}>
+                    Key: {item.key}
+                  </div>
+                )}
+              </div>
             );
           }
         })}

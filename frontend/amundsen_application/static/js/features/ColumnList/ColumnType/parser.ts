@@ -174,100 +174,28 @@ export function parseNestedType(
   columnType: string,
   databaseId: string = DatabaseId.Default
 ): NestedType | null {
-  // EXTREME LOGGING: Log when parseNestedType is called
-  // eslint-disable-next-line no-console
-  console.log('🔴🔴🔴 parseNestedType called - EXTREME LOGGING', {
-    timestamp: new Date().toISOString(),
-    columnType,
-    columnTypeType: typeof columnType,
-    columnTypeIsNull: columnType === null,
-    columnTypeIsUndefined: columnType === undefined,
-    databaseId,
-    callStack: new Error().stack,
-  });
-
   // Presto includes un-needed "" characters
   if (databaseId === DatabaseId.Presto) {
     columnType = columnType.replace(/"/g, '');
   }
 
-  // eslint-disable-next-line no-console
-  console.log('🔴🔴🔴 parseNestedType: Checking if nested type', {
-    columnType,
-    databaseId,
-    willCheckIsNestedType: true,
-  });
-
   const isNested = isNestedType(columnType, databaseId);
 
-  // eslint-disable-next-line no-console
-  console.log('🔴🔴🔴 parseNestedType: isNestedType result', {
-    isNested,
-    columnType,
-    databaseId,
-  });
-
   if (isNested) {
-    // eslint-disable-next-line no-console
-    console.log('🔴🔴🔴 parseNestedType: Calling parseNestedTypeHelper', {
-      columnType,
-    });
-
     const helperResult = parseNestedTypeHelper(columnType);
 
-    // eslint-disable-next-line no-console
-    console.log('🔴🔴🔴 parseNestedType: parseNestedTypeHelper returned', {
-      helperResult,
-      helperResultStringified: JSON.stringify(helperResult),
-      results: helperResult.results,
-      resultsLength: helperResult.results?.length,
-      resultsType: typeof helperResult.results,
-      resultsIsArray: Array.isArray(helperResult.results),
-      firstResult: helperResult.results?.[0],
-      firstResultType: typeof helperResult.results?.[0],
-      firstResultIsNull: helperResult.results?.[0] === null,
-      firstResultIsUndefined: helperResult.results?.[0] === undefined,
-      firstResultStringified: helperResult.results?.[0] ? JSON.stringify(helperResult.results[0]) : 'null/undefined',
-    });
-
     if (!helperResult.results || !Array.isArray(helperResult.results) || helperResult.results.length === 0) {
-      // eslint-disable-next-line no-console
-      console.error('🔴🔴🔴 parseNestedType: Invalid results from helper', {
-        helperResult,
-        results: helperResult.results,
-        callStack: new Error().stack,
-      });
       return null;
     }
 
     const firstResult = helperResult.results[0];
 
     if (!firstResult || firstResult === null || firstResult === undefined) {
-      // eslint-disable-next-line no-console
-      console.error('🔴🔴🔴 parseNestedType: First result is null/undefined', {
-        helperResult,
-        firstResult,
-        callStack: new Error().stack,
-      });
       return null;
     }
 
-    // eslint-disable-next-line no-console
-    console.log('🔴🔴🔴 parseNestedType: Returning first result', {
-      firstResult,
-      firstResultType: typeof firstResult,
-      firstResultStringified: JSON.stringify(firstResult),
-      firstResultKeys: typeof firstResult === 'object' && firstResult !== null ? Object.keys(firstResult) : 'not an object',
-    });
-
     return firstResult as NestedType;
   }
-
-  // eslint-disable-next-line no-console
-  console.log('🔴🔴🔴 parseNestedType: Not a nested type, returning null', {
-    columnType,
-    databaseId,
-  });
 
   return null;
 }

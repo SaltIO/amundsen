@@ -83,7 +83,10 @@ function getSearchLinkText(d: LineageItem) {
         return `${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}.${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}`;
     }
     else {
-        return '#'
+        // Handle generic/unknown types
+        const genericDetail = d.lineage_item_detail as any || {};
+        const genericType = genericDetail?.type || d.type || 'Unknown';
+        return genericType;
     }
 }
 
@@ -347,7 +350,10 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
                     return (d.lineage_item_detail as FileLineageItemDetail).name;
                 }
                 else {
-                    return '#';
+                    // Handle generic/unknown types - display type and name
+                    const genericDetail = d.lineage_item_detail as any || {};
+                    const genericName = genericDetail?.name || d.key || 'Unknown';
+                    return `${d.type || 'Unknown'}: ${genericName}`;
                 }
             })
             .each(function() {
@@ -369,7 +375,11 @@ const chart: LineageChart = function(selection: Selection<HTMLElement, LineageCh
                 return `${(d.lineage_item_detail as FileLineageItemDetail).data_location_type}.${(d.lineage_item_detail as FileLineageItemDetail).data_location_name}.${(d.lineage_item_detail as FileLineageItemDetail).name}`;
             }
             else {
-                return '';
+                // Handle generic/unknown types - display type, name, and key
+                const genericDetail = d.lineage_item_detail as any || {};
+                const genericName = genericDetail?.name || d.key || 'Unknown';
+                const genericType = genericDetail?.type || d.type || 'Unknown';
+                return `${genericType}: ${genericName}${d.key ? ` (${d.key})` : ''}`;
             }
         });
 

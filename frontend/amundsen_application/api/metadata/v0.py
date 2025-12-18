@@ -1049,8 +1049,8 @@ def get_table_lineage() -> Response:
         json = response.json()
         LOGGER.info(f'get_table_lineage={json}')
 
-        downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
-        upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
+        downstream = [item for item in [marshall_lineage_item(item) for item in json.get('downstream_entities', [])] if item is not None]
+        upstream = [item for item in [marshall_lineage_item(item) for item in json.get('upstream_entities', [])] if item is not None]
 
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
@@ -1081,8 +1081,8 @@ def get_column_lineage() -> Response:
         url = f'{table_endpoint}/{table_key}/column/{column_name}/lineage'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
-        upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
+        downstream = [item for item in [marshall_lineage_item(item) for item in json.get('downstream_entities', [])] if item is not None]
+        upstream = [item for item in [marshall_lineage_item(item) for item in json.get('upstream_entities', [])] if item is not None]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 
@@ -1118,10 +1118,10 @@ def get_file_lineage() -> Response:
         upstream_count = 0
         if json is not None:
             if 'downstream_entities' in json:
-                downstream = [marshall_lineage_item(item) for item in json.get('downstream_entities')]
+                downstream = [item for item in [marshall_lineage_item(item) for item in json.get('downstream_entities', [])] if item is not None]
                 downstream_count = json.get('downstream_count')
             if 'upstream_entities' in json:
-                upstream = [marshall_lineage_item(item) for item in json.get('upstream_entities')]
+                upstream = [item for item in [marshall_lineage_item(item) for item in json.get('upstream_entities', [])] if item is not None]
                 upstream_count = json.get('upstream_count')
 
         payload = {
@@ -1224,8 +1224,8 @@ def get_feature_lineage() -> Response:
         url = f'{endpoint}/{feature_key}/lineage?depth={depth}&direction={direction}'
         response = request_metadata(url=url, method=request.method)
         json = response.json()
-        downstream = [marshall_lineage_item(table) for table in json.get('downstream_entities')]
-        upstream = [marshall_lineage_item(table) for table in json.get('upstream_entities')]
+        downstream = [item for item in [marshall_lineage_item(table) for table in json.get('downstream_entities', [])] if item is not None]
+        upstream = [item for item in [marshall_lineage_item(table) for table in json.get('upstream_entities', [])] if item is not None]
         downstream_count = json.get('downstream_count')
         upstream_count = json.get('upstream_count')
 

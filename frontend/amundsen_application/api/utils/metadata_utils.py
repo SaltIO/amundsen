@@ -241,7 +241,7 @@ def marshall_dashboard_full(dashboard_dict: Dict) -> Dict:
     dashboard_dict['tables'] = [marshall_table_partial(table) for table in dashboard_dict['tables']]
     return dashboard_dict
 
-def marshall_lineage_item(entity: Dict) -> Dict:
+def marshall_lineage_item(entity: Dict) -> Optional[Dict]:
     type = entity.get('type')
     if type == "Table":
         return marshall_lineage_table(entity)
@@ -249,6 +249,9 @@ def marshall_lineage_item(entity: Dict) -> Dict:
         return marshall_lineage_column(entity)
     elif type == "File":
         return marshall_lineage_file(entity)
+    else:
+        # Handle generic/unknown types
+        return marshall_lineage_generic(entity)
 
 def marshall_lineage_table(table_dict: Dict) -> Dict:
     """
@@ -295,6 +298,32 @@ def marshall_lineage_file(file_dict: Dict) -> Dict:
     file_dict['lineage_item_detail']['data_location_name'] = file_uri.data_location_name
 
     return file_dict
+
+def marshall_lineage_generic(item_dict: Dict) -> Dict:
+    """
+    Marshal generic/unknown lineage item types.
+    These types don't have first-class URI support, so we minimally marshal
+    them with just the key and type for display in lineage.
+    :param item_dict: Dictionary containing lineage item data
+    :return: Dictionary with minimally marshalled lineage item
+    """
+    logger = logging.getLogger(__name__)
+    item_type = item_dict.get('type', 'Unknown')
+    item_key = item_dict.get('key', '')
+
+    # Log unknown types for debugging
+    if item_type not in ["Table", "Column", "File"]:
+        logger.warning(f"Unknown lineage item type: {item_type}, key: {item_key}")
+
+    # Create minimal lineage_item_detail for generic types
+    # Since they don't have URIs, we just use the key and type
+    item_dict['lineage_item_detail'] = {
+        'type': item_type,
+        'key': item_key,
+        'name': item_dict.get('name', item_key.split('/')[-1] if item_key else 'Unknown')
+    }
+
+    return item_dict
 
 
 def _convert_prog_descriptions(prog_descriptions: List = None) -> Dict:
