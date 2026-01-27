@@ -37,7 +37,7 @@ class RevealChatAPI(Resource):
         self.ai_chat_client: AIChatClient = OpenAIChatClient()
 
     @require_auth()
-    # @swag_from('swagger_doc/reveal/chat_post.yml')
+    @swag_from('swagger_doc/reveal/chat_post.yml')
     def post(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             request = self.get_chat_request()
@@ -74,7 +74,7 @@ class RevealSearchAPI(Resource):
         self.ai_embedding_client: AIEmbeddingClient = STEmbeddingClient()
 
     @require_auth()
-    # @swag_from('swagger_doc/reveal/chat_post.yml')
+    @swag_from('swagger_doc/reveal/search_post.yml')
     def post(self, resource:str) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             if resource == 'column':

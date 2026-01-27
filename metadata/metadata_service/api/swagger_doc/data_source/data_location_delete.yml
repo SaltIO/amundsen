@@ -1,0 +1,34 @@
+Delete a Data Location
+Deletes a data location and cascades delete to its files
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'data_source'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: data_location_key
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'Key of the data location to delete'
+    example: 'filesystem://networkfilesystem'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'Data location deleted successfully'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/MessageResponse'
+  404:
+    description: 'Data location not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

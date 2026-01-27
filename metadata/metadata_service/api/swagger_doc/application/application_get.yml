@@ -1,0 +1,37 @@
+Get Application details
+Retrieves details for a specific application
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'application'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: application_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'URI of the application'
+    example: 'application://gold/myapp'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    description: 'Application details'
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            application:
+              $ref: '#/components/schemas/ApplicationFields'
+  404:
+    description: 'Application not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

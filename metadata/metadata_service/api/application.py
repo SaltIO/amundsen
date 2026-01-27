@@ -36,7 +36,7 @@ class ApplicationAPI(Resource):
         super(ApplicationAPI, self).__init__()
 
     @require_auth()
-    # @swag_from('swagger_doc/application/application_get.yml')
+    @swag_from('swagger_doc/application/application_get.yml')
     def get(self, application_uri: str) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             application = self.client.get_application(application_uri=application_uri)
@@ -51,7 +51,7 @@ class ApplicationAPI(Resource):
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/application/application_put.yml')
+    @swag_from('swagger_doc/application/application_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             data = request.get_json(force=True)  # Force parsing regardless of Content-Type

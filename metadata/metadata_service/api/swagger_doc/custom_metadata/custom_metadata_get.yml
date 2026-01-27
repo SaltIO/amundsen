@@ -1,0 +1,46 @@
+Get Custom Metadata
+Retrieves custom metadata for a specific resource
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'custom_metadata'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: label
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'Label/type of the custom metadata'
+    example: 'TableMetadata'
+  - name: custom_metadata_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: false
+    description: 'URI of the specific custom metadata node'
+    example: 'custom://table.property'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    description: 'Custom metadata'
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            custom_metadata:
+              type: object
+              additionalProperties: true
+  404:
+    description: 'Resource not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

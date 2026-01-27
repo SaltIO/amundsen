@@ -1,0 +1,50 @@
+Create or update a Data Channel
+Creates a new data channel within a data provider or updates an existing one
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'data_source'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: data_provider_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'URI of the parent data provider'
+    example: 'data_provider://CMDRVL'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        allOf:
+          - $ref: '#/components/schemas/DataChannelFields'
+          - $ref: '#/components/schemas/Publisher'
+responses:
+  400:
+    $ref: '#/components/responses/ValidationErrorResponse'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'Data channel updated'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/KeyStatus'
+  201:
+    description: 'Data channel created'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/KeyStatus'
+  404:
+    description: 'Data provider not found or failed to create/update data channel'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

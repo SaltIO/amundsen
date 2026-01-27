@@ -1,0 +1,56 @@
+Create or update Custom Metadata
+Creates or updates custom metadata for a specific resource
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'custom_metadata'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          custom_metadata:
+            type: object
+            description: 'Custom metadata object with resource key and metadata fields'
+            properties:
+              key:
+                type: string
+                description: 'Key of the resource to attach custom metadata to'
+                example: 'database://cluster.schema/table_name'
+              metadata:
+                type: object
+                additionalProperties: true
+                description: 'Key-value pairs of custom metadata'
+          published_tag:
+            type: string
+            description: 'A meaningful tag to describe the publishing mechanism'
+            example: 'api'
+        required:
+          - custom_metadata
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'Custom metadata created/updated successfully'
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              name:
+                type: string
+              value:
+                type: string
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

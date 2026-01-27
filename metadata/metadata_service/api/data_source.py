@@ -37,7 +37,7 @@ class DataProviderDetailAPI(Resource):
         self.client = get_proxy_client()
 
     @require_auth()
-    # @swag_from('swagger_doc/data_source/data_provider_get.yml')
+    @swag_from('swagger_doc/data_source/data_provider_get.yml')
     def get(self, data_provider_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             data_provider = self.client.get_data_provider(data_provider_uri=data_provider_uri)
@@ -57,7 +57,7 @@ class DataProviderDescriptionAPI(BaseAPI):
         super().__init__(DescriptionSchema, 'data_provider_description', self.client)
 
     @require_auth()
-    # @swag_from('swagger_doc/common/description_get.yml')
+    @swag_from('swagger_doc/data_source/data_provider_description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
         Returns description
@@ -72,7 +72,7 @@ class DataProviderDescriptionAPI(BaseAPI):
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/common/description_put.yml')
+    @swag_from('swagger_doc/data_source/data_provider_description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
         Updates Data Provider description (passed as a request body)
@@ -110,7 +110,7 @@ class DataProviderTagAPI(Resource):
         self._tag_common = TagCommon(client=self.client)
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/data_source/data_provider_tag_put.yml')
+    @swag_from('swagger_doc/data_source/data_provider_tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to add a tag to existing Data Provider.
@@ -134,7 +134,7 @@ class DataProviderTagAPI(Resource):
         )
 
     @require_auth()
-    # @swag_from('swagger_doc/data_source/data_provider_tag_delete.yml')
+    @swag_from('swagger_doc/data_source/data_provider_tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to remove a association between a given tag and a Data Provider.
@@ -225,7 +225,7 @@ class FileTagAPI(Resource):
         self._tag_common = TagCommon(client=self.client)
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/tag/tag_put.yml')
+    @swag_from('swagger_doc/data_source/file_tag_put.yml')
     def put(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to add a tag to existing File.
@@ -249,7 +249,7 @@ class FileTagAPI(Resource):
         )
 
     @require_auth()
-    # @swag_from('swagger_doc/tag/tag_delete.yml')
+    @swag_from('swagger_doc/data_source/file_tag_delete.yml')
     def delete(self, id: str, tag: str) -> Iterable[Union[Mapping, int, None]]:
         """
         API to remove a association between a given tag and a File.
@@ -276,7 +276,7 @@ class FileDescriptionAPI(BaseAPI):
         super().__init__(DescriptionSchema, 'file_description', self.client)
 
     @require_auth()
-    # @swag_from('swagger_doc/common/description_get.yml')
+    @swag_from('swagger_doc/data_source/file_description_get.yml')
     def get(self, *, id: Optional[str] = None) -> Iterable[Union[Mapping, int, None]]:
         """
         Returns description
@@ -291,10 +291,10 @@ class FileDescriptionAPI(BaseAPI):
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/common/description_put.yml')
+    @swag_from('swagger_doc/data_source/file_description_put.yml')
     def put(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         """
-        Updates Dashboard description (passed as a request body)
+        Updates File description (passed as a request body)
         :param id:
         :return:
         """
@@ -323,7 +323,7 @@ class FileOwnerAPI(Resource):
         self.client = get_proxy_client()
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/file/owner_put.yml')
+    @swag_from('swagger_doc/data_source/file_owner_put.yml')
     def put(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             data = request.get_json(force=True, silent=True) or {}
@@ -345,7 +345,7 @@ class FileOwnerAPI(Resource):
                                                                   file_uri)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @require_auth()
-    # @swag_from('swagger_doc/file/owner_delete.yml')
+    @swag_from('swagger_doc/data_source/file_owner_delete.yml')
     def delete(self, file_uri: str, owner: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             self.client.delete_resource_owner(uri=file_uri, resource_type=ResourceType.File, owner=owner)
@@ -366,7 +366,7 @@ class FileLineageAPI(Resource):
         super(FileLineageAPI, self).__init__()
 
     @require_auth()
-    # @swag_from('swagger_doc/table/lineage_get.yml')
+    @swag_from('swagger_doc/data_source/file_lineage_get.yml')
     def get(self, id: str) -> Iterable[Union[Mapping, int, None]]:
         args = self.parser.parse_args()
         direction = args.get('direction')
@@ -392,6 +392,7 @@ class DataProviderPutAPI(Resource):
         super(DataProviderPutAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/data_provider_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         data = None
         try:
@@ -433,6 +434,7 @@ class DataProviderDeleteAPI(Resource):
         super(DataProviderDeleteAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/data_provider_delete.yml')
     def delete(self, data_provider_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             # TODO: Implement delete_data_provider in proxy (should cascade delete channels)
@@ -453,6 +455,7 @@ class DataLocationPutAPI(Resource):
         super(DataLocationPutAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/data_location_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, None]]:
         data = None
         try:
@@ -494,6 +497,7 @@ class DataLocationDeleteAPI(Resource):
         super(DataLocationDeleteAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/data_location_delete.yml')
     def delete(self, data_location_key: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             # TODO: Implement delete_data_location in proxy (should cascade delete files)
@@ -514,6 +518,7 @@ class DataChannelPutAPI(Resource):
         super(DataChannelPutAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/data_channel_put.yml')
     def put(self, data_provider_uri: str) -> Iterable[Union[Mapping, int, None]]:
         data = None
         try:
@@ -556,6 +561,7 @@ class DataChannelDeleteAPI(Resource):
         super(DataChannelDeleteAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/data_channel_delete.yml')
     def delete(self, data_provider_uri: str, data_channel_key: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             # TODO: Implement delete_data_channel in proxy
@@ -579,6 +585,7 @@ class FileDeleteAPI(Resource):
         super(FileDeleteAPI, self).__init__()
 
     @require_auth('write:metadata')
+    @swag_from('swagger_doc/data_source/file_delete.yml')
     def delete(self, file_uri: str) -> Iterable[Union[Mapping, int, None]]:
         try:
             # TODO: Implement delete_file in proxy

@@ -1,0 +1,32 @@
+Get Data Provider details
+Retrieves details for a specific data provider including its data channels
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'data_source'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: data_provider_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'URI of the data provider'
+    example: 'data_provider://CMDRVL'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    description: 'Data provider details'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/DataProviderFields'
+  404:
+    description: 'Data provider not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'

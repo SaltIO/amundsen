@@ -34,7 +34,7 @@ class CustomMetadataAPI(Resource):
         super(CustomMetadataAPI, self).__init__()
 
     @require_auth()
-    # @swag_from('swagger_doc/custom_metadata/custom_metadata_get.yml')
+    @swag_from('swagger_doc/custom_metadata/custom_metadata_get.yml')
     def get(self, label: str, custom_metadata_uri: Optional[str] = None) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             custom_metadata = self.client.get_custom_metadata(
@@ -53,7 +53,7 @@ class CustomMetadataAPI(Resource):
             return {'message': 'Internal server error!'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
     @require_auth('write:metadata')
-    # @swag_from('swagger_doc/reveal/chat_post.yml')
+    @swag_from('swagger_doc/custom_metadata/custom_metadata_put.yml')
     def put(self) -> Iterable[Union[Mapping, int, tuple, None]]:
         try:
             data = request.get_json(force=True)  # Force parsing regardless of Content-Type

@@ -1,4 +1,5 @@
-Chat interface to an LLM
+Chat with AI
+Sends a chat request to the AI and returns a response
 ---
 security:
   - BearerAuth: []
@@ -6,30 +7,56 @@ tags:
   - 'reveal'
 parameters:
   - $ref: '#/components/parameters/AuthorizationHeaderParameter'
-  - $ref: '#/components/parameters/TableUriParameter'
-  - name: column_name
-    in: path
-    type: string
-    schema:
-      type: string
-    required: true
-    example: 'currency'
 requestBody:
-  $ref: '#/components/requestBodies/StatsPutRequest'
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          messages:
+            type: array
+            description: 'Array of chat messages'
+            items:
+              type: object
+              properties:
+                role:
+                  type: string
+                  description: 'Role of the message sender (system, user, assistant)'
+                  example: 'user'
+                content:
+                  type: string
+                  description: 'Content of the message'
+                  example: 'What tables have customer data?'
+          function:
+            type: object
+            description: 'Optional function call configuration for structured output'
+        required:
+          - messages
 responses:
-  400:
-    $ref: '#/components/responses/ValidationErrorResponse'
   401:
     $ref: '#/components/responses/AuthTokenInvalidResponse'
   200:
-    description: 'The chat was processed successfully'
+    description: 'Chat response from AI'
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/MessageResponse'
-  500:
-    description: 'Internal error processing the chat'
+          type: object
+          properties:
+            message:
+              type: object
+              properties:
+                role:
+                  type: string
+                content:
+                  type: string
+            finish_reason:
+              type: string
+  400:
+    description: 'Bad request - missing required fields'
     content:
       application/json:
         schema:
           $ref: '#/components/schemas/ErrorResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

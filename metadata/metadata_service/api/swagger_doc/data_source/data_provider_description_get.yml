@@ -1,0 +1,30 @@
+Get Data Provider description
+Retrieves the description for a specific data provider
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'data_source'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: id
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'URI of the data provider'
+    example: 'data_provider://CMDRVL'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    $ref: '#/components/responses/ResourceDescriptionResponse'
+  404:
+    description: 'Data provider not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

@@ -1,0 +1,93 @@
+Semantic Search
+Performs semantic vector search on resources
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'reveal'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: resource
+    in: path
+    type: string
+    schema:
+      type: string
+      enum: ['column']
+    required: true
+    description: 'Type of resource to search'
+    example: 'column'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          column_search_text:
+            type: array
+            description: 'Array of search text strings'
+            items:
+              type: string
+            example: ['customer email', 'user identifier']
+          search_filters:
+            type: array
+            description: 'Optional filters to apply to search'
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 'Filter field name'
+                values:
+                  type: array
+                  items:
+                    type: string
+                  description: 'Filter values'
+                operation:
+                  type: string
+                  description: 'Filter operation'
+        required:
+          - column_search_text
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    description: 'Search results'
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              search_text:
+                type: string
+              hits:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    score:
+                      type: number
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    data_type:
+                      type: string
+                    description:
+                      type: string
+                    table_key:
+                      type: string
+                    table_name:
+                      type: string
+                    table_description:
+                      type: string
+  400:
+    description: 'Bad request - missing required fields'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

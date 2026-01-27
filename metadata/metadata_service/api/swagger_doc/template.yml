@@ -112,6 +112,21 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/FilePut'
+          example:
+            name: "customer_data.csv"
+            type: "csv"
+            path: "/data/exports/customer_data.csv"
+            description: "Customer export file"
+            is_directory: false
+            data_location:
+              key: "filesystem://data_exports"
+              name: "data_exports"
+              type: "filesystem"
+            data_provider:
+              key: "data_provider://Internal_ETL"
+              name: "Internal ETL"
+              website: "https://example.com"
+            published_tag: "api"
     LineagePutRequest:
       required: true
       content:
@@ -535,13 +550,16 @@ components:
         is_directory:
           type: boolean
           example: false
-        dashboard_location:
-          "oneOf": [
-                { "$ref": "#/components/schemas/DataLocationFields" },
-                { "$ref": "#/components/schemas/AwsS3DataLocationFields" },
-                { "$ref": "#/components/schemas/FilesystemDataLocationFields" }
-            ]
-        dashboard_provider:
+        data_location:
+          oneOf:
+            - $ref: '#/components/schemas/DataLocationFields'
+            - $ref: '#/components/schemas/AwsS3DataLocationFields'
+            - $ref: '#/components/schemas/FilesystemDataLocationFields'
+          example:
+            key: "filesystem://networkfilesystem"
+            name: "NetworkFilesystem"
+            type: "filesystem"
+        data_provider:
           $ref: '#/components/schemas/DataProviderFields'
         tags:
           type: array
@@ -892,10 +910,21 @@ components:
         functions:
           type: array
           description: 'The list of LLM function calls'
-          $ref: '#/components/schemas/ChatFunctionCall'
+          items:
+            $ref: '#/components/schemas/ChatFunctionCall'
         function_call:
           type: object
           description: 'The function to call'
+          additionalProperties: true
+    ChatFunctionCall:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 'The name of the function to call'
+        arguments:
+          type: object
+          description: 'The arguments to pass to the function'
           additionalProperties: true
     ColumnFields:
       type: object

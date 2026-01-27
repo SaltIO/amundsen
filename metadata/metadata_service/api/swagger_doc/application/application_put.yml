@@ -1,0 +1,45 @@
+Create or update an Application
+Creates a new application or updates an existing one
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'application'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          application:
+            $ref: '#/components/schemas/ApplicationFields'
+          published_tag:
+            type: string
+            description: 'A meaningful tag to describe the publishing mechanism'
+            example: 'api'
+        required:
+          - application
+responses:
+  400:
+    $ref: '#/components/responses/ValidationErrorResponse'
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  403:
+    $ref: '#/components/responses/ReadOnlyModeResponse'
+  200:
+    description: 'Application updated'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/KeyStatus'
+  201:
+    description: 'Application created'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/KeyStatus'
+  500:
+    $ref: '#/components/responses/InternalServerErrorResponse'

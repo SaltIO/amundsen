@@ -1,0 +1,36 @@
+Remove owner from File
+Removes an owner association from a file
+---
+security:
+  - BearerAuth: []
+tags:
+  - 'data_source'
+parameters:
+  - $ref: '#/components/parameters/AuthorizationHeaderParameter'
+  - name: file_uri
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'URI of the file'
+    example: 'filesystem://text/file.txt'
+  - name: owner
+    in: path
+    type: string
+    schema:
+      type: string
+    required: true
+    description: 'Email or ID of the owner to remove'
+    example: 'owner@example.com'
+responses:
+  401:
+    $ref: '#/components/responses/AuthTokenInvalidResponse'
+  200:
+    $ref: '#/components/responses/EmptyResponse'
+  404:
+    description: 'File or owner not found'
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
