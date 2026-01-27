@@ -5838,8 +5838,7 @@ class Neo4jProxy(BaseProxy):
             OPTIONAL MATCH (file)-[:OWNER]->(owner:User)
             WITH file, file_desc, data_provider, data_channel, data_location,
                 collect(distinct tag) as tags,
-                collect(distinct owner) as owners,
-                collect(distinct file_table) as file_tables
+                collect(distinct owner) as owners
             RETURN file, file_desc, data_location, data_channel, data_provider, tags, owners, file_tables;
         """)
         return file_query
