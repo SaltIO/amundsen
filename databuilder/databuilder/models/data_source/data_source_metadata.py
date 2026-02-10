@@ -272,10 +272,13 @@ class FilesystemDataLocation(DataLocation):
         return attrs
 
     def get_key(self) -> str:
-        return FilesystemDataLocation.DATA_LOCATION_NODE_KEY.format(
-            name=self.name,
-            type=self.type,
-            drive=self.drive)
+        if not self.drive:
+            return super().get_key()
+        else:
+            return FilesystemDataLocation.DATA_LOCATION_NODE_KEY.format(
+                name=self.name,
+                type=self.type,
+                drive=self.drive)
 
     def get_root(self) -> str:
         return self.drive
@@ -304,7 +307,10 @@ class AwsS3DataLocation(DataLocation):
         return attrs
 
     def get_key(self) -> str:
-        return AwsS3DataLocation.DATA_LOCATION_NODE_KEY.format(
+        if not self.bucket:
+            return super().get_key()
+        else:
+            return AwsS3DataLocation.DATA_LOCATION_NODE_KEY.format(
             name=self.name,
             type=self.type,
             bucket=self.bucket)
@@ -335,10 +341,13 @@ class SharepointDataLocation(DataLocation):
         return attrs
 
     def get_key(self) -> str:
-        return SharepointDataLocation.DATA_LOCATION_NODE_KEY.format(
+        if not self.document_library:
+            return super().get_key()
+        else:
+            return SharepointDataLocation.DATA_LOCATION_NODE_KEY.format(
             name=self.name,
             type=self.type,
-            document_library=self.bucket)
+            document_library=self.document_library)
 
     def get_root(self) -> str:
         return self.document_library
