@@ -6,6 +6,7 @@ from typing import Optional, List
 from amundsen_common.models.badge import Badge
 
 import attr
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -17,6 +18,7 @@ class LineageBaseItemSchema(AttrsSchema):
     class Meta:
         target = LineageBaseItem
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class LineageItem(LineageBaseItem):
@@ -34,6 +36,7 @@ class LineageItemSchema(AttrsSchema):
     class Meta:
         target = LineageItem
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -47,6 +50,7 @@ class LineageBaseSchema(AttrsSchema):
     class Meta:
         target = LineageBase
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class Lineage(LineageBase):
@@ -62,3 +66,4 @@ class LineageSchema(AttrsSchema):
     class Meta:
         target = Lineage
         register_as_scheme = True
+        unknown = EXCLUDE

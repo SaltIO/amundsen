@@ -18,3 +18,4 @@ class KeyStatusSchema(AttrsSchema):
     class Meta:
         target = KeyStatus
         register_as_scheme = True
+        unknown = EXCLUDE

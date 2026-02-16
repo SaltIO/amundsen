@@ -8,6 +8,7 @@ import attr
 from amundsen_common.models.user import User
 from amundsen_common.models.badge import Badge
 from amundsen_common.models.tag import Tag
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -21,6 +22,7 @@ class ReaderSchema(AttrsSchema):
     class Meta:
         target = Reader
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -35,6 +37,7 @@ class WatermarkSchema(AttrsSchema):
     class Meta:
         target = Watermark
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -50,6 +53,7 @@ class StatSchema(AttrsSchema):
     class Meta:
         target = Stat
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -68,6 +72,7 @@ class TypeMetadataSchema(AttrsSchema):
     class Meta:
         target = TypeMetadata
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ProgrammaticDescription:
@@ -79,6 +84,7 @@ class ProgrammaticDescriptionSchema(AttrsSchema):
     class Meta:
         target = ProgrammaticDescription
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -98,6 +104,7 @@ class ColumnSchema(AttrsSchema):
     class Meta:
         target = Column
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -113,6 +120,7 @@ class ApplicationSchema(AttrsSchema):
     class Meta:
         target = Application
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -125,6 +133,7 @@ class SourceSchema(AttrsSchema):
     class Meta:
         target = Source
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -137,6 +146,7 @@ class ResourceReportSchema(AttrsSchema):
     class Meta:
         target = ResourceReport
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 # this is a temporary hack to satisfy mypy. Once https://github.com/python/mypy/issues/6136 is resolved, use
@@ -159,6 +169,7 @@ class TableSummarySchema(AttrsSchema):
     class Meta:
         target = TableSummary
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -174,6 +185,7 @@ class SqlJoinSchema(AttrsSchema):
     class Meta:
         target = SqlJoin
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -185,6 +197,7 @@ class SqlWhereSchema(AttrsSchema):
     class Meta:
         target = SqlWhere
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -216,3 +229,4 @@ class TableSchema(AttrsSchema):
     class Meta:
         target = Table
         register_as_scheme = True
+        unknown = EXCLUDE

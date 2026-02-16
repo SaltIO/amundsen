@@ -1,5 +1,6 @@
 
 from typing import Any, Dict, Optional, List, Union
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 import attr
 from amundsen_common.models.util import UnionSchemaField
@@ -13,6 +14,7 @@ class ChatMessageSchema(AttrsSchema):
     class Meta:
         target = ChatMessage
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ChatFunction:
@@ -24,6 +26,7 @@ class ChatFunctionSchema(AttrsSchema):
     class Meta:
         target = ChatFunction
         register_as_scheme = True
+        unknown = EXCLUDE
 
     function_call = UnionSchemaField([str, dict])
 
@@ -39,6 +42,7 @@ class ChatRequestSchema(AttrsSchema):
     class Meta:
         target = ChatRequest
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ChatResponse:
@@ -51,6 +55,7 @@ class ChatResponseSchema(AttrsSchema):
     class Meta:
         target = ChatResponse
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ColumnSearchHit:
@@ -67,6 +72,7 @@ class ColumnSearchHitSchema(AttrsSchema):
     class Meta:
         target = ColumnSearchHit
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class ColumnSearchResponse:
@@ -77,3 +83,4 @@ class ColumnSearchResponseSchema(AttrsSchema):
     class Meta:
         target = ColumnSearchResponse
         register_as_scheme = True
+        unknown = EXCLUDE

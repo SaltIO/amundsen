@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Dict
 
 import attr
 
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -17,6 +18,7 @@ class HighlightOptionsSchema(AttrsSchema):
     class Meta:
         target = HighlightOptions
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -30,6 +32,7 @@ class FilterSchema(AttrsSchema):
     class Meta:
         target = Filter
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -47,6 +50,7 @@ class SearchRequestSchema(AttrsSchema):
     class Meta:
         target = SearchRequest
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -62,6 +66,7 @@ class SearchResponseSchema(AttrsSchema):
     class Meta:
         target = SearchResponse
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class KnnSearchRequest:
@@ -74,6 +79,7 @@ class KnnSearchRequestSchema(AttrsSchema):
     class Meta:
         target = KnnSearchRequest
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -85,6 +91,7 @@ class KnnSearchHitSchema(AttrsSchema):
     class Meta:
         target = KnnSearchHit
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class KnnSearchResponse:
@@ -97,6 +104,7 @@ class KnnSearchResponseSchema(AttrsSchema):
     class Meta:
         target = KnnSearchResponse
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -114,6 +122,7 @@ class HybridSearchRequestSchema(AttrsSchema):
     class Meta:
         target = HybridSearchRequest
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -127,6 +136,7 @@ class HybridSearchHitSchema(AttrsSchema):
     class Meta:
         target = HybridSearchHit
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -142,6 +152,7 @@ class HybridSearchResponseSchema(AttrsSchema):
     class Meta:
         target = HybridSearchResponse
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -157,3 +168,4 @@ class UpdateDocumentRequestSchema(AttrsSchema):
     class Meta:
         target = UpdateDocumentRequest
         register_as_scheme = True
+        unknown = EXCLUDE

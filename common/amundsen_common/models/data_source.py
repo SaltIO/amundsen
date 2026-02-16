@@ -12,8 +12,7 @@ from amundsen_common.models.badge import Badge
 from amundsen_common.models.tag import Tag
 
 from marshmallow3_annotations.ext.attrs import AttrsSchema
-from marshmallow import fields
-import marshmallow
+from marshmallow import EXCLUDE, fields
 
 
 
@@ -47,6 +46,7 @@ class DataLocationSchema(AttrsSchema):
     class Meta:
         target = DataLocation
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -63,6 +63,7 @@ class FilesystemDataLocationSchema(AttrsSchema):
     class Meta:
         target = FilesystemDataLocation
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -78,6 +79,7 @@ class AwsS3DataLocationSchema(AttrsSchema):
     class Meta:
         target = AwsS3DataLocation
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class SharePointDataLocation(DataLocation):
@@ -92,6 +94,7 @@ class SharePointDataLocationSchema(AttrsSchema):
     class Meta:
         target = SharePointDataLocation
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DataChannel:
@@ -131,6 +134,7 @@ class DataChannelSchema(AttrsSchema):
     class Meta:
         target = DataChannel
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DataProvider:
@@ -146,6 +150,7 @@ class DataProviderSchema(AttrsSchema):
     class Meta:
         target = DataProvider
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class File:
@@ -194,6 +199,7 @@ class FileSchema(AttrsSchema):
     class Meta:
         target = File
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 # this is a temporary hack to satisfy mypy. Once https://github.com/python/mypy/issues/6136 is resolved, use

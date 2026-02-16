@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import attr
 
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -18,3 +19,4 @@ class AuthTokenSchema(AttrsSchema):
     class Meta:
         target = AuthToken
         register_as_scheme = True
+        unknown = EXCLUDE

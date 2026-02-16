@@ -1,6 +1,6 @@
 
 from typing import Any, Dict, Optional, List, Union
-from marshmallow import ValidationError, validates_schema
+from marshmallow import EXCLUDE, ValidationError, validates_schema
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 import attr
 from amundsen_common.models.util import UnionSchemaField
@@ -17,6 +17,7 @@ class CustomMetadataNodeSchema(AttrsSchema):
     class Meta:
         target = CustomMetadataNode
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class CustomMetadataNodeKey:
@@ -27,6 +28,7 @@ class CustomMetadataNodeKeySchema(AttrsSchema):
     class Meta:
         target = CustomMetadataNodeKey
         register_as_scheme = True
+        unknown = EXCLUDE
 
 # For Union support
 CustomMetadataNodeKey.__marshmallow_schema__ = CustomMetadataNodeKeySchema
@@ -41,6 +43,7 @@ class DefaultMetadataNodeKeySchema(AttrsSchema):
     class Meta:
         target = DefaultMetadataNodeKey
         register_as_scheme = True
+        unknown = EXCLUDE
 
 # For Union support
 DefaultMetadataNodeKey.__marshmallow_schema__ = DefaultMetadataNodeKeySchema
@@ -57,6 +60,7 @@ class CustomMetadataRelationshipSchema(AttrsSchema):
     class Meta:
         target = CustomMetadataRelationship
         register_as_scheme = True
+        unknown = EXCLUDE
 
     start_node = UnionSchemaField([CustomMetadataNodeKey, DefaultMetadataNodeKey])
     end_node = UnionSchemaField([CustomMetadataNodeKey, DefaultMetadataNodeKey])
@@ -75,4 +79,5 @@ class CustomMetadataSchema(AttrsSchema):
     class Meta:
         target = CustomMetadata
         register_as_scheme = True
+        unknown = EXCLUDE
 

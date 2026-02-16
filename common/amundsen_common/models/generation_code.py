@@ -5,6 +5,7 @@ from typing import Optional
 
 import attr
 
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -19,3 +20,4 @@ class GenerationCodeSchema(AttrsSchema):
     class Meta:
         target = GenerationCode
         register_as_scheme = True
+        unknown = EXCLUDE

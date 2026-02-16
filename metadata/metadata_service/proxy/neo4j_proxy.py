@@ -198,6 +198,15 @@ class Neo4jProxy(BaseProxy):
         self._transaction_size = 500
         self._progress_report_frequency = 500
 
+    def close(self) -> None:
+        """Close the Neo4j driver. Call on worker shutdown to avoid Driver.__del__ errors during interpreter teardown (e.g. gunicorn --reload)."""
+        if getattr(self, '_driver', None) is not None:
+            try:
+                self._driver.close()
+            except Exception:  # pragma: no cover - best-effort during shutdown
+                pass
+            self._driver = None
+
     def get_database_name(self):
         if self._database_name is None or self._database_name == '':
             self._database_name = None
@@ -437,7 +446,6 @@ class Neo4jProxy(BaseProxy):
         // Delete column-level resources first
         OPTIONAL MATCH (t)-[:COLUMN]->(col:Column)
         OPTIONAL MATCH (col)-[col_desc_rel:DESCRIPTION]->(col_desc:Description)
-        OPTIONAL MATCH (col_desc)-[col_desc_of_rel:DESCRIPTION_OF]->(col)
         OPTIONAL MATCH (col)-[col_stat_rel:STAT]->(col_stat:Stat)
         OPTIONAL MATCH (col_stat)-[col_stat_of_rel:STAT_OF]->(col)
         OPTIONAL MATCH (col)-[col_badge_rel:HAS_BADGE]->(col_badge:Badge)
@@ -450,10 +458,10 @@ class Neo4jProxy(BaseProxy):
 
         // Delete column relationships
         WITH t, col, col_desc, col_stat, col_badge, col_prog_desc, col_tm, col_tm_child, col_tm_desc, col_tm_badge,
-            col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel,
+            col_desc_rel, col_stat_rel, col_stat_of_rel,
             col_badge_rel, col_badge_for_rel, col_prog_desc_rel,
             col_tm_rel, col_tm_subtype_rel, col_tm_desc_rel, col_tm_badge_rel
-        DELETE col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel,
+        DELETE col_desc_rel, col_stat_rel, col_stat_of_rel,
             col_badge_rel, col_badge_for_rel, col_prog_desc_rel,
             col_tm_rel, col_tm_subtype_rel, col_tm_desc_rel, col_tm_badge_rel
 
@@ -504,7 +512,6 @@ class Neo4jProxy(BaseProxy):
         // Delete table-level resources
         WITH t
         OPTIONAL MATCH (t)-[tbl_desc_rel:DESCRIPTION]->(tbl_desc:Description)
-        OPTIONAL MATCH (tbl_desc)-[tbl_desc_of_rel:DESCRIPTION_OF]->(t)
         OPTIONAL MATCH (t)-[tbl_stat_rel:STAT]->(tbl_stat:Stat)
         OPTIONAL MATCH (tbl_stat)-[tbl_stat_of_rel:STAT_OF]->(t)
         OPTIONAL MATCH (t)-[tbl_tag_rel:TAGGED_BY]->(tbl_tag:Tag)
@@ -523,12 +530,12 @@ class Neo4jProxy(BaseProxy):
 
         // Delete table relationships
         WITH t, tbl_desc, tbl_stat, tbl_tag, tbl_badge, tbl_owner, tbl_wmk, tbl_uf, tbl_src, tbl_prog_desc, tbl_timestamp, tbl_report,
-            tbl_desc_rel, tbl_desc_of_rel, tbl_stat_rel, tbl_stat_of_rel,
+            tbl_desc_rel, tbl_stat_rel, tbl_stat_of_rel,
             tbl_tag_rel, tbl_tag_tag_rel, tbl_badge_rel, tbl_badge_for_rel,
             tbl_owner_rel, tbl_owner_of_rel, tbl_wmk_rel,
             tbl_uf_rel, tbl_uf_of_rel, tbl_src_rel, tbl_prog_desc_rel,
             tbl_last_updated_rel, tbl_report_rel
-        DELETE tbl_desc_rel, tbl_desc_of_rel, tbl_stat_rel, tbl_stat_of_rel,
+        DELETE tbl_desc_rel, tbl_stat_rel, tbl_stat_of_rel,
             tbl_tag_rel, tbl_tag_tag_rel, tbl_badge_rel, tbl_badge_for_rel,
             tbl_owner_rel, tbl_owner_of_rel, tbl_wmk_rel,
             tbl_uf_rel, tbl_uf_of_rel, tbl_src_rel, tbl_prog_desc_rel,
@@ -2418,9 +2425,6 @@ class Neo4jProxy(BaseProxy):
         MERGE (n2)-[r1:DESCRIPTION]->(n1)
         SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
         SET r1.published_tag = $published_tag
-        MERGE (n1)-[r2:DESCRIPTION_OF]->(n2)
-        SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
-        SET r2.published_tag = $published_tag
         RETURN n1.key, n2.key
         """.format(node_label=resource_type.name))
 
@@ -2478,9 +2482,8 @@ class Neo4jProxy(BaseProxy):
         delete_desc_relation_query = textwrap.dedent("""
         MATCH (n2:{node_label} {{key: $key}})
         OPTIONAL MATCH (n2)-[r1:DESCRIPTION]->(n1:Description {{key: $desc_key}})
-        OPTIONAL MATCH (n1)-[r2:DESCRIPTION_OF]->(n2)
-        WITH n1, n2, r1, r2
-        DELETE r1, r2
+        WITH n1, n2, r1
+        DELETE r1
         WITH n1
         WHERE n1 IS NOT NULL
         // Delete description node if it has no other relationships (orphan cleanup)
@@ -2951,9 +2954,6 @@ class Neo4jProxy(BaseProxy):
             MERGE (n2)-[r1:DESCRIPTION]->(n1)
             SET r1.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
             SET r1.published_tag = $published_tag
-            MERGE (n1)-[r2:DESCRIPTION_OF]->(n2)
-            SET r2.publisher_last_updated_epoch_ms = $publisher_last_updated_epoch_ms
-            SET r2.published_tag = $published_tag
             RETURN n1.key, n2.key
             """)
 
@@ -3026,7 +3026,6 @@ class Neo4jProxy(BaseProxy):
 
         // Delete column description relationships
         OPTIONAL MATCH (col)-[col_desc_rel:DESCRIPTION]->(col_desc:Description)
-        OPTIONAL MATCH (col_desc)-[col_desc_of_rel:DESCRIPTION_OF]->(col)
 
         // Delete column stat relationships
         OPTIONAL MATCH (col)-[col_stat_rel:STAT]->(col_stat:Stat)
@@ -3037,8 +3036,8 @@ class Neo4jProxy(BaseProxy):
 
         // Delete column relationships
         WITH t, col, col_desc, col_stat, col_prog_desc,
-            col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel, col_prog_desc_rel
-        DELETE col_desc_rel, col_desc_of_rel, col_stat_rel, col_stat_of_rel, col_prog_desc_rel
+            col_desc_rel, col_stat_rel, col_stat_of_rel, col_prog_desc_rel
+        DELETE col_desc_rel, col_stat_rel, col_stat_of_rel, col_prog_desc_rel
 
         // Delete column description nodes (orphan cleanup)
         WITH t, col, col_desc, col_stat, col_prog_desc

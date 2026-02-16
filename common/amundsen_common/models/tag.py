@@ -3,6 +3,7 @@
 
 import attr
 
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -16,3 +17,4 @@ class TagSchema(AttrsSchema):
     class Meta:
         target = Tag
         register_as_scheme = True
+        unknown = EXCLUDE

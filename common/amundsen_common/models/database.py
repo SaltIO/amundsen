@@ -2,6 +2,7 @@ from typing import Optional
 
 import attr
 
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -15,4 +16,5 @@ class DatabaseSchema(AttrsSchema):
     class Meta:
         target = Database
         register_as_scheme = True
+        unknown = EXCLUDE
 

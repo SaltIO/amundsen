@@ -9,6 +9,7 @@ from amundsen_common.models.user import User
 from amundsen_common.models.badge import Badge
 from amundsen_common.models.tag import Tag
 from amundsen_common.models.table import ProgrammaticDescription
+from marshmallow import EXCLUDE
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 
@@ -22,6 +23,7 @@ class ColumnItemSchema(AttrsSchema):
     class Meta:
         target = ColumnItem
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -36,6 +38,7 @@ class DataSampleSchema(AttrsSchema):
     class Meta:
         target = DataSample
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -49,6 +52,7 @@ class FeatureWatermarkSchema(AttrsSchema):
     class Meta:
         target = FeatureWatermark
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -75,6 +79,7 @@ class FeatureSchema(AttrsSchema):
     class Meta:
         target = Feature
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -93,3 +98,4 @@ class FeatureSummarySchema(AttrsSchema):
     class Meta:
         target = FeatureSummary
         register_as_scheme = True
+        unknown = EXCLUDE

@@ -1,6 +1,7 @@
 # Copyright Contributors to the Amundsen project.
 # SPDX-License-Identifier: Apache-2.0
 
+import atexit
 from threading import Lock
 
 from flask import current_app
@@ -11,6 +12,17 @@ from metadata_service.proxy.base_proxy import BaseProxy
 
 _proxy_client = None
 _proxy_client_lock = Lock()
+
+
+def _close_proxy_on_exit() -> None:
+    """Close the Neo4j driver before interpreter teardown to avoid Driver.__del__ AttributeError when gunicorn --reload exits workers."""
+    global _proxy_client
+    if _proxy_client is not None and callable(getattr(_proxy_client, 'close', None)):
+        try:
+            _proxy_client.close()
+        except Exception:  # pragma: no cover
+            pass
+        _proxy_client = None
 
 
 def get_proxy_client() -> BaseProxy:
@@ -47,5 +59,6 @@ def get_proxy_client() -> BaseProxy:
                                    validate_ssl=validate_ssl,
                                    database_name=database_name,
                                    client_kwargs=client_kwargs)
+            atexit.register(_close_proxy_on_exit)
 
     return _proxy_client

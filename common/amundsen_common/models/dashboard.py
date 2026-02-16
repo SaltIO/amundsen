@@ -3,7 +3,7 @@
 
 from typing import List, Literal, Optional
 import attr
-from marshmallow import pre_load
+from marshmallow import EXCLUDE, pre_load
 from marshmallow3_annotations.ext.attrs import AttrsSchema
 
 from amundsen_common.models.user import User
@@ -30,6 +30,7 @@ class DashboardSummarySchema(AttrsSchema):
     class Meta:
         target = DashboardSummary
         register_as_scheme = True
+        unknown = EXCLUDE
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -45,6 +46,7 @@ class DashboardGroupSchema(AttrsSchema):
     class Meta:
         target = DashboardGroup
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardChart:
@@ -62,6 +64,7 @@ class DashboardChartSchema(AttrsSchema):
     class Meta:
         target = DashboardChart
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardQueryExecution:
@@ -79,6 +82,7 @@ class DashboardQueryExecutionSchema(AttrsSchema):
     class Meta:
         target = DashboardQueryExecution
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class DashboardQuery:
@@ -97,6 +101,7 @@ class DashboardQuerySchema(AttrsSchema):
     class Meta:
         target = DashboardQuery
         register_as_scheme = True
+        unknown = EXCLUDE
 
     @pre_load
     def inject_key_context(self, data, **kwargs):
@@ -138,6 +143,7 @@ class DashboardLastModifiedTimestampSchema(AttrsSchema):
     class Meta:
         target = DashboardLastModifiedTimestamp
         register_as_scheme = True
+        unknown = EXCLUDE
 
 @attr.s(auto_attribs=True, kw_only=True)
 class Dashboard:
@@ -159,6 +165,7 @@ class DashboardSchema(AttrsSchema):
     class Meta:
         target = Dashboard
         register_as_scheme = True
+        unknown = EXCLUDE
 
     @pre_load
     def inject_key_context(self, data, **kwargs):
