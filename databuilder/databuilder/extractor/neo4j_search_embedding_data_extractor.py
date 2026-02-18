@@ -21,8 +21,7 @@ class Neo4jSearchEmbeddingDataExtractor(Neo4jSearchDataExtractor):
 
     DEFAULT_NEO4J_TABLE_EMBEDDING_CYPHER_QUERY = textwrap.dedent(
         """
-        MATCH (db:Database)<-[:CLUSTER_OF]-(cluster:Cluster)
-        <-[:SCHEMA_OF]-(schema:Schema)<-[:TABLE_OF]-(table:Table)
+        MATCH (db:Database)-[:CLUSTER]->(cluster:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)
         {publish_tag_filter}
         OPTIONAL MATCH (table)-[:DESCRIPTION]->(table_description:Description)
         OPTIONAL MATCH (table)-[:DESCRIPTION]->(prog_descs:Programmatic_Description)
@@ -51,7 +50,7 @@ class Neo4jSearchEmbeddingDataExtractor(Neo4jSearchDataExtractor):
 
     DEFAULT_NEO4J_COLUMN_EMBEDDING_CYPHER_QUERY = textwrap.dedent(
         """
-        MATCH (db:Database)<-[:CLUSTER_OF]-(cluster:Cluster)<-[:SCHEMA_OF]-(schema:Schema)<-[:TABLE_OF]-(table:Table)<-[:COLUMN_OF]-(column:Column)
+        MATCH (db:Database)-[:CLUSTER]->(cluster:Cluster)-[:SCHEMA]->(schema:Schema)-[:TABLE]->(table:Table)-[:COLUMN]->(column:Column)
         {publish_tag_filter}
         OPTIONAL MATCH (column)-[:DESCRIPTION]->(column_description:Description)
         OPTIONAL MATCH (column)-[:TAGGED_BY]->(column_tags:Tag) WHERE column_tags.tag_type='default'
